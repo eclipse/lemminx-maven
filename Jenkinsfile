@@ -12,7 +12,7 @@ pipeline{
     stage("Maven Build"){
         steps {
           withMaven {
-            sh './mvnw -B verify --file lemminx-maven/pom.xml'
+            sh './mvnw -B verify --file lemminx-maven/pom.xml -DskipTests'
           }
         }
     }
