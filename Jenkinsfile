@@ -2,6 +2,7 @@ pipeline{
   agent any
   tools {
     jdk 'adoptopenjdk-hotspot-jdk8-latest'
+    maven 'M3'
   }
   environment {
     MAVEN_HOME = "$WORKSPACE/.m2/"
@@ -11,7 +12,7 @@ pipeline{
     stage("Maven Build"){
         steps {
           withMaven {
-            sh './mvnw -B verify --file lemminx-maven/pom.xml'
+            sh 'mvn -B verify --file lemminx-maven/pom.xml'
           }
         }
     }
