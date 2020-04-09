@@ -21,7 +21,7 @@ pipeline{
       }
       steps {
         withMaven {
-          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false'
+          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
         }
       }
     }
