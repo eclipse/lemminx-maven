@@ -15,8 +15,7 @@ pipeline{
           }
         }
     }
-  }
-     stage('Deploy to downloads.eclipse.org') {
+    stage('Deploy to downloads.eclipse.org') {
       when {
         branch 'master'
       }
@@ -31,4 +30,6 @@ pipeline{
         }
       }
     }
+  }
 }
+
