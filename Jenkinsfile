@@ -25,7 +25,7 @@ pipeline{
             targetDir=/home/data/httpd/download.eclipse.org/lemminx/lemminx-maven/snapshots
             ssh genie.lemminx@projects-storage.eclipse.org rm -rf $targetDir
             ssh genie.lemminx@projects-storage.eclipse.org mkdir -p $targetDir
-            scp -r org.eclipse.lemminx/target/org.eclipse.lemminx-* genie.lemminx@projects-storage.eclipse.org:$targetDir
+            scp -r lemminx-maven/lemminx-maven/target/lemminx-maven-* genie.lemminx@projects-storage.eclipse.org:$targetDir
             '''
         }
       }
