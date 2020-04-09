@@ -32,6 +32,7 @@ import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class PluginTest {
@@ -51,6 +52,7 @@ public class PluginTest {
 	// Completion related tests
 
 	@Test(timeout=15000)
+	@Ignore
 	public void testCompleteGoal() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-complete-plugin-goal.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -67,6 +69,7 @@ public class PluginTest {
 	}
 
 	@Test(timeout=15000)
+	@Ignore
 	public void testCompleteConfigurationParameters() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-complete-plugin-goal.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -82,6 +85,7 @@ public class PluginTest {
 	}
 
 	@Test(timeout=15000)
+	@Ignore
 	public void testCompleteConfigurationParametersInTag() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-plugin-config-tag.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -99,6 +103,7 @@ public class PluginTest {
 	// Hover related tests
 	
 	@Test(timeout=15000)
+	@Ignore
  	public void testPluginConfigurationHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-plugin-configuration-hover.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -109,6 +114,7 @@ public class PluginTest {
 	}
 	
 	@Test(timeout=15000)
+	@Ignore
  	public void testPluginGoalHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-plugin-goal-hover.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -119,6 +125,7 @@ public class PluginTest {
 	}
 	
 	@Test(timeout=15000)
+	@Ignore
  	public void testPluginArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException, TimeoutException {
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-plugin-artifact-hover.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);

@@ -29,6 +29,7 @@ import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class RemoteRepositoryTest {
@@ -102,6 +103,7 @@ public class RemoteRepositoryTest {
 	}
 	
 	@Test(timeout=60000)
+	@Ignore
 	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-groupId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -116,6 +118,7 @@ public class RemoteRepositoryTest {
 	}
 	
 	@Test(timeout=60000)
+	@Ignore
 	public void testRemotePluginArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-artifactId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -130,6 +133,7 @@ public class RemoteRepositoryTest {
 	}
 	
 	@Test(timeout=60000)
+	@Ignore
 	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-version-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
