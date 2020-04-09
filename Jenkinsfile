@@ -15,21 +15,15 @@ pipeline{
           }
         }
     }
-    stage('Deploy to downloads.eclipse.org') {
+    stage ('Deploy Maven artifacts') {
       when {
-        branch 'master'
+          branch 'master'
       }
       steps {
-        sshagent ( ['projects-storage.eclipse.org-bot-ssh']) {
-          sh '''
-            targetDir=/home/data/httpd/download.eclipse.org/lemminx/lemminx-maven/snapshots
-            ssh genie.lemminx@projects-storage.eclipse.org rm -rf $targetDir
-            ssh genie.lemminx@projects-storage.eclipse.org mkdir -p $targetDir
-            scp -r lemminx-maven/target/lemminx-maven-* genie.lemminx@projects-storage.eclipse.org:$targetDir
-            '''
+        withMaven {
+          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false'
         }
       }
     }
   }
 }
-
