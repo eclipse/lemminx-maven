@@ -522,9 +522,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						return updatingItem;
 					case "artifactId":
 						if (onlyPlugins) {
-							artifactInfosCollector.addAll(indexSearcher.getPluginArtifactIds(artifactToSearch, index));
+							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
 						} else {
-							artifactInfosCollector.addAll(indexSearcher.getArtifactIds(artifactToSearch, index));
+							artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
 						}
 						return updatingItem;
 					case "version":
@@ -540,11 +540,11 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						return updatingItem;
 					case "dependencies":
 					case "dependency":
-						artifactInfosCollector.addAll(indexSearcher.getArtifactIds(artifactToSearch, index));
+						artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
 						return updatingItem;
 					case "plugins":
 					case "plugin":
-						artifactInfosCollector.addAll(indexSearcher.getPluginArtifactIds(artifactToSearch, index));
+						artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
 						return updatingItem;
 					}
 					return (CompletionItem)null;

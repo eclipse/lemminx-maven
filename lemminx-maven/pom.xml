@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.eclipse.lemminx</groupId>
@@ -84,8 +86,12 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.felix</groupId>
-				<artifactId>maven-bundle-plugin</artifactId>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.22.2</version>
+				<configuration>
+					<test>org.eclipse.lemminx.maven.test.AllTests</test>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
@@ -103,7 +109,7 @@
 		</repository>
 	</repositories>
 
-<distributionManagement>
+	<distributionManagement>
 		<repository>
 			<id>repo.eclipse.org</id>
 			<name>lemminx-releases</name>

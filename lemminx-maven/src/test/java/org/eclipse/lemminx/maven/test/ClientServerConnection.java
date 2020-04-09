@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import org.eclipse.lemminx.XMLServerLauncher;
@@ -72,7 +74,12 @@ public class ClientServerConnection {
 	}
 
 	public void stop() throws InterruptedException, ExecutionException {
-		languageServer.shutdown().get();
+		try {
+			languageServer.shutdown().get(30, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			e.printStackTrace();
+			server.cancel(false);
+		}
 		clientFuture.cancel(true);
 	}
 

@@ -29,9 +29,12 @@ import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class RemoteRepositoryTest {
+
+	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
 	private ClientServerConnection connection;
 
@@ -45,7 +48,7 @@ public class RemoteRepositoryTest {
 		connection.stop();
 	}
 
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemoteGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-groupId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -59,7 +62,7 @@ public class RemoteRepositoryTest {
 		assertTrue(completionContains(items, desiredCompletion));
 	}
 	
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemoteArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-artifactId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -73,7 +76,7 @@ public class RemoteRepositoryTest {
 		assertTrue(completionContains(items, desiredCompletion));
 	}
 	
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemoteVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-version-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -87,8 +90,9 @@ public class RemoteRepositoryTest {
 		assertTrue(completionContains(items, desiredCompletion));
 	}
 
-	@Test(timeout=60000)
+	@Test(timeout=15000)
  	public void testRemoteArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		String description = "A custom implementation of XPath 1.0 based upon apache commons jxpath 1.3";
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-remote-artifact-hover.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
  		connection.languageServer.getTextDocumentService().didOpen(params);
@@ -96,12 +100,11 @@ public class RemoteRepositoryTest {
  		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 6));
  		do {
  	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
- 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains("Updating")));
- 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("Converts between version 3.0.0 and version 4.0.0 models.")));
-
+ 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
+ 		// if got out of the loop without timeout, then test is PASSED
 	}
 	
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-groupId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -115,7 +118,7 @@ public class RemoteRepositoryTest {
 		assertTrue(completionContains(items, desiredCompletion));
 	}
 	
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemotePluginArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-artifactId-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
@@ -129,7 +132,7 @@ public class RemoteRepositoryTest {
 		assertTrue(completionContains(items, desiredCompletion));
 	}
 	
-	@Test(timeout=60000)
+	@Test(timeout=15000)
 	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-version-complete.xml");
 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
