@@ -32,9 +32,13 @@ import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class PluginTest {
+
+	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
 	private ClientServerConnection connection;
 
@@ -129,6 +133,6 @@ public class PluginTest {
  	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
  		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains("Updating")));
 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue()
-				.contains("Provides a maven plugin that supports creating an OSGi bundle")));
+				.contains("Maven Surefire MOJO in maven-surefire-plugin")));
 	}
 }

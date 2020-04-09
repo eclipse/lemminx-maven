@@ -120,19 +120,19 @@ public class MavenHoverParticipant implements IHoverParticipant {
 					if (isPlugin) {
 						// TODO: make a new function that gets only the exact artifact ID match, or just
 						// take the first thing given
-						indexSearcher.getPluginArtifactIds(artifactToSearch, index).stream()
+						indexSearcher.getPluginArtifacts(artifactToSearch, index).stream()
 								.map(ArtifactInfo::getDescription)
 								.filter(Objects::nonNull)
 								.forEach(possibleHovers::add);
 					} else {
-						indexSearcher.getArtifactIds(artifactToSearch, index).stream()
+						indexSearcher.getArtifacts(artifactToSearch, index).stream()
 								.map(ArtifactInfo::getDescription)
 								.filter(Objects::nonNull)
 								.forEach(possibleHovers::add);
 					}
 				}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem));
 
-			}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
+			}).toArray(CompletableFuture<?>[]::new)).get(10, TimeUnit.SECONDS);
 		} catch (InterruptedException | ExecutionException exception) {
 			exception.printStackTrace();
 		} catch (TimeoutException e) {

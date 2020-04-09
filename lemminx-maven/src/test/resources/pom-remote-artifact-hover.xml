@@ -11,9 +11,16 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>org.apache.maven</groupId>
-			<artifactId>maven-model-converter</artifactId>
-			<version></version>
+			<groupId>com.soffid.zkib</groupId>
+			<artifactId>jxpath</artifactId>
 		</dependency>
 	</dependencies>
+	
+	<repositories>
+		<repository>
+			<id>soffid</id>
+			<layout>m2</layout>
+			<url>http://www.soffid.com/maven/</url>
+		</repository>
+	</repositories>
 </project>
