@@ -103,16 +103,16 @@
 		</repository>
 	</repositories>
 
-	<distributionManagement>
-		<snapshotRepository>
-			<id>github</id>
-			<name>GitHub AObuchow </name>
-			<url>https://maven.pkg.github.com/AObuchow/lsp4xml-extensions-maven</url>
-		</snapshotRepository>
+<distributionManagement>
 		<repository>
-			<id>github</id>
-			<name>GitHub AObuchow </name>
-			<url>https://maven.pkg.github.com/AObuchow/lsp4xml-extensions-maven</url>
+			<id>repo.eclipse.org</id>
+			<name>lemminx-releases</name>
+			<url>https://repo.eclipse.org/content/repositories/lemminx-releases/</url>
 		</repository>
+		<snapshotRepository>
+			<id>repo.eclipse.org</id>
+			<name>lemminx-snapshots</name>
+			<url>https://repo.eclipse.org/content/repositories/lemminx-snapshots/</url>
+		</snapshotRepository>
 	</distributionManagement>
 </project>
