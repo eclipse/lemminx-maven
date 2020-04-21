@@ -17,11 +17,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -451,22 +449,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				break;
 			}
 		}
-		Map<String, String> allProps = new HashMap<>();
+
 		MavenProject project = cache.getLastSuccessfulMavenProject(request.getXMLDocument());
-		if (project != null && project.getProperties() != null) {
-			for (Entry<Object, Object> prop : project.getProperties().entrySet()) {
-				allProps.put((String) prop.getKey(), (String) prop.getValue());
-			}
-		}
-		allProps.put("basedir", project == null ? "unknown" : project.getBasedir().toString());
-		allProps.put("project.basedir", project == null ? "unknown" : project.getBasedir().toString());
-		allProps.put("project.version", project == null ? "unknown" : project.getVersion());
-		allProps.put("project.groupId", project == null ? "unknown" : project.getGroupId());
-		allProps.put("project.artifactId", project == null ? "unknown" : project.getArtifactId());
-		allProps.put("project.name", project == null ? "unknown" : project.getName());
-		allProps.put("project.build.directory", project.getBuild() == null ? "unknown" : project.getBuild().getDirectory());
-		allProps.put("project.build.outputDirectory",
-				project.getBuild() == null ? "unknown" : project.getBuild().getOutputDirectory());
+		Map<String, String> allProps = MavenHoverParticipant.getMavenProjectProperties(project);
 
 		final int offset = initialPropertyOffset;
 		return allProps.entrySet().stream().map(property -> {

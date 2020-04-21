@@ -11,4 +11,9 @@
 	<properties>
 		<myProperty>$</myProperty>
 	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.${myProperty}.${project.version}</groupId>
+		</dependency>
+	</dependencies>
 </project>
