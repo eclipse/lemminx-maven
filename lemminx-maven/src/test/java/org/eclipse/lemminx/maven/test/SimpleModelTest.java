@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createTextDocumentItem;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -25,11 +26,14 @@ import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentItem;
+import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -191,6 +195,25 @@ public class SimpleModelTest {
 			assertTrue(items.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
 					.anyMatch("generate-resources</phase>"::equals));
 		}
+	}
+	
+	@Test
+ 	public void testPropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+ 		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-with-properties.xml");
+ 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
+ 		connection.languageServer.getTextDocumentService().didOpen(params);
+ 		Hover hover;
+ 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(15, 20));
+ 	 	hover = connection.languageServer.getTextDocumentService().hover(pos).get();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("$")));
+
+ 		pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(15, 35));
+ 	 	hover = connection.languageServer.getTextDocumentService().hover(pos).get();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("0.0.1-SNAPSHOT")));
+
+ 		pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(15, 13));
+ 	 	hover = connection.languageServer.getTextDocumentService().hover(pos).get();
+ 		assertNull(hover);
 	}
 
 }
