@@ -11,6 +11,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
+import java.io.File;
+
 import org.apache.maven.Maven;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.repository.RepositorySystem;
@@ -42,7 +44,13 @@ import org.eclipse.lsp4j.InitializeParams;
 public class MavenPlugin implements IXMLExtension {
 
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenPlugin.class.getName();
-	
+
+	public static final File LOCAL_REPOSITORY;
+	static {
+		String propValue = System.getProperty("maven.repo.local");
+		LOCAL_REPOSITORY = propValue != null && !propValue.trim().isEmpty() ? new File(System.getProperty("maven.repo.local")) : RepositorySystem.defaultUserLocalRepository;
+	}
+
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
@@ -71,7 +79,7 @@ public class MavenPlugin implements IXMLExtension {
 		} catch (PlexusContainerException e) {
 			e.printStackTrace();
 		}
-		localRepositorySearcher = new LocalRepositorySearcher(RepositorySystem.defaultUserLocalRepository);
+		localRepositorySearcher = new LocalRepositorySearcher(MavenPlugin.LOCAL_REPOSITORY);
 		indexSearcher = new RemoteRepositoryIndexSearcher(container);
 		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
 		try {
