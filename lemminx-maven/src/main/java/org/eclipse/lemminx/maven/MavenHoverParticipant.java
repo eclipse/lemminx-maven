@@ -38,8 +38,6 @@ import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
-import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.MarkupContent;
 
 public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
@@ -72,27 +70,9 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			return null;
 		}
 
-		boolean isPlugin = "plugin".equals(parent.getLocalName())
-				|| (grandParent != null && "plugin".equals(grandParent.getLocalName()));
-		boolean isParentDeclaration = "parent".equals(parent.getLocalName())
-				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
-
 		switch (parent.getLocalName()) {
 		case "configuration":
 			return collectPuginConfiguration(request);
-		case "goals":
-			return collectGoals(request);
-		default:
-			break;
-		}
-
-		switch (tag.getLocalName()) {
-		case "artifactId":
-			if (isParentDeclaration) {
-				return null;
-			} else {
-				return collectArtifactDescription(request, isPlugin);
-			}
 		default:
 			break;
 		}
@@ -147,13 +127,12 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return possibleHovers.iterator().next();
 	}
 
-	private String collectGoals(IPositionRequest request) {
+	private String collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
 		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, pluginManager);
 		if (pluginDescriptor != null ) {
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
-				if (!node.getChild(0).getNodeValue().trim().isEmpty() && node.hasChildNodes()
-						&& node.getChild(0).getNodeValue().equals(mojo.getGoal())) {
+				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
 					return mojo.getDescription();
 				}
 			}			
@@ -172,23 +151,41 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		}
 		return null;
 	}
-	
-	private Hover toHover(String description) {
-		Hover hover = new Hover();
-		hover.setContents(new MarkupContent("plaintext", description));
-		return hover;
-	}
 
 	@Override
 	public String onText(IHoverRequest request) throws Exception {
+		DOMNode tag = request.getNode();
+		DOMElement parent = tag.getParentElement();
+		DOMElement grandParent = parent.getParentElement();
+		
+		boolean isPlugin = "plugin".equals(parent.getLocalName())
+				|| (grandParent != null && "plugin".equals(grandParent.getLocalName()));
+		boolean isParentDeclaration = "parent".equals(parent.getLocalName())
+				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
+		
+		
 		String mavenProperty = getMavenPropertyInHover(request);
 		if (mavenProperty != null) {
 			return collectProperty(request, mavenProperty);
 		}
-
+		
+		switch (parent.getLocalName()) {
+		case "artifactId":
+			if (isParentDeclaration) {
+				return null;
+			} else {
+				return collectArtifactDescription(request, isPlugin);
+			}
+		case "goal":
+			return collectGoal(request);
+		default:
+			break;
+		}
+		
 		return null;
 	}
-	
+
+
 	public String getMavenPropertyInHover(IPositionRequest request) {
 		DOMNode tag = request.getNode();
 		String tagText = tag.getNodeValue();
