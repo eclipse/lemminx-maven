@@ -19,7 +19,7 @@ import org.junit.Test;
 
 public class MavenParseUtilsTest {
 
-	@Test
+	@Test(timeout=15000)
 	public void testAsParentNode() {
 		DOMDocument document = DOMParser.getInstance().parse(new TextDocument("<blah><groupId>aGroupId</groupId><artifactId>anArtifactId</artifactId><version>aVersion</version></blah>", Maven.POMv4), null);
 		assertEquals("anArtifactId", MavenParseUtils.parseArtifact(document.getRoots().get(0)).getArtifactId());

@@ -131,7 +131,7 @@ public class SimpleModelTest {
 		// * if relativePath is not set, complete with remote repo artifacts with "pom" packaging
 	}
 
-	@Test
+	@Test(timeout=15000)
 	public void testMissingArtifactIdError()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-without-artifactId.xml");
@@ -197,7 +197,7 @@ public class SimpleModelTest {
 		}
 	}
 	
-	@Test
+	@Test(timeout=15000)
  	public void testPropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-with-properties.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
