@@ -54,6 +54,7 @@ import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.codehaus.plexus.PlexusContainer;
 import org.eclipse.aether.repository.RemoteRepository;
+import org.eclipse.lemminx.maven.MavenPlugin;
 
 public class RemoteRepositoryIndexSearcher {
 	private static final String PACKAGING_TYPE_JAR = "jar";
@@ -72,7 +73,8 @@ public class RemoteRepositoryIndexSearcher {
 
 	private List<IndexCreator> indexers = new ArrayList<>();
 
-	private File indexPath;
+	// TODO allow a system property to set the index path, so we could pass it the location of m2e index.
+	private static final File INDEX_PATH = new File(MavenPlugin.LOCAL_REPOSITORY.getParentFile(), "_maven_index_");
 
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
 	private Map<IndexingContext, CompletableFuture<IndexingContext>> indexDownloadJobs = new HashMap<>();
@@ -106,9 +108,7 @@ public class RemoteRepositoryIndexSearcher {
 		if (!disableCentralIndex) {
 			knownRepositories.add(CENTRAL_REPO);
 		}
-		File localRepository = new File(RepositorySystem.defaultUserLocalRepository.getAbsolutePath());
-		this.indexPath = new File(localRepository.getParent(), "_maven_index_");
-		indexPath.mkdirs();
+		INDEX_PATH.mkdirs();
 		knownRepositories.stream().map(RemoteRepository::getUrl).map(URI::create).forEach(this::getIndexingContext);
 		// TODO knownRepositories.addAll(readRepositoriesFromSettings());
 	}
@@ -259,8 +259,8 @@ public class RemoteRepositoryIndexSearcher {
 
 	private IndexingContext initializeContext(URI repoUrl) {
 		String fileSystemFriendlyName = repoUrl.getHost() + repoUrl.hashCode();
-		File repoFile = new File(indexPath, fileSystemFriendlyName + "-cache");
-		File repoIndex = new File(indexPath, fileSystemFriendlyName + "-index");
+		File repoFile = new File(INDEX_PATH, fileSystemFriendlyName + "-cache");
+		File repoIndex = new File(INDEX_PATH, fileSystemFriendlyName + "-index");
 		try {
 			return indexer.createIndexingContext(repoUrl.toString(), repoUrl.toString(),
 					repoFile, repoIndex, repoUrl.toString(), null, true, true, indexers);

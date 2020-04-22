@@ -11,7 +11,7 @@ pipeline{
     stage("Maven Build"){
         steps {
           withMaven {
-            sh './mvnw -B verify --file lemminx-maven/pom.xml -DskipTests'
+            sh './mvnw -B verify --file lemminx-maven/pom.xml -DskipTests -Dmaven.repo.local=$WORKSPACE/.m2/repository'
           }
         }
     }
@@ -21,7 +21,7 @@ pipeline{
       }
       steps {
         withMaven {
-          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
+          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false -Dmaven.repo.local=$WORKSPACE/.m2/repository --file lemminx-maven/pom.xml'
         }
       }
     }

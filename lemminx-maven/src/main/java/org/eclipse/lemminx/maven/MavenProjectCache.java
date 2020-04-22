@@ -225,7 +225,7 @@ public class MavenProjectCache {
 		}
 		projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
 		mavenRequest = new DefaultMavenExecutionRequest();
-		mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
+		mavenRequest.setLocalRepositoryPath(MavenPlugin.LOCAL_REPOSITORY);
 		repositorySystem = getPlexusContainer().lookup(RepositorySystem.class);
 		localRepo = repositorySystem.createDefaultLocalRepository();
 		mavenRequest.setLocalRepository(getLocalRepository());
