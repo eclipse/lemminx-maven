@@ -117,7 +117,7 @@ public class PluginTest {
  		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-plugin-goal-hover.xml");
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
  		connection.languageServer.getTextDocumentService().didOpen(params);
- 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(18, 18));
+ 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(18, 22));
  		Hover hover = connection.languageServer.getTextDocumentService().hover(pos).get();
  		assertTrue(((MarkupContent) hover.getContents().getRight()).getValue().contains("determines the duplicate declared dependencies."));
 	}
@@ -128,7 +128,7 @@ public class PluginTest {
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
  		connection.languageServer.getTextDocumentService().didOpen(params);
  		Hover hover;
- 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 6));
+ 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 18));
  		do {
  	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
  		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains("Updating")));
