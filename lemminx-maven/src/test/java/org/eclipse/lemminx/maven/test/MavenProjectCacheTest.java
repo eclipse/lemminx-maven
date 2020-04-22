@@ -23,7 +23,7 @@ import org.junit.Test;
 
 public class MavenProjectCacheTest {
 
-	@Test
+	@Test(timeout=15000)
 	public void testSimpleProjectIsParsed() throws Exception {
 		URI uri = getClass().getResource("/pom-with-properties.xml").toURI();
 		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
