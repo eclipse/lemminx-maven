@@ -2,6 +2,7 @@ pipeline{
   agent any
   tools {
     jdk 'adoptopenjdk-hotspot-jdk8-latest'
+    maven 'apache-maven-latest'
   }
   environment {
     MAVEN_HOME = "$WORKSPACE/.m2/"
@@ -11,9 +12,15 @@ pipeline{
     stage("Maven Build"){
         steps {
           withMaven {
-            sh './mvnw -B verify --file lemminx-maven/pom.xml -DskipTests'
+            sh 'mvn -B verify --file lemminx-maven/pom.xml  -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true -DskipTests'
           }
         }
+        post {
+			always {
+				junit 'lemminx-maven/target/surefire-reports/TEST-*.xml'
+				archiveArtifacts artifacts: 'lemminx-maven/target/*.jar'
+			}
+		}
     }
     stage ('Deploy Maven artifacts') {
       when {
@@ -21,7 +28,7 @@ pipeline{
       }
       steps {
         withMaven {
-          sh './mvnw clean deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
+          sh 'mvn deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
         }
       }
     }

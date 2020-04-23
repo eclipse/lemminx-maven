@@ -67,7 +67,7 @@ public class PluginTest {
 					.get();
 			items = completion.getRight().getItems();
 		} while (items.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
-				.noneMatch("copy-dependencies"::equals));
+				.noneMatch("test"::equals));
 	}
 
 	@Test(timeout=15000)
@@ -82,7 +82,7 @@ public class PluginTest {
 							new Position(23, 7)))
 					.get();
 			items = completion.getRight().getItems();
-		} while (items.stream().map(CompletionItem::getLabel).noneMatch("appendOutput"::equals));
+		} while (items.stream().map(CompletionItem::getLabel).noneMatch("failIfNoTests"::equals));
 	}
 
 	@Test(timeout=15000)
@@ -97,7 +97,7 @@ public class PluginTest {
 							new Position(20, 9)))
 					.get();
 			items = completion.getRight().getItems();
-		} while (items.stream().map(CompletionItem::getLabel).noneMatch("appendOutput"::equals));
+		} while (items.stream().map(CompletionItem::getLabel).noneMatch("failIfNoTests"::equals));
 	}
 	
 	// Hover related tests
@@ -119,7 +119,7 @@ public class PluginTest {
  		connection.languageServer.getTextDocumentService().didOpen(params);
  		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(18, 22));
  		Hover hover = connection.languageServer.getTextDocumentService().hover(pos).get();
- 		assertTrue(((MarkupContent) hover.getContents().getRight()).getValue().contains("determines the duplicate declared dependencies."));
+ 		assertTrue(((MarkupContent) hover.getContents().getRight()).getValue().contains("Run tests using Surefire."));
 	}
 	
 	@Test(timeout=15000)
