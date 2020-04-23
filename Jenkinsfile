@@ -7,7 +7,7 @@ pipeline{
   stages{
     stage("Maven Build"){
         steps {
-            sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true -Dmaven.repo.local=$WORKSPACE/.m2/repository'
+            sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
         }
         post {
 			always {
@@ -22,7 +22,7 @@ pipeline{
       }
       steps {
         withMaven {
-          sh 'mvn deploy -B -DskipTests -Dcbi.jarsigner.skip=false -Dmaven.repo.local=$WORKSPACE/.m2/repository --file lemminx-maven/pom.xml'
+          sh 'mvn deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
         }
       }
     }

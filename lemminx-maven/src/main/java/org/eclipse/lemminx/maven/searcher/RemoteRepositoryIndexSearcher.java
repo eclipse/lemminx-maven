@@ -74,7 +74,11 @@ public class RemoteRepositoryIndexSearcher {
 	private List<IndexCreator> indexers = new ArrayList<>();
 
 	// TODO allow a system property to set the index path, so we could pass it the location of m2e index.
-	private static final File INDEX_PATH = new File(MavenPlugin.LOCAL_REPOSITORY.getParentFile(), "_maven_index_");
+	private static final File INDEX_PATH;
+	static {
+		String property = System.getProperty("lemminx.maven.indexDirectory");
+		INDEX_PATH = property != null && !property.trim().isEmpty() ? new File(property) : new File(MavenPlugin.LOCAL_REPOSITORY.getParentFile(), "_maven_index_");
+	}
 
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
 	private Map<IndexingContext, CompletableFuture<IndexingContext>> indexDownloadJobs = new HashMap<>();
