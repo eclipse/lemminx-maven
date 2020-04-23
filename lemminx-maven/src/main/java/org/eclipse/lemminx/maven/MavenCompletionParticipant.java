@@ -101,6 +101,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	@Override
 	public void onTagOpen(ICompletionRequest request, ICompletionResponse response)
 			throws Exception {
+		if (!MavenPlugin.match(request.getXMLDocument())) {
+			  return;
+		}
+		
 		if ("configuration".equals(request.getParentElement().getLocalName())) {
 			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, pluginManager).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
@@ -110,6 +114,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 	@Override
 	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
+		if (!MavenPlugin.match(request.getXMLDocument())) {
+			  return;
+		}
+		
 		if (request.getXMLDocument().getText().length() < 2) {
 			response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
 		}

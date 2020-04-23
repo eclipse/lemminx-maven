@@ -62,6 +62,10 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	@Override
 	public String onTag(IHoverRequest request) throws Exception {
+		if (!MavenPlugin.match(request.getXMLDocument())) {
+			  return null;
+		}
+		
 		DOMNode tag = request.getNode();
 		DOMElement parent = tag.getParentElement();
 		DOMElement grandParent = parent.getParentElement();
@@ -154,6 +158,10 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	@Override
 	public String onText(IHoverRequest request) throws Exception {
+		if (!MavenPlugin.match(request.getXMLDocument())) {
+			  return null;
+		}
+		
 		DOMNode tag = request.getNode();
 		DOMElement parent = tag.getParentElement();
 		DOMElement grandParent = parent.getParentElement();

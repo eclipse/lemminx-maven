@@ -39,6 +39,10 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	
 	@Override
 	public void findDefinition(IDefinitionRequest request, List<LocationLink> locations, CancelChecker cancelChecker) {
+		if (!MavenPlugin.match(request.getXMLDocument())) {
+			  return;
+		}
+		
 		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
 		DOMElement element = findInterestingElement(request.getNode());
 		if (element.getLocalName().equals("module")) {

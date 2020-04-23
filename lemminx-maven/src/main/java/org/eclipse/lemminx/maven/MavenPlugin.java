@@ -11,6 +11,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
+import java.io.File;
+
 import org.apache.maven.Maven;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.repository.RepositorySystem;
@@ -139,6 +141,8 @@ public class MavenPlugin implements IXMLExtension {
 	}
 
 	public static boolean match(DOMDocument document) {
-		return document.getDocumentURI().endsWith(Maven.POMv4);
+		String uri = document.getDocumentURI();
+		String fileName = uri.substring(uri.lastIndexOf(File.separatorChar) + 1);
+		return (fileName.startsWith("pom") && fileName.endsWith(".xml")) || fileName.endsWith(Maven.POMv4);
 	}
 }
