@@ -97,10 +97,10 @@ public class RemoteRepositoryTest {
  		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
  		connection.languageServer.getTextDocumentService().didOpen(params);
  		Hover hover;
- 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 20));
+ 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 18));
  		do {
  	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
- 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
+ 		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
  		// if got out of the loop without timeout, then test is PASSED
 	}
 	

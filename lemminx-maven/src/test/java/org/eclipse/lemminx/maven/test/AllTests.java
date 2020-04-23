@@ -8,6 +8,7 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven.test;
 
+import org.eclipse.lemminx.maven.MavenPlugin;
 import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
@@ -21,6 +22,7 @@ public class AllTests {
 
 	@BeforeClass
 	public static void skipCentral() {
+		System.err.println("local repo=" + MavenPlugin.LOCAL_REPOSITORY);
 		RemoteRepositoryIndexSearcher.disableCentralIndex = true;
 	};
 }

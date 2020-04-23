@@ -5,9 +5,21 @@ pipeline{
     maven 'apache-maven-latest'
   }
   stages{
+    stage("View Maven infos") {
+		steps {
+			sh 'echo "Effective settings" && mvn -f lemminx-maven/pom.xml help:effective-settings'
+			sh 'echo "Effective pom" && mvn -f lemminx-maven/pom.xml help:effective-pom'
+			sh '''
+				export settings_localRepository=$(mvn -f lemminx-maven/pom.xml help:evaluate -Dexpression=settings.localRepository  -q -DforceStdout)
+				echo "settings.localRepository=${settings_localRepository}"
+				echo "ls surefire..."
+				ls -l ${settings_localRepository}/org/apache/maven/plugins/maven-surefire-plugin/*
+			'''
+		}
+    }
     stage("Maven Build"){
         steps {
-            sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
+            sh 'mvn -X -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
         }
         post {
 			always {
