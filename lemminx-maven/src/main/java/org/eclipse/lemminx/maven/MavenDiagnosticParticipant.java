@@ -38,6 +38,10 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	@Override
 	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics, CancelChecker monitor) {
+		if (!MavenPlugin.match(xmlDocument)) {
+			  return;
+		}
+		
 		projectCache.getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
 		DOMElement documentElement = xmlDocument.getDocumentElement();
 		HashMap<String, Function<DiagnosticRequest, Diagnostic>> tagDiagnostics = configureDiagnosticFunctions(

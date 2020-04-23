@@ -100,8 +100,8 @@ public class RemoteRepositoryTest {
  		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 20));
  		do {
  	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
- 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
- 		// if got out of the loop without timeout, then test is PASSED
+ 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains("Updating")));
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
 	}
 	
 	@Test(timeout=15000)
