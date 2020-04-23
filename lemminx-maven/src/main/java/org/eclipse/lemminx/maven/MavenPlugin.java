@@ -44,6 +44,12 @@ import org.eclipse.lsp4j.InitializeParams;
 public class MavenPlugin implements IXMLExtension {
 
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenPlugin.class.getName();
+
+	public static final File LOCAL_REPOSITORY;
+	static {
+		String property = System.getProperty("maven.repo.local");
+		LOCAL_REPOSITORY = property != null && !property.trim().isEmpty() ? new File(property) : RepositorySystem.defaultUserLocalRepository;
+	}
 	
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
@@ -73,7 +79,7 @@ public class MavenPlugin implements IXMLExtension {
 		} catch (PlexusContainerException e) {
 			e.printStackTrace();
 		}
-		localRepositorySearcher = new LocalRepositorySearcher(RepositorySystem.defaultUserLocalRepository);
+		localRepositorySearcher = new LocalRepositorySearcher(LOCAL_REPOSITORY);
 		indexSearcher = new RemoteRepositoryIndexSearcher(container);
 		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
 		try {

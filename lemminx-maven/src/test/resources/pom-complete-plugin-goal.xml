@@ -12,14 +12,14 @@
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.1.1</version>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.22.2</version> <!-- Need to be same as in lemminx-maven pom so we're sure version in in local repo -->
 				<executions>
 					<execution>
 						<goals><goal></goal></goals>
 					</execution>
 					<execution>
-						<goals><goal>list</goal></goals>
+						<goals><goal>test</goal></goals>
 						<configuration>
 							
 						</configuration>
