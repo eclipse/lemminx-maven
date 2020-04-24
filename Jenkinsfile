@@ -1,27 +1,52 @@
 pipeline{
-  agent any
-  tools {
-    jdk 'adoptopenjdk-hotspot-jdk8-latest'
-    maven 'apache-maven-latest'
+  environment {
+      USER = "jenkins"
+  }
+  agent {
+    kubernetes {
+      label 'my-agent-pod-6'
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: maven
+    image: maven:3.6.3-jdk-11
+    tty: true
+    command:
+    - cat
+    resources:
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+      requests:
+        memory: "4Gi"
+        cpu: "1000m"
+"""
+    }
   }
   stages{
-    stage("View Maven infos") {
+	stage("View Maven infos") {
 		steps {
-			sh 'echo "Effective settings" && mvn -f lemminx-maven/pom.xml help:effective-settings'
-			sh 'echo "Effective pom" && mvn -f lemminx-maven/pom.xml help:effective-pom'
-			sh '''
-				export settings_localRepository=$(mvn -f lemminx-maven/pom.xml help:evaluate -Dexpression=settings.localRepository  -q -DforceStdout)
-				echo "settings.localRepository=${settings_localRepository}"
-				echo "ls surefire..."
-				ls -l ${settings_localRepository}/org/apache/maven/plugins/maven-surefire-plugin/*
-			'''
+			container('maven') {
+				sh 'echo "Effective settings" && mvn -f lemminx-maven/pom.xml help:effective-settings'
+				sh 'echo "Effective pom" && mvn -f lemminx-maven/pom.xml help:effective-pom'
+				sh '''
+					export settings_localRepository=$(mvn -f lemminx-maven/pom.xml help:evaluate -Dexpression=settings.localRepository  -q -DforceStdout)
+					echo "settings.localRepository=${settings_localRepository}"
+					echo "ls surefire..."
+					ls -l ${settings_localRepository}/org/apache/maven/plugins/maven-surefire-plugin/*
+				'''
+			}
 		}
-    }
-    stage("Maven Build"){
-        steps {
-            sh 'mvn -X -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
-        }
-        post {
+	}
+	stage("Maven Build"){
+		steps {
+			container('maven') {
+				sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true -Dmaven.repo.local=$WORKSPACE/.m2/repository'    
+			}
+		}
+		post {
 			always {
 				junit 'lemminx-maven/target/surefire-reports/TEST-*.xml'
 				archiveArtifacts artifacts: 'lemminx-maven/target/*.jar'
@@ -34,7 +59,7 @@ pipeline{
       }
       steps {
         withMaven {
-          sh 'mvn deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml'
+          sh 'mvn deploy -B -DskipTests -Dcbi.jarsigner.skip=false --file lemminx-maven/pom.xml -Dmaven.repo.local=$WORKSPACE/.m2/repository'
         }
       }
     }
