@@ -18,6 +18,7 @@ import javax.annotation.Nonnull;
 
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
+import org.apache.maven.plugin.MavenPluginManager;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -31,9 +32,11 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	private MavenProjectCache projectCache;
+	MavenPluginManager pluginManager;
 
-	public MavenDiagnosticParticipant(MavenProjectCache projectCache) {
+	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager) {
 		this.projectCache = projectCache;
+		this.pluginManager = pluginManager;
 	}
 
 	@Override
@@ -79,24 +82,13 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	private HashMap<String, Function<DiagnosticRequest, Diagnostic>> configureDiagnosticFunctions(
 			DOMDocument xmlDocument) {
-//		SubModuleValidator subModuleValidator= new SubModuleValidator();
-//		try {
-//			subModuleValidator.setPomFile(new File(xmlDocument.getDocumentURI().substring(5)));
-//		} catch (IOException | XmlPullParserException e) {
-//			// TODO: Use plug-in error logger
-//			e.printStackTrace();
-//		}
-		//Function<DiagnosticRequest, Diagnostic> versionFunc = VersionValidator::validateVersion;
-		//Function<DiagnosticRequest, Diagnostic> submoduleExistenceFunc = subModuleValidator::validateSubModuleExistence;
-		// Below is a mock Diagnostic function which creates a warning between inside
-		// <configuration> tags
-		//Function<DiagnosticRequest, Diagnostic> configFunc = diagnosticReq -> new Diagnostic(diagnosticReq.getRange(),
-		//		"Configuration Error", DiagnosticSeverity.Warning, xmlDocument.getDocumentURI(), "XML");
+		PluginValidator pluginValidator = new PluginValidator(projectCache, pluginManager);
+		Function<DiagnosticRequest, Diagnostic> validatePluginConfiguration = pluginValidator::validateConfiguration;
+		Function<DiagnosticRequest, Diagnostic> validatePluginGoal = pluginValidator::validateGoal;
 
 		HashMap<String, Function<DiagnosticRequest, Diagnostic>> tagDiagnostics = new HashMap<>();
-		//tagDiagnostics.put("version", versionFunc);
-		//tagDiagnostics.put("configuration", configFunc);
-		//tagDiagnostics.put("module", submoduleExistenceFunc);
+		tagDiagnostics.put("configuration", validatePluginConfiguration);
+		tagDiagnostics.put("goal", validatePluginGoal);
 		return tagDiagnostics;
 	}
 

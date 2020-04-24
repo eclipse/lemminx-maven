@@ -90,7 +90,7 @@ public class MavenPlugin implements IXMLExtension {
 		}
 		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, mavenPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
-		diagnosticParticipant = new MavenDiagnosticParticipant(cache);
+		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager);
 		registry.registerDiagnosticsParticipant(diagnosticParticipant);
 		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, mavenPluginManager);
 		registry.registerHoverParticipant(hoverParticipant);
