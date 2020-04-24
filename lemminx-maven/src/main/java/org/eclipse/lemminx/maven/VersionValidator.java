@@ -22,7 +22,7 @@ public class VersionValidator {
 
 	public static Diagnostic validateVersion(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
-		DOMDocument xmlDocument = diagnosticRequest.getDOMDocument();
+		DOMDocument xmlDocument = diagnosticRequest.getXMLDocument();
 		Dependency model = MavenParseUtils.parseArtifact(node);
 		Artifact artifact = null;
 		Range range = diagnosticRequest.getRange();

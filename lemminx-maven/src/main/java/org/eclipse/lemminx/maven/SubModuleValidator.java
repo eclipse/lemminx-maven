@@ -34,7 +34,7 @@ public class SubModuleValidator {
 
 	public Diagnostic validateSubModuleExistence(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
-		DOMDocument xmlDocument = diagnosticRequest.getDOMDocument();
+		DOMDocument xmlDocument = diagnosticRequest.getXMLDocument();
 		Diagnostic diagnostic = null;
 		Range range = diagnosticRequest.getRange();
 		String tagContent = null;

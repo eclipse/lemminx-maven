@@ -10,37 +10,42 @@ package org.eclipse.lemminx.maven;
 
 import java.util.List;
 
+import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.dom.LineIndentInfo;
+import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-public class DiagnosticRequest {
+public class DiagnosticRequest implements IPositionRequest {
 	private DOMNode node;
 	private DOMDocument xmlDocument;
 	private List<Diagnostic> diagnostics;
 
 	public DiagnosticRequest(DOMNode node, DOMDocument xmlDocument, List<Diagnostic> diagnostics) {
 		this.setNode(node);
-		this.setDOMDocument(xmlDocument);
+		this.setXMLDocument(xmlDocument);
 		this.setDiagnostics(diagnostics);
 	}
 
-	public DOMDocument getDOMDocument() {
+	public DOMDocument getXMLDocument() {
 		return xmlDocument;
 	}
 
-	public void setDOMDocument(DOMDocument xmlDocument) {
+	private void setXMLDocument(DOMDocument xmlDocument) {
 		this.xmlDocument = xmlDocument;
 	}
 
+	@Override
 	public DOMNode getNode() {
 		return node;
 	}
 
-	public void setNode(DOMNode node) {
+	private void setNode(DOMNode node) {
 		this.node = node;
 	}
 
@@ -48,13 +53,49 @@ public class DiagnosticRequest {
 		return diagnostics;
 	}
 
-	public void setDiagnostics(List<Diagnostic> diagnostics) {
+	private void setDiagnostics(List<Diagnostic> diagnostics) {
 		this.diagnostics = diagnostics;
 	}
 
 	public Range getRange() {
 		return XMLPositionUtility.createRange(((DOMElement) node).getStartTagCloseOffset() + 1,
 				((DOMElement) node).getEndTagOpenOffset(), xmlDocument);
+	}
+
+	@Override
+	public int getOffset() {
+		return 0;
+	}
+
+	@Override
+	public Position getPosition() {
+		return null;
+	}
+
+	@Override
+	public DOMElement getParentElement() {
+		return this.node.getParentElement();
+	}
+
+	@Override
+	public String getCurrentTag() {
+		return this.node.getLocalName();
+	}
+
+	@Override
+	public String getCurrentAttributeName() {
+		return null;
+	}
+
+	@Override
+	public LineIndentInfo getLineIndentInfo() throws BadLocationException {
+		return null;
+	}
+
+	@Override
+	public <T> T getComponent(Class clazz) {
+		// TODO: Not sure how to implement this..
+		return null;
 	}
 
 }
