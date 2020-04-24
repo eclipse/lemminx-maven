@@ -1,6 +1,8 @@
 pipeline{
   environment {
       USER = "jenkins"
+      MAVEN_HOME = "$WORKSPACE/.m2/"
+      MAVEN_USER_HOME = "$MAVEN_HOME"
   }
   agent {
     kubernetes {
@@ -29,10 +31,10 @@ spec:
 	stage("View Maven infos") {
 		steps {
 			container('maven') {
-				sh 'echo "Effective settings" && mvn -f lemminx-maven/pom.xml help:effective-settings'
-				sh 'echo "Effective pom" && mvn -f lemminx-maven/pom.xml help:effective-pom'
+				sh 'echo "Effective settings" && mvn -f lemminx-maven/pom.xml help:effective-settings -Dmaven.repo.local=$WORKSPACE/.m2/repository'
+				sh 'echo "Effective pom" && mvn -f lemminx-maven/pom.xml help:effective-pom -Dmaven.repo.local=$WORKSPACE/.m2/repository'
 				sh '''
-					export settings_localRepository=$(mvn -f lemminx-maven/pom.xml help:evaluate -Dexpression=settings.localRepository  -q -DforceStdout)
+					export settings_localRepository=$(mvn -f lemminx-maven/pom.xml help:evaluate -Dexpression=settings.localRepository  -q -DforceStdout -Dmaven.repo.local=$WORKSPACE/.m2/repository)
 					echo "settings.localRepository=${settings_localRepository}"
 					echo "ls surefire..."
 					ls -l ${settings_localRepository}/org/apache/maven/plugins/maven-surefire-plugin/*

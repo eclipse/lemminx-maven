@@ -19,7 +19,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
+import org.eclipse.lemminx.maven.MavenPlugin;
+import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
@@ -39,10 +42,17 @@ import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class SimpleModelTest {
 
+	@BeforeClass
+	public static void skipCentral() {
+		System.err.println("local repo=" + MavenPlugin.LOCAL_REPOSITORY);
+		RemoteRepositoryIndexSearcher.disableCentralIndex = true;
+	}
+	
 	private ClientServerConnection connection;
 
 	@Before
@@ -64,7 +74,8 @@ public class SimpleModelTest {
 				.completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()),
 						new Position(12, 10)))
 				.get();
-		assertTrue(completion.getRight().getItems().stream().map(CompletionItem::getLabel).anyMatch("runtime"::equals));
+		assertTrue("Exepected 'runtime', got:\n" + completion.getRight().getItems().stream().map(CompletionItem::getLabel).collect(Collectors.joining("\n* ")),
+				completion.getRight().getItems().stream().map(CompletionItem::getLabel).anyMatch("runtime"::equals));
 	}
 
 

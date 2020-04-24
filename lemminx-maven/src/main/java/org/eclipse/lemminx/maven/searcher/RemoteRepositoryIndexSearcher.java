@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.Query;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
@@ -48,7 +49,6 @@ import org.apache.maven.index.updater.WagonHelper;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.wagon.Wagon;
 import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
@@ -197,14 +197,15 @@ public class RemoteRepositoryIndexSearcher {
 	}
 
 	private Set<String> internalGetGroupIds(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
-		final Query groupIdQ = indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.SCORED);
-		final Query jarPackagingQ = indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT);
-		final BooleanQuery query = new BooleanQuery.Builder().add(groupIdQ, Occur.MUST).add(jarPackagingQ, Occur.MUST)
-				.build();
+		Builder builder = new BooleanQuery.Builder();
+		if (artifactToSearch != null) {
+			builder.add(indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.SCORED), Occur.MUST);
+		}
+		builder.add(indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT), Occur.MUST);
 		List<IndexingContext> contexts = Collections.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0 ?
 				Arrays.asList(requestSpecificContexts) :
 				new LinkedList<>(indexingContexts.values()));
-		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
+		final IteratorSearchRequest request = new IteratorSearchRequest(builder.build(), contexts, null);
 		// TODO: Find the Count sweet spot
 		request.setCount(7500);
 		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getGroupId).collect(Collectors.toSet());		

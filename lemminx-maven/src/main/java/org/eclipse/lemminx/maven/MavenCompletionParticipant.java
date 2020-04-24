@@ -110,6 +110,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 	@Override
 	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
+		System.err.println("Completion Request: " + request.getXMLDocument().getDocumentURI() + '@' + request.getPosition());
 		if (request.getXMLDocument().getText().length() < 2) {
 			response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
 		}
@@ -144,6 +145,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "scope":
 			collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
 					DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
+			System.err.println("Scopes completion items added");
 			break;
 		case "phase":
 			collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
@@ -267,8 +269,11 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				.forEach(response::addCompletionItem);
 		}
 		if (request.getNode().isText() && (allArtifactInfos.isEmpty() || request.getNode().getTextContent().contains("$"))) {
+			System.err.println("Adding properties completion items");
 			completeProperties(request).forEach(response::addCompletionAttribute);
+			System.err.println("Added properties completion items");
 		}
+		System.err.println("Completion complete");
 	}
 
 	private ArtifactInfo toArtifactInfo(Gav gav) {
