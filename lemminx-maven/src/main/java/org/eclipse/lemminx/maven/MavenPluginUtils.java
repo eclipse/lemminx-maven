@@ -24,6 +24,7 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -98,9 +99,11 @@ public class MavenPluginUtils {
 		}
 
 		try {
+			DefaultRepositorySystemSession repositorySystemSession = cache.getRepositorySystemSession();
+			System.err.println("local repo for plugin manager=" + repositorySystemSession.getLocalRepositoryManager().getRepository().getBasedir());
 			return pluginManager.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
 					.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()),
-					cache.getRepositorySystemSession());
+					repositorySystemSession);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			return null;

@@ -82,20 +82,18 @@ public class MavenPlugin implements IXMLExtension {
 		localRepositorySearcher = new LocalRepositorySearcher(LOCAL_REPOSITORY);
 		indexSearcher = new RemoteRepositoryIndexSearcher(container);
 		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
+		MavenPluginManager mavenPluginManager = null;
 		try {
-			completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, container.lookup(MavenPluginManager.class));
+			mavenPluginManager = container.lookup(MavenPluginManager.class);
 		} catch (ComponentLookupException e) {
 			e.printStackTrace();
 		}
+		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, mavenPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
 		diagnosticParticipant = new MavenDiagnosticParticipant(cache);
 		registry.registerDiagnosticsParticipant(diagnosticParticipant);
-		try {
-			hoverParticipant = new MavenHoverParticipant(cache, indexSearcher, (MavenPluginManager) container.lookup(MavenPluginManager.class));
-			registry.registerHoverParticipant(hoverParticipant);
-		} catch (ComponentLookupException e) {
-			e.printStackTrace();
-		}
+		hoverParticipant = new MavenHoverParticipant(cache, indexSearcher, mavenPluginManager);
+		registry.registerHoverParticipant(hoverParticipant);
 		definitionParticipant = new MavenDefinitionParticipant(cache, localRepositorySearcher);
 		registry.registerDefinitionParticipant(definitionParticipant);
 	}
