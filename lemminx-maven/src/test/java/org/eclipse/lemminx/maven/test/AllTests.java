@@ -15,7 +15,7 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@SuiteClasses({ LocalRepoTests.class, MavenParseUtilsTest.class, MavenProjectCacheTest.class, PluginTest.class,
+@SuiteClasses({ LocalRepoTests.class, MavenParseUtilsTest.class, MavenProjectCacheTest.class, LocalPluginTest.class,
 		RemoteRepositoryTest.class, SimpleModelTest.class })
 public class AllTests {
 

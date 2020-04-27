@@ -8,70 +8,48 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven.test;
 
-import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createTextDocumentItem;
+import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
+import org.eclipse.lemminx.services.XMLLanguageService;
+import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionList;
-import org.eclipse.lsp4j.CompletionParams;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentItem;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class LocalRepoTests {
 
-	private ClientServerConnection connection;
+
+	private XMLLanguageService languageService;
 
 	@Before
 	public void setUp() throws IOException {
-		connection = new ClientServerConnection();
+		languageService = new XMLLanguageService();
 	}
 
 	@After
 	public void tearDown() throws InterruptedException, ExecutionException {
-		connection.stop();
+		languageService.dispose();
+		languageService = null;
 	}
 
 	@Test(timeout=90000)
 	public void testCompleteDependency()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-with-dependency.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		Either<List<CompletionItem>, CompletionList> completion = connection.languageServer.getTextDocumentService()
-				.completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()),
-						new Position(11, 7)))
-				.get();
-		List<CompletionItem> items = completion.getRight().getItems();
-		Optional<String> mavenCoreCompletionItem = items.stream().map(CompletionItem::getLabel)
-				.filter(label -> label.contains("org.apache.maven:maven-core")).findAny();
-		assertTrue(mavenCoreCompletionItem.isPresent());
+		assertTrue(languageService.doComplete(createDOMDocument("/pom-with-dependency.xml", languageService), new Position(11, 7), new SharedSettings())
+				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("org.apache.maven:maven-core")));
 	}
 
 	@Test(timeout=90000)
 	public void testCompleteLocalGroupdId()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-local-groupId-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		Either<List<CompletionItem>, CompletionList> completion = connection.languageServer.getTextDocumentService()
-				.completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()),
-						new Position(11, 12)))
-				.get();
-		List<CompletionItem> items = completion.getRight().getItems();
-		Optional<String> mavenGroupCompletionItem = items.stream().map(CompletionItem::getLabel)
-				.filter(label -> label.contains("org.apache.maven")).findAny();
-		assertTrue(mavenGroupCompletionItem.isPresent());
+		assertTrue(languageService.doComplete(createDOMDocument("/pom-local-groupId-complete.xml", languageService), new Position(11, 12), new SharedSettings())
+				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("org.apache.maven")));
 	}
 }

@@ -16,6 +16,9 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.lemminx.commons.TextDocument;
+import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.TextDocumentItem;
 
@@ -23,6 +26,10 @@ public interface MavenLemminxTestsUtils {
 	
 	public static TextDocumentItem createTextDocumentItem(String resourcePath) throws IOException, URISyntaxException {
 		return createTextDocumentItem(resourcePath, null);
+	}
+	
+	public static DOMDocument createDOMDocument(String resourcePath, XMLLanguageService languageService) throws IOException, URISyntaxException {
+		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(resourcePath)), languageService.getResolverExtensionManager());
 	}
 
 	public static TextDocumentItem createTextDocumentItem(String resourcePath, Map<String, String> replacements) throws IOException, URISyntaxException {

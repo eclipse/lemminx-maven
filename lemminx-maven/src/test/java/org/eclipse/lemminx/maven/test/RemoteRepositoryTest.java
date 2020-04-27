@@ -8,9 +8,7 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven.test;
 
-import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.completionContains;
-import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createTextDocumentItem;
-import static org.junit.Assert.assertTrue;
+import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -18,15 +16,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.services.XMLLanguageService;
+import org.eclipse.lemminx.settings.SharedSettings;
+import org.eclipse.lemminx.settings.XMLHoverSettings;
 import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionParams;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentItem;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -36,114 +33,81 @@ public class RemoteRepositoryTest {
 
 	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
-	private ClientServerConnection connection;
+	private XMLLanguageService languageService;
 
 	@Before
 	public  void setUp() throws IOException {
-		connection = new ClientServerConnection();
+		languageService = new XMLLanguageService();
 	}
 
 	@After
 	public  void tearDown() throws InterruptedException, ExecutionException {
-		connection.stop();
+		languageService.dispose();
+		languageService = null;
+	}
+
+	private void loopUntilCompletionItemFound(DOMDocument document, Position position, String expectedLabel) throws InterruptedException {
+		final SharedSettings settings = new SharedSettings();
+		List<CompletionItem> items = Collections.emptyList();
+		do {
+			items = languageService.doComplete(document, position, settings).getItems();
+			Thread.sleep(500);
+		} while (items.stream().map(CompletionItem::getLabel).noneMatch(expectedLabel::equals));
 	}
 
 	@Test(timeout=15000)
 	public void testRemoteGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-groupId-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		final Position pos = new Position(11, 20);
-		String desiredCompletion = "signaturacaib";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion));
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-groupId-complete.xml", languageService), //
+				new Position(11, 20), "signaturacaib");
+		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 	
-	@Test(timeout=15000)
+	@Test(timeout=150000)
 	public void testRemoteArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-artifactId-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		final Position pos = new Position(12, 15);
-		String desiredCompletion = "signaturacaib.core";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			 items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion) && items.size() < 30);
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-artifactId-complete.xml", languageService), //
+				new Position(12, 15), "signaturacaib.core - signaturacaib:signaturacaib.core:3.3.0");
+		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 	
 	@Test(timeout=15000)
 	public void testRemoteVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-version-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		Position pos = new Position(13, 13);
-		String desiredCompletion = "3.3.0";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			 items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion));
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-version-complete.xml", languageService), //
+				new Position(13, 13), "3.3.0");
+		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
 	@Test(timeout=15000)
  	public void testRemoteArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		String description = "A custom implementation of XPath 1.0 based upon apache commons jxpath 1.3";
- 		TextDocumentItem textDocumentItem = MavenLemminxTestsUtils.createTextDocumentItem("/pom-remote-artifact-hover.xml");
- 		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
- 		connection.languageServer.getTextDocumentService().didOpen(params);
+		final DOMDocument document = createDOMDocument("/pom-remote-artifact-hover.xml", languageService);
+		final Position position = new Position(14, 18);
  		Hover hover;
- 		TextDocumentPositionParams pos = new TextDocumentPositionParams( new TextDocumentIdentifier(textDocumentItem.getUri()), new Position(14, 20));
  		do {
- 	 		hover = connection.languageServer.getTextDocumentService().hover(pos).get();
- 		} while ((((MarkupContent) hover.getContents().getRight()).getValue().contains("Updating")));
- 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
+ 	 		hover = languageService.doHover(document, position, new XMLHoverSettings());
+ 	 		Thread.sleep(500);
+ 		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
+ 		// if got out of the loop without timeout, then test is PASSED
 	}
 	
 	@Test(timeout=15000)
 	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-groupId-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		final Position pos = new Position(11, 14);
-		String desiredCompletion = "org.codehaus.mojo";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion));
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml", languageService), //
+				new Position(11, 14), "org.codehaus.mojo");
+		// if got out of the loop without timeout, then test is PASSED
 	}
 	
 	@Test(timeout=15000)
 	public void testRemotePluginArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-artifactId-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		final Position pos = new Position(12, 15);
-		String desiredCompletion = "deb-maven-plugin";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			 items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion) && items.size() < 30);
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-artifactId-complete.xml", languageService), //
+				new Position(12, 15), "deb-maven-plugin - org.codehaus.mojo:deb-maven-plugin:1.0-beta-1");
+		// if got out of the loop without timeout, then test is PASSED
 	}
 	
 	@Test(timeout=15000)
 	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		TextDocumentItem textDocumentItem = createTextDocumentItem("/pom-remote-plugin-version-complete.xml");
-		DidOpenTextDocumentParams params = new DidOpenTextDocumentParams(textDocumentItem);
-		connection.languageServer.getTextDocumentService().didOpen(params);
-		Position pos = new Position(13, 12);
-		String desiredCompletion = "1.0-beta-1";
-		List<CompletionItem> items = Collections.emptyList();
-		do {
-			 items = connection.languageServer.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(textDocumentItem.getUri()), pos)).get().getRight().getItems();
-		} while (!completionContains(items, desiredCompletion));
-		assertTrue(completionContains(items, desiredCompletion));
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml", languageService), //
+				new Position(13, 12), "1.0-beta-1");
+		// if got out of the loop without timeout, then test is PASSED
 	}
 
 }
