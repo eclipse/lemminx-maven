@@ -110,8 +110,13 @@ public class LocalRepositorySearcher {
 		return groupIdArtifactIdToVersion.values();
 	}
 
+	
+	// TODO consider using directly ArtifactRepository for those 2 methods
 	public File findLocalFile(Dependency dependency) {
 		return new File(localRepository, dependency.getGroupId().replace('.', File.separatorChar) + File.separatorChar + dependency.getArtifactId() + File.separatorChar + dependency.getVersion() + File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom");
+	}
+	public File findLocalFile(Gav gav) {
+		return new File(localRepository, gav.getGroupId().replace('.', File.separatorChar) + File.separatorChar + gav.getArtifactId() + File.separatorChar + gav.getVersion() + File.separatorChar + gav.getArtifactId() + '-' + gav.getVersion() + ".pom");
 	}
 
 	public void stop() {

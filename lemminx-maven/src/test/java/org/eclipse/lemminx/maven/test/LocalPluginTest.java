@@ -46,21 +46,21 @@ public class LocalPluginTest {
 	
 	// Completion related tests
 
-	@Test(timeout=15000)
+	@Test
 	public void testCompleteGoal() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
 				new Position(18, 19), new SharedSettings())
 			.getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText).anyMatch("test"::equals));
 	}
 
-	@Test(timeout=15000)
+	@Test
 	public void testCompleteConfigurationParameters() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
 				new Position(23, 7), new SharedSettings())
 			.getItems().stream().map(CompletionItem::getLabel).anyMatch("failIfNoTests"::equals));
 	}
 
-	@Test(timeout=15000)
+	@Test
 	public void testCompleteConfigurationParametersInTag() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-plugin-config-tag.xml", languageService),
 				new Position(20, 9), new SharedSettings())
@@ -69,19 +69,19 @@ public class LocalPluginTest {
 	
 	// Hover related tests
 	
-	@Test(timeout=15000)
+	@Test
  	public void testPluginConfigurationHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-configuration-hover.xml", languageService),
-				new Position(15, 5), new XMLHoverSettings()).getContents().getRight().getValue().contains("The -source argument for the Java compiler."));
+				new Position(15, 6), new XMLHoverSettings()).getContents().getRight().getValue().contains("cause a failure if there are no tests to run"));
 	}
 	
-	@Test(timeout=15000)
+	@Test
  	public void testPluginGoalHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-goal-hover.xml", languageService),
 				new Position(18, 22), new XMLHoverSettings()).getContents().getRight().getValue().contains("Run tests using Surefire."));
 	}
 	
-	@Test(timeout=15000)
+	@Test
  	public void testPluginArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException, TimeoutException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-artifact-hover.xml", languageService),
 				new Position(14, 18), new XMLHoverSettings()).getContents().getRight().getValue().contains("Maven Surefire MOJO in maven-surefire-plugin"));

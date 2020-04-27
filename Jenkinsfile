@@ -3,6 +3,13 @@ pipeline{
 		kubernetes {
 			label 'lemminx-maven-pod2'
 			defaultContainer 'jnlp'
+			// We use a pod with alpine Maven because we don't want the local
+			// filesystem cache for maven deps, which causes issues later in
+			// tests.
+			// This is actually a limitation of Lemminx Maven not propertly 
+			// supporting local filesystem repos of whatever configuration used
+			// by default jnlp. When Lemmin Maven supports that, let's get back
+			// to "agent any" which saves a lot of downloads.
 			yaml """
 apiVersion: v1
 kind: Pod
