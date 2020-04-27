@@ -11,12 +11,14 @@ package org.eclipse.lemminx.maven;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -24,8 +26,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
+import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.building.ModelBuilder;
+import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
@@ -34,6 +40,7 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
@@ -43,9 +50,11 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
 	private final RemoteRepositoryIndexSearcher indexSearcher;
 	private final MavenPluginManager pluginManager;
+	private LocalRepositorySearcher localRepoSearcher;
 
-	public MavenHoverParticipant(MavenProjectCache cache,  RemoteRepositoryIndexSearcher indexSearcher,  MavenPluginManager pluginManager) {
+	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher,  MavenPluginManager pluginManager) {
 		this.cache = cache;
+		this.localRepoSearcher = localRepoSearcher;
 		this.indexSearcher = indexSearcher;
 		this.pluginManager = pluginManager;
 	}
@@ -96,6 +105,26 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		if (project != null) {
 			remoteArtifactRepositories = project.getRemoteArtifactRepositories().stream()
 					.map(ArtifactRepository::getUrl).collect(Collectors.toList());
+		}
+
+		try {
+			ModelBuilder builder = cache.getPlexusContainer().lookup(ModelBuilder.class);
+			Optional<String> localDescription = localRepoSearcher.getLocalArtifactsLastVersion().stream()
+				.filter(gav ->
+					(artifactToSearch.getGroupId() == null || artifactToSearch.getGroupId().equals(gav.getGroupId())) &&
+					(artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().equals(gav.getArtifactId())) &&
+					(artifactToSearch.getVersion() == null || artifactToSearch.getVersion().equals(gav.getVersion())))
+				.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
+				.findFirst()
+				.map(localRepoSearcher::findLocalFile)
+				.map(file -> builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
+				.map(model -> model.getName() + "\n\n" + model.getDescription())
+				.map(message -> (message.length() > 2 ? message : null));
+			if (localDescription.isPresent()) {
+				return localDescription.get();
+			}
+		} catch (Exception e1) {
+			e1.printStackTrace();
 		}
 
 		try {
