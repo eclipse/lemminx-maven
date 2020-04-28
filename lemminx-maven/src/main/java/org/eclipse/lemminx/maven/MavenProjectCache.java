@@ -26,13 +26,11 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.InvalidRepositoryException;
-import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
-import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.MavenExecutionRequest;
-import org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory;
+import org.apache.maven.execution.MavenExecutionRequestPopulationException;
 import org.apache.maven.model.Build;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.building.DefaultModelProblem;
@@ -48,7 +46,7 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.apache.maven.repository.RepositorySystem;
+import org.apache.maven.settings.io.SettingsParseException;
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -62,16 +60,15 @@ public class MavenProjectCache {
 	private final Map<URI, Collection<ModelProblem>> problemCache;
 	private final PlexusContainer plexusContainer;
 
-	private MavenExecutionRequest mavenRequest;
+	private final MavenExecutionRequest mavenRequest;
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
 	private DefaultRepositorySystemSession repositorySystemSession;
 	private ProjectBuilder projectBuilder;
-	private RepositorySystem repositorySystem;
-	private ArtifactRepository localRepo;
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
 
-	public MavenProjectCache(PlexusContainer container) {
+	public MavenProjectCache(PlexusContainer container, MavenExecutionRequest mavenRequest) {
+		this.mavenRequest = mavenRequest;
 		this.plexusContainer = container;
 		this.lastCheckedVersion = new HashMap<URI, Integer>();
 		this.projectCache = new HashMap<URI, MavenProject>();
@@ -118,7 +115,7 @@ public class MavenProjectCache {
 		if (mavenRequest == null) {
 			try {
 				initializeMavenBuildState();
-			} catch (ComponentLookupException | InvalidRepositoryException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -210,7 +207,7 @@ public class MavenProjectCache {
 					}
 				}
 			}
-		} catch (ComponentLookupException | InvalidRepositoryException e) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -219,39 +216,13 @@ public class MavenProjectCache {
 		problemCache.put(uri, problems);
 	}
 
-	private void initializeMavenBuildState() throws ComponentLookupException, InvalidRepositoryException {
-		if (mavenRequest != null) {
+	private void initializeMavenBuildState() throws ComponentLookupException, InvalidRepositoryException, SettingsParseException, IOException, MavenExecutionRequestPopulationException {
+		if (projectBuilder != null) {
 			return;
 		}
 		projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
-		mavenRequest = new DefaultMavenExecutionRequest();
-		mavenRequest.setLocalRepositoryPath(MavenPlugin.LOCAL_REPOSITORY.getAbsolutePath());
-		repositorySystem = getPlexusContainer().lookup(RepositorySystem.class);
-		localRepo = repositorySystem.createLocalRepository(MavenPlugin.LOCAL_REPOSITORY);
-		mavenRequest.setLocalRepository(getLocalRepository());
-		DefaultRepositorySystemSessionFactory repositorySessionFactory = getPlexusContainer().lookup(DefaultRepositorySystemSessionFactory.class);
-		repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
 	}
 	
-	public RepositorySystem getRepositorySystem() {
-		try {
-			initializeMavenBuildState();
-		} catch (ComponentLookupException | InvalidRepositoryException e) {
-			e.printStackTrace();
-		}
-		return this.repositorySystem;
-	}
-
-
-	public ArtifactRepository getLocalRepository() {
-		try {
-			initializeMavenBuildState();
-		} catch (ComponentLookupException | InvalidRepositoryException e) {
-			e.printStackTrace();
-		}
-		return localRepo;
-	}
-
 	public PlexusContainer getPlexusContainer() {
 		return plexusContainer;
 	}
@@ -263,7 +234,7 @@ public class MavenProjectCache {
 	public DefaultRepositorySystemSession getRepositorySystemSession() {
 		try {
 			initializeMavenBuildState();
-		} catch (ComponentLookupException | InvalidRepositoryException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return repositorySystemSession;

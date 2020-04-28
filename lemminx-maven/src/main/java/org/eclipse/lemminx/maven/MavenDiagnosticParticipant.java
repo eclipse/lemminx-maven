@@ -19,6 +19,7 @@ import javax.annotation.Nonnull;
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.plugin.MavenPluginManager;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -33,10 +34,12 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	private MavenProjectCache projectCache;
 	MavenPluginManager pluginManager;
+	private final RepositorySystemSession repoSession;
 
-	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager) {
+	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager, RepositorySystemSession repoSession) {
 		this.projectCache = projectCache;
 		this.pluginManager = pluginManager;
+		this.repoSession = repoSession;
 	}
 
 	@Override
@@ -82,7 +85,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	private HashMap<String, Function<DiagnosticRequest, Diagnostic>> configureDiagnosticFunctions(
 			DOMDocument xmlDocument) {
-		PluginValidator pluginValidator = new PluginValidator(projectCache, pluginManager);
+		PluginValidator pluginValidator = new PluginValidator(projectCache, repoSession, pluginManager);
 		Function<DiagnosticRequest, Diagnostic> validatePluginConfiguration = pluginValidator::validateConfiguration;
 		Function<DiagnosticRequest, Diagnostic> validatePluginGoal = pluginValidator::validateGoal;
 

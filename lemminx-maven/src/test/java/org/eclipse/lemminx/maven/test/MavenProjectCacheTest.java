@@ -28,7 +28,9 @@ public class MavenProjectCacheTest {
 		URI uri = getClass().getResource("/pom-with-properties.xml").toURI();
 		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		MavenProjectCache cache = new MavenProjectCache(MavenPlugin.newPlexusContainer());
+		MavenPlugin plugin = new MavenPlugin();
+		plugin.initialize();
+		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
 	}

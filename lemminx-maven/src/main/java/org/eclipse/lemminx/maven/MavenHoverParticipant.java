@@ -37,6 +37,7 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -50,12 +51,14 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
 	private final RemoteRepositoryIndexSearcher indexSearcher;
 	private final MavenPluginManager pluginManager;
-	private LocalRepositorySearcher localRepoSearcher;
+	private final LocalRepositorySearcher localRepoSearcher;
+	private final RepositorySystemSession repoSession;
 
-	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher,  MavenPluginManager pluginManager) {
+	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
 		this.cache = cache;
 		this.localRepoSearcher = localRepoSearcher;
 		this.indexSearcher = indexSearcher;
+		this.repoSession = repoSession;
 		this.pluginManager = pluginManager;
 	}
 
@@ -162,7 +165,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	private String collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, pluginManager);
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
 		if (pluginDescriptor != null ) {
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
@@ -174,7 +177,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 	private String collectPuginConfiguration(IPositionRequest request) {
-		List<Parameter> parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, pluginManager);
+		List<Parameter> parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager);
 		DOMNode node = request.getNode();
 		
 		for (Parameter parameter : parameters) {

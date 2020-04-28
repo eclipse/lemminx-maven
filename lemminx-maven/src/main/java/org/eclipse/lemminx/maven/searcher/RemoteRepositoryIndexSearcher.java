@@ -76,7 +76,7 @@ public class RemoteRepositoryIndexSearcher {
 	private static final File INDEX_PATH;
 	static {
 		String property = System.getProperty("lemminx.maven.indexDirectory");
-		INDEX_PATH = property != null && !property.trim().isEmpty() ? new File(property) : new File(MavenPlugin.LOCAL_REPOSITORY.getParentFile(), "_maven_index_");
+		INDEX_PATH = property != null && !property.trim().isEmpty() ? new File(property) : new File(System.getProperty("user.home") + "/.lemminx/index");
 	}
 
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
