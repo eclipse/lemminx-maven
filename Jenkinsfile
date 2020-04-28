@@ -1,8 +1,8 @@
 pipeline{
 	agent {
 		kubernetes {
-			label 'lemminx-maven-pod2'
-			defaultContainer 'jnlp'
+			label 'lemminx-maven-pod3'
+			defaultContainer 'maven-with-settings'
 			// We use a pod with alpine Maven because we don't want the local
 			// filesystem cache for maven deps, which causes issues later in
 			// tests.
@@ -15,7 +15,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: maven
+  - name: maven-without-settings
     image: maven
     imagePullPolicy: Always
     tty: true
@@ -28,29 +28,33 @@ spec:
         cpu: "1000m"
     command:
     - cat
-  - name: jnlp
-    image: 'eclipsecbi/jenkins-jnlp-agent'
+  - name: maven-with-settings
+    image: maven:alpine
+    tty: true
+    command:
+    - cat
     volumeMounts:
-    - mountPath: "/home/jenkins/.m2/settings-security.xml"
-      name: "settings-security-xml"
+    - name: settings-xml
+      mountPath: /home/jenkins/.m2/settings.xml
+      subPath: settings.xml
       readOnly: true
-      subPath: "settings-security.xml"
-    - mountPath: "/home/jenkins/.m2/settings.xml"
-      name: "settings-xml"
+    - name: settings-security-xml
+      mountPath: /home/jenkins/.m2/settings-security.xml
+      subPath: settings-security.xml
       readOnly: true
   volumes:
-  - name: "settings-security-xml"
+  - name: settings-xml
     secret:
+      secretName: m2-secret-dir
       items:
-      - key: "settings-security.xml"
-        path: "settings-security.xml"
-      secretName: "m2-secret-dir"
-  - name: "settings-xml"
+      - key: settings.xml
+        path: settings.xml
+  - name: settings-security-xml
     secret:
+      secretName: m2-secret-dir
       items:
-      - key: "settings.xml"
-        path: "settings.xml"
-      secretName: "m2-secret-dir"
+      - key: settings-security.xml
+        path: settings-security.xml
 """
 		}
 	}
@@ -61,7 +65,7 @@ spec:
   stages{
     stage("Maven Build"){
         steps {
-			container('maven') {
+			container('maven-without-settings') {
 				sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true -Dmaven.repo.local=$WORKSPACE/.m2/repository'
 			}
         }
@@ -76,7 +80,7 @@ spec:
           branch 'master'
       }
       steps {
-        withMaven {
+        container('maven-with-settings') {
           sh 'mvn -B deploy  --file lemminx-maven/pom.xml -DskipTests -Dcbi.jarsigner.skip=false -Dmaven.repo.local=$WORKSPACE/.m2/repository'
         }
       }
