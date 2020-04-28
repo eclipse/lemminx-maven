@@ -32,7 +32,7 @@ import org.apache.maven.model.Dependency;
 
 public class LocalRepositorySearcher {
 	
-	private File localRepository;
+	private final File localRepository;
 
 	public LocalRepositorySearcher(File localRepository) {
 		this.localRepository = localRepository;
@@ -88,6 +88,10 @@ public class LocalRepositorySearcher {
 				}
 				if (Character.isDigit(file.getFileName().toString().charAt(0))) {
 					Path artifactFolderPath = repoPath.relativize(file);
+					if (artifactFolderPath.getNameCount() < 3) {
+						// eg "maven-dependency-plugin/3.1.2"
+						return FileVisitResult.SKIP_SUBTREE;
+					}
 					ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
 					String artifactId = artifactFolderPath.getParent().getFileName().toString();
 					String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");

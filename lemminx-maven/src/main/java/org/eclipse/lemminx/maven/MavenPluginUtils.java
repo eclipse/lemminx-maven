@@ -24,7 +24,7 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
-import org.eclipse.aether.DefaultRepositorySystemSession;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -47,8 +47,8 @@ public class MavenPluginUtils {
 	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
-			MavenProjectCache cache, MavenPluginManager pluginManager) {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache,
+			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession,
 				pluginManager);
 		if (pluginDescriptor == null) {
 			return Collections.emptyList();
@@ -73,7 +73,7 @@ public class MavenPluginUtils {
 		return builder.build();
 	}
 
-	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request, MavenProjectCache cache,
+	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request, MavenProjectCache cache, RepositorySystemSession repositorySystemSession,
 			MavenPluginManager pluginManager) {
 		MavenProject project = cache.getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
@@ -99,8 +99,6 @@ public class MavenPluginUtils {
 		}
 
 		try {
-			DefaultRepositorySystemSession repositorySystemSession = cache.getRepositorySystemSession();
-			System.err.println("local repo for plugin manager=" + repositorySystemSession.getLocalRepositoryManager().getRepository().getBasedir());
 			return pluginManager.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
 					.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()),
 					repositorySystemSession);

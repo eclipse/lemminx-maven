@@ -12,6 +12,7 @@ import java.util.List;
 
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.descriptor.Parameter;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -19,9 +20,11 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 public class PluginValidator {
 	private final MavenProjectCache cache;
 	private final MavenPluginManager pluginManager;
+	private final RepositorySystemSession repoSession;
 
-	public PluginValidator(MavenProjectCache cache, MavenPluginManager pluginManager) {
+	public PluginValidator(MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
 		this.cache = cache;
+		this.repoSession = repoSession;
 		this.pluginManager = pluginManager;
 	}
 
@@ -32,7 +35,7 @@ public class PluginValidator {
 		}
 		if (node.isElement() && node.hasChildNodes()) {
 			List<Parameter> parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache,
-					pluginManager);
+					repoSession, pluginManager);
 			for (DOMNode childNode : node.getChildren()) {
 				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode,
 						diagnosticRequest.getXMLDocument(), diagnosticRequest.getDiagnostics());
@@ -52,7 +55,7 @@ public class PluginValidator {
 		}
 		if (node.isElement() && node.hasChildNodes()) {
 			List<Parameter> parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache,
-					pluginManager);
+					repoSession, pluginManager);
 			Diagnostic diag = internalValidateGoal(diagnosticRequest, parameters);
 			if (diag != null) {
 				diagnosticRequest.getDiagnostics().add(diag);

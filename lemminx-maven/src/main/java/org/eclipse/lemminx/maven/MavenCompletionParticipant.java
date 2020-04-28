@@ -42,6 +42,7 @@ import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -89,12 +90,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private final LocalRepositorySearcher localRepositorySearcher;
 	private final MavenProjectCache cache;
 	private final RemoteRepositoryIndexSearcher indexSearcher;
-	private MavenPluginManager pluginManager;
+	private final MavenPluginManager pluginManager;
+	private final RepositorySystemSession repoSession;
 
-	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, MavenPluginManager pluginManager) {
+	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
 		this.cache = cache;
 		this.localRepositorySearcher = localRepositorySearcher;
 		this.indexSearcher = indexSearcher;
+		this.repoSession = repoSession;
 		this.pluginManager = pluginManager;
 	}
 	
@@ -106,7 +109,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 		
 		if ("configuration".equals(request.getParentElement().getLocalName())) {
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, pluginManager).stream()
+			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
 					.forEach(response::addCompletionItem);
 		}
@@ -243,7 +246,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			collectGoals(request).forEach(response::addCompletionItem);
 			break;
 		case "configuration":
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, pluginManager).stream()
+			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
 					.forEach(response::addCompletionItem);
 			break;
@@ -341,7 +344,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private Collection<CompletionItem> collectGoals(ICompletionRequest request) {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, pluginManager);
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
 		if (pluginDescriptor != null) {
 			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal, MojoDescriptor::getDescription, request);
 		}

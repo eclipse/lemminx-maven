@@ -14,8 +14,16 @@ package org.eclipse.lemminx.maven;
 import java.io.File;
 
 import org.apache.maven.Maven;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.cli.configuration.SettingsXmlConfigurationProcessor;
+import org.apache.maven.execution.DefaultMavenExecutionRequest;
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenExecutionRequestPopulator;
+import org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.repository.RepositorySystem;
+import org.apache.maven.settings.Settings;
+import org.apache.maven.settings.io.SettingsReader;
 import org.codehaus.plexus.ContainerConfiguration;
 import org.codehaus.plexus.DefaultContainerConfiguration;
 import org.codehaus.plexus.DefaultPlexusContainer;
@@ -26,6 +34,7 @@ import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
@@ -45,23 +54,19 @@ public class MavenPlugin implements IXMLExtension {
 
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenPlugin.class.getName();
 
-	public static final File LOCAL_REPOSITORY;
-	static {
-		String property = System.getProperty("maven.repo.local");
-		LOCAL_REPOSITORY = property != null && !property.trim().isEmpty() ? new File(property) : RepositorySystem.defaultUserLocalRepository;
-	}
-	
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
-	private PlexusContainer container;
+	private MavenDefinitionParticipant definitionParticipant;
+
 	private MavenProjectCache cache;
-
 	private RemoteRepositoryIndexSearcher indexSearcher;
-
 	private LocalRepositorySearcher localRepositorySearcher;
 
-	private MavenDefinitionParticipant definitionParticipant;
+	private PlexusContainer container;
+	private MavenExecutionRequest mavenRequest;
+	private RepositorySystemSession repositorySystemSession;
+	private MavenPluginManager mavenPluginManager;
 
 	public MavenPlugin() {
 	}
@@ -73,33 +78,69 @@ public class MavenPlugin implements IXMLExtension {
 
 	@Override
 	public void start(InitializeParams params, XMLExtensionsRegistry registry) {
-		try {
-			container = newPlexusContainer();
-			cache = new MavenProjectCache(container);
-		} catch (PlexusContainerException e) {
-			e.printStackTrace();
-		}
-		localRepositorySearcher = new LocalRepositorySearcher(LOCAL_REPOSITORY);
-		indexSearcher = new RemoteRepositoryIndexSearcher(container);
-		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
-		MavenPluginManager mavenPluginManager = null;
-		try {
-			mavenPluginManager = container.lookup(MavenPluginManager.class);
-		} catch (ComponentLookupException e) {
-			e.printStackTrace();
-		}
-		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, mavenPluginManager);
+		initialize();
+		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, repositorySystemSession, mavenPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
-		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager);
+		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, repositorySystemSession);
 		registry.registerDiagnosticsParticipant(diagnosticParticipant);
-		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, mavenPluginManager);
+		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, repositorySystemSession, mavenPluginManager);
 		registry.registerHoverParticipant(hoverParticipant);
 		definitionParticipant = new MavenDefinitionParticipant(cache, localRepositorySearcher);
 		registry.registerDefinitionParticipant(definitionParticipant);
 	}
 
+	public void initialize() {
+		try {
+			container = newPlexusContainer();
+			mavenRequest = initMavenRequest(container);
+			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
+			repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		cache = new MavenProjectCache(container, mavenRequest);
+		localRepositorySearcher = new LocalRepositorySearcher(repositorySystemSession.getLocalRepository().getBasedir());
+		indexSearcher = new RemoteRepositoryIndexSearcher(container);
+		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
+		mavenPluginManager = null;
+		try {
+			mavenPluginManager = container.lookup(MavenPluginManager.class);
+		} catch (ComponentLookupException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private MavenExecutionRequest initMavenRequest(PlexusContainer container) throws Exception {
+		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
+		SettingsReader reader = container.lookup(SettingsReader.class);
+		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
+		if (SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE.canRead()) {
+			mavenRequest.setGlobalSettingsFile(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			Settings globalSettings = reader.read(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE, null);
+			requestPopulator.populateFromSettings(mavenRequest, globalSettings);
+		}
+		if (SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE.canRead()) {
+			mavenRequest.setUserSettingsFile(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			Settings userSettings = reader.read(SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE, null);
+
+			requestPopulator.populateFromSettings(mavenRequest, userSettings);
+		}
+		String localRepoProperty = System.getProperty("maven.repo.local");
+		if (localRepoProperty != null) {
+			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
+		}
+		if (mavenRequest.getLocalRepositoryPath() == null) {
+			mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
+		}
+		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
+
+		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
+		mavenRequest.setLocalRepository(localRepo);
+		return mavenRequest;
+	}
+
 	/* Copied from m2e */
-	public static DefaultPlexusContainer newPlexusContainer() throws PlexusContainerException {
+	private DefaultPlexusContainer newPlexusContainer() throws PlexusContainerException {
 		final ClassWorld classWorld = new ClassWorld(MAVEN_XMLLS_EXTENSION_REALM_ID, ClassWorld.class.getClassLoader());
 		final ClassRealm realm;
 		try {
@@ -148,5 +189,9 @@ public class MavenPlugin implements IXMLExtension {
 		String uri = document.getDocumentURI();
 		String fileName = uri.substring(uri.lastIndexOf(File.separatorChar) + 1);
 		return (fileName.startsWith("pom") && fileName.endsWith(".xml")) || fileName.endsWith(Maven.POMv4);
+	}
+
+	public MavenProjectCache getProjectCache() {
+		return this.cache;
 	}
 }
