@@ -6,11 +6,11 @@ This project is an [Eclipse LemMinX](https://github.com/eclipse/lemminx) (XML La
 
 ## Features
 
-Additionally to the XSD based assistance provided by LemMinX when editing pom files, this extension adds
+Additionally to the XSD based assistance provided by LemMinX when editing pom files, this extension adds:
 
 - model error reports are diagnostics
 - completion and hover documentation for `dependency/scope` (test, provided, runtime, ...)
-- completion and hover documentation for `plugins/exection/phase` (process-resources, package, test, verify...)
+- completion and hover documentation for `plugins/execution/phase` (process-resources, package, test, verify...)
 - completion and hover for GAVs or any groupId, artifactId, version item under `depedencies`, `dependency`, `plugins`, `plugin`, `parent`
 - completion and hover evaluation for properties
 - completion, hover documentation and validation for plugins `configuration` elements
@@ -54,7 +54,7 @@ Get the maven artifact from the Eclipse Nexus repository
 	</repositories>
 ```
 
-Then, just start the LemMinx Language Server as documented on the LemMinX documentation, and make sure the LemMinX-Maven extension is in the classpath. If done correctly, then whenever LemMinX starts processing some pom.xml file, the LemMinX-Maven extension should automatically participate as well.
+Then, just start the LemMinx Language Server as documented on the LemMinX documentation, and make sure the LemMinX-Maven extension is in the classpath. If done correctly, then whenever LemMinX starts processing some `pom.xml` file, the LemMinX-Maven extension should automatically participate as well.
 
 ## Integrations
 
