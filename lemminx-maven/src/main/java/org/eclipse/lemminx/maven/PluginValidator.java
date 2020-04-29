@@ -19,6 +19,7 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 public class PluginValidator {
 	private final MavenProjectCache cache;
 	private final MavenPluginManager pluginManager;
+	private static final String FALSE = "false";
 
 	public PluginValidator(MavenProjectCache cache, MavenPluginManager pluginManager) {
 		this.cache = cache;
@@ -84,12 +85,105 @@ public class PluginValidator {
 		}
 		for (Parameter parameter : parameters) {
 			if (node.getLocalName().equals(parameter.getName())) {
+				// Now check if the node's child is the right type
+				validateConfigurationType(diagnosticReq, parameter);
 				return null;
 			}
 		}
-		return new Diagnostic(diagnosticReq.getRange(), "Invalid plugin configuration: " + diagnosticReq.getCurrentTag(), DiagnosticSeverity.Warning,
+		return new Diagnostic(diagnosticReq.getRange(),
+				"Invalid plugin configuration: " + diagnosticReq.getCurrentTag(), DiagnosticSeverity.Warning,
 				diagnosticReq.getXMLDocument().getDocumentURI(), "XML");
 
+	}
+
+	private static void validateConfigurationType(DiagnosticRequest diagnosticReq, Parameter parameter) {
+		DOMNode node = diagnosticReq.getNode();
+		System.out.println("Processing: " + node.getLocalName());
+		System.out.println("Children: ");
+		node.getChildren().forEach(n -> System.out.println("local name: " + n.getLocalName()));
+		node.getChildren().forEach(n -> System.out.println("value: " + n.getNodeValue()));
+		// TODO: Type needs to be parsed to account for array '[] 'string
+		String type = parameter.getType();
+		if (!node.hasChildNodes()) {
+			if (parameter.isRequired()) {
+				diagnosticReq.getDiagnostics()
+						.add(new Diagnostic(diagnosticReq.getRange(),
+								"Missing required parameter: " + parameter.getName(), DiagnosticSeverity.Warning,
+								diagnosticReq.getXMLDocument().getDocumentURI(), "XML"));
+
+			}
+			return;
+		}
+
+		if (type.endsWith("[]")) {
+			// should have child nodes which are tags
+			if (!node.getChildren().stream().allMatch(n -> n.isElement())) {
+				diagnosticReq.getDiagnostics()
+						.add(new Diagnostic(diagnosticReq.getRange(),
+								"This configuration parameter requires a child tag", DiagnosticSeverity.Warning,
+								diagnosticReq.getXMLDocument().getDocumentURI(), "XML"));
+				return;
+			}
+
+			for (DOMNode childNode : node.getChildren()) {
+				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode, diagnosticReq.getXMLDocument(),
+						diagnosticReq.getDiagnostics());
+				System.out.println("Processing child node: " + childNode.getLocalName());
+					internalValidateConfigurationType(childDiagnosticReq, type.substring(0, type.length() - 2));					
+
+			}
+		} else {
+			internalValidateConfigurationType(diagnosticReq, type);
+		}
+
+	}
+
+	private static void internalValidateConfigurationType(DiagnosticRequest diagnosticReq, String type) {
+		DOMNode node = diagnosticReq.getNode();
+		if (!node.hasChildNodes()) {
+			return;
+		}
+		if (node.getChildren().size() > 1) {
+			for (DOMNode childNode : node.getChildren()) {
+				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode, diagnosticReq.getXMLDocument(),
+						diagnosticReq.getDiagnostics());
+				System.out.println("Processing child node: " + childNode.getLocalName());
+				internalValidateConfigurationType(childDiagnosticReq, type);			
+			}
+		}
+		
+		DOMNode childNode = node.getChild(0);
+		if (childNode.isComment()) {
+			return;
+		}
+		
+		String value = childNode.getNodeValue();
+		switch (type) {
+		case "java.lang.Integer":
+			try {
+				Integer.parseInt(value);
+			} catch (NumberFormatException e) {
+				diagnosticReq.getDiagnostics()
+				.add(new Diagnostic(diagnosticReq.getRange(),
+						"This parameter must be an integer", DiagnosticSeverity.Warning,
+						diagnosticReq.getXMLDocument().getDocumentURI(), "XML"));
+			}
+
+			break;
+		case "java.lang.String":
+			break;
+		case "boolean":
+			Boolean result = Boolean.parseBoolean(value);
+			if (!result && !value.equalsIgnoreCase(FALSE)) {
+				diagnosticReq.getDiagnostics()
+				.add(new Diagnostic(diagnosticReq.getRange(),
+						"This parameter must be a boolean", DiagnosticSeverity.Warning,
+						diagnosticReq.getXMLDocument().getDocumentURI(), "XML"));
+			}
+			break;
+		default:
+			break;
+		}
 	}
 
 }

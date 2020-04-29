@@ -92,12 +92,21 @@ public class LocalPluginTest {
 	
 	// Diagnostic related tests
 
-		@Test(timeout=30000)
+		//@Test(timeout=30000)
+		@Test
 	 	public void testPluginConfigurationDiagnostics() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 			DOMDocument document = createDOMDocument("/pom-plugin-configuration-diagnostic.xml", languageService);
 			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
 					.anyMatch(message -> message.contains("Invalid plugin configuration")));
 			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
+		}
+		
+		@Test
+	 	public void testPluginConfigurationElementDiagnostics() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+			DOMDocument document = createDOMDocument("/pom-plugin-configuration-element-diagnostic.xml", languageService);
+			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
+					.anyMatch(message -> message.contains("parameter must be a boolean")));
+			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 1);
 		}
 		
 		@Test
