@@ -1,7 +1,7 @@
 pipeline{
 	agent {
 		kubernetes {
-			label 'lemminx-maven-pod2'
+			label 'lemminx-maven-pod8'
 			defaultContainer 'jnlp'
 			// We use a pod with alpine Maven because we don't want the local
 			// filesystem cache for maven deps, which causes issues later in
@@ -29,7 +29,7 @@ spec:
     command:
     - cat
   - name: jnlp
-    image: 'eclipsecbi/jenkins-jnlp-agent'
+    image: 'eclipsecbijenkins/basic-agent:3.35'
     volumeMounts:
     - mountPath: "/home/jenkins/.m2/settings-security.xml"
       name: "settings-security-xml"
@@ -38,6 +38,10 @@ spec:
     - mountPath: "/home/jenkins/.m2/settings.xml"
       name: "settings-xml"
       readOnly: true
+      subPath: "settings.xml"
+    - mountPath: "/opt/tools"
+      name: "volume-0"
+      readOnly: false
   volumes:
   - name: "settings-security-xml"
     secret:
@@ -51,6 +55,10 @@ spec:
       - key: "settings.xml"
         path: "settings.xml"
       secretName: "m2-secret-dir"
+  - name: "volume-0"
+    persistentVolumeClaim:
+      claimName: "tools-claim-jiro-lemminx"
+      readOnly: true
 """
 		}
 	}
@@ -76,8 +84,8 @@ spec:
           branch 'master'
       }
       steps {
-        withMaven {
-          sh 'mvn -B deploy  --file lemminx-maven/pom.xml -DskipTests -Dcbi.jarsigner.skip=false -Dmaven.repo.local=$WORKSPACE/.m2/repository'
+        container('jnlp') {
+          sh '/opt/tools/apache-maven/3.6.3/bin/mvn -B deploy  --file lemminx-maven/pom.xml -DskipTests -Dcbi.jarsigner.skip=false -Dmaven.repo.local=$WORKSPACE/.m2/repository'
         }
       }
     }
