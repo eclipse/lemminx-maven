@@ -34,4 +34,17 @@ public class MavenProjectCacheTest {
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
 	}
+	
+	@Test
+	public void testOnBuildError_ResolveProjectFromDocumentBytes() throws Exception {
+		URI uri = getClass().getResource("/pom-with-module-error.xml").toURI();
+		File pomFile = new File(uri);
+		String content = FileUtils.readFileToString(pomFile, "UTF-8");
+		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
+		MavenPlugin plugin = new MavenPlugin();
+		plugin.initialize();
+		MavenProjectCache cache = plugin.getProjectCache();
+		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
+		assertNotNull(project);
+	}
 }

@@ -10,12 +10,9 @@ package org.eclipse.lemminx.maven;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -154,7 +151,8 @@ public class MavenProjectCache {
 			}, request);
 			problems.addAll(buildResult.getProblems());
 			if (buildResult.getProject() != null) {
-				// setFile should ideally be invoked during project build, but related methods to pass modelSource and pomFile are private
+				// setFile should ideally be invoked during project build, but related methods
+				// to pass modelSource and pomFile are private
 				buildResult.getProject().setFile(new File(uri));
 				projectCache.put(uri, buildResult.getProject());
 				projectParsedListeners.forEach(listener -> listener.accept(buildResult.getProject()));
@@ -164,12 +162,10 @@ public class MavenProjectCache {
 				if (e.getCause() instanceof ModelBuildingException) {
 					ModelBuildingException modelBuildingException = (ModelBuildingException) e.getCause();
 					problems.addAll(modelBuildingException.getProblems());
-					File workingCopy = null;
-					try {
-						File file = new File(uri);
-						workingCopy = File.createTempFile("workingCopy", '.' + file.getName(), file.getParentFile());
-						Files.write(workingCopy.toPath(), document.getText().getBytes(), StandardOpenOption.CREATE);
-						Model model = mavenReader.read(new FileReader(workingCopy));
+					File file = new File(uri);
+					try (ByteArrayInputStream documentStream = new ByteArrayInputStream(
+							document.getText().getBytes())) {
+						Model model = mavenReader.read(documentStream);
 						MavenProject project = new MavenProject(model);
 						project.setRemoteArtifactRepositories(model.getRepositories().stream()
 								.map(repo -> new MavenArtifactRepository(repo.getId(), repo.getUrl(),
@@ -187,10 +183,6 @@ public class MavenProjectCache {
 						projectParsedListeners.forEach(listener -> listener.accept(project));
 					} catch (IOException | XmlPullParserException e1) {
 						e1.printStackTrace();
-					} finally {
-						if (workingCopy != null) {
-							workingCopy.delete();
-						}
 					}
 				} else {
 					problems.add(
@@ -216,13 +208,14 @@ public class MavenProjectCache {
 		problemCache.put(uri, problems);
 	}
 
-	private void initializeMavenBuildState() throws ComponentLookupException, InvalidRepositoryException, SettingsParseException, IOException, MavenExecutionRequestPopulationException {
+	private void initializeMavenBuildState() throws ComponentLookupException, InvalidRepositoryException,
+			SettingsParseException, IOException, MavenExecutionRequestPopulationException {
 		if (projectBuilder != null) {
 			return;
 		}
 		projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
 	}
-	
+
 	public PlexusContainer getPlexusContainer() {
 		return plexusContainer;
 	}
