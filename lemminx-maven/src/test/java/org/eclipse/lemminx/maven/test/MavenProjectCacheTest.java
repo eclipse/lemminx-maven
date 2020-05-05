@@ -29,7 +29,7 @@ public class MavenProjectCacheTest {
 		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenPlugin plugin = new MavenPlugin();
-		plugin.initialize();
+		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -42,7 +42,7 @@ public class MavenProjectCacheTest {
 		String content = FileUtils.readFileToString(pomFile, "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenPlugin plugin = new MavenPlugin();
-		plugin.initialize();
+		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);

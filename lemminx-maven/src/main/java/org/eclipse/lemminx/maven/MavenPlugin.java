@@ -44,7 +44,11 @@ import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext;
+import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
 import org.eclipse.lsp4j.InitializeParams;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 /**
  * Extension for pom.xml.
@@ -68,17 +72,28 @@ public class MavenPlugin implements IXMLExtension {
 	private RepositorySystemSession repositorySystemSession;
 	private MavenPluginManager mavenPluginManager;
 
+	private XMLExtensionsRegistry currentRegistry;
+
+	private InitializeParams params;
+
 	public MavenPlugin() {
 	}
 
 	@Override
 	public void doSave(ISaveContext context) {
-
+		if (context.getType() == SaveContextType.SETTINGS) {
+			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes null on stop
+			stop(registry);
+			params.setInitializationOptions(context.getSettings());
+			start(params, registry);
+		}
 	}
 
 	@Override
 	public void start(InitializeParams params, XMLExtensionsRegistry registry) {
-		initialize();
+		this.params = params;
+		this.currentRegistry = registry;
+		initialize(params != null ? params.getInitializationOptions() : null);
 		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, repositorySystemSession, mavenPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
 		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, repositorySystemSession);
@@ -89,10 +104,10 @@ public class MavenPlugin implements IXMLExtension {
 		registry.registerDefinitionParticipant(definitionParticipant);
 	}
 
-	public void initialize() {
+	public void initialize(Object initializationOptions) {
 		try {
 			container = newPlexusContainer();
-			mavenRequest = initMavenRequest(container);
+			mavenRequest = initMavenRequest(container, initializationOptions);
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
 			repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
 		} catch (Exception e) {
@@ -110,33 +125,64 @@ public class MavenPlugin implements IXMLExtension {
 		}
 	}
 
-	private MavenExecutionRequest initMavenRequest(PlexusContainer container) throws Exception {
+	private MavenExecutionRequest initMavenRequest(PlexusContainer container, Object initializationOptions) throws Exception {
+		JsonObject options = initializationOptions != null ? (JsonObject)initializationOptions : new JsonObject();
+		if (options.has("xml")) {
+			options = options.getAsJsonObject("xml");
+		}
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		SettingsReader reader = container.lookup(SettingsReader.class);
 		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
-		if (SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE.canRead()) {
-			mavenRequest.setGlobalSettingsFile(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
-			Settings globalSettings = reader.read(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE, null);
-			requestPopulator.populateFromSettings(mavenRequest, globalSettings);
+		{
+			final File globalSettingsFile = getFileFromOptons(options.get("maven.globalSettings"), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			if (globalSettingsFile.canRead()) {
+				mavenRequest.setGlobalSettingsFile(globalSettingsFile);
+				Settings globalSettings = reader.read(globalSettingsFile, null);
+				requestPopulator.populateFromSettings(mavenRequest, globalSettings);
+			}
 		}
-		if (SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE.canRead()) {
-			mavenRequest.setUserSettingsFile(SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
-			Settings userSettings = reader.read(SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE, null);
-
-			requestPopulator.populateFromSettings(mavenRequest, userSettings);
+		{
+			final File localSettingsFile = getFileFromOptons(options.get("maven.userSettings"), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
+			if (localSettingsFile.canRead()) {
+				mavenRequest.setUserSettingsFile(localSettingsFile);
+				Settings userSettings = reader.read(localSettingsFile, null);
+				requestPopulator.populateFromSettings(mavenRequest, userSettings);
+			}
 		}
+		mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
 		String localRepoProperty = System.getProperty("maven.repo.local");
 		if (localRepoProperty != null) {
 			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
 		}
-		if (mavenRequest.getLocalRepositoryPath() == null) {
-			mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
+		JsonElement localRepoElement = options.get("maven.repo.local");
+		if (localRepoElement != null && localRepoElement.isJsonPrimitive()) {
+			String localRepoOption = localRepoElement.getAsString();
+			if (localRepoOption != null && !localRepoOption.trim().isEmpty()) {
+				File candidate = new File(localRepoOption);
+				if (candidate.isFile() && candidate.canRead()) {
+					mavenRequest.setLocalRepositoryPath(candidate);
+				}
+			}
 		}
-		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
 
+		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
 		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
 		mavenRequest.setLocalRepository(localRepo);
 		return mavenRequest;
+	}
+
+	private File getFileFromOptons(JsonElement element, File defaults) {
+		if (element == null || !element.isJsonPrimitive()) {
+			return defaults;
+		}
+		String stringValue = element.getAsString();
+		if (stringValue != null && !stringValue.trim().isEmpty()) {
+			File globalSettingsCandidate = new File(stringValue);
+			if (globalSettingsCandidate.canRead()) {
+				return globalSettingsCandidate;
+			}
+		}
+		return defaults;
 	}
 
 	/* Copied from m2e */
@@ -183,6 +229,7 @@ public class MavenPlugin implements IXMLExtension {
 		cache = null;
 		container.dispose();
 		container = null;
+		this.currentRegistry = null;
 	}
 
 	public static boolean match(DOMDocument document) {
