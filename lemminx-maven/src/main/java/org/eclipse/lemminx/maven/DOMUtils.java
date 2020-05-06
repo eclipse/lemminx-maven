@@ -8,9 +8,12 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Optional;
 
 import org.eclipse.lemminx.commons.BadLocationException;
+import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.services.extensions.ICompletionRequest;
@@ -33,6 +36,26 @@ public class DOMUtils {
 
 		if (localName.equals(pluginNode.getLocalName())) {
 			return pluginNode;
+		}
+		return null;
+	}
+	
+	// TODO: use optional?
+	public static DOMNode findNodeByLocalName(final DOMDocument document, final String localName) {
+		Deque<DOMNode> nodes = new ArrayDeque<>();
+		for (DOMNode node : document.getChildren()) {
+			nodes.push(node);
+		}
+		while (!nodes.isEmpty()) {
+			DOMNode node = nodes.pop();
+				if (node.getLocalName() != null && node.getLocalName().equals(localName)) {
+					return node;
+				}
+			if (node.hasChildNodes()) {
+				for (DOMNode childNode : node.getChildren()) {
+					nodes.push(childNode);
+				}
+			}
 		}
 		return null;
 	}
