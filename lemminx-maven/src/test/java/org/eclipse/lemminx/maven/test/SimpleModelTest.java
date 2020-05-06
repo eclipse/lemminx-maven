@@ -22,19 +22,23 @@ import java.util.concurrent.TimeoutException;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.maven.DOMUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lemminx.settings.XMLHoverSettings;
+import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -140,6 +144,37 @@ public class SimpleModelTest {
 
  		hover = languageService.doHover(document, new Position(15, 13), new XMLHoverSettings());
  		assertNull(hover);
+	}
+	
+	@Test
+ 	public void testPropertyDefinitionSameDocument() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
+		Position pos = new Position(14, 22);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		DOMDocument targetDocument = document;
+		DOMNode propertyNode = DOMUtils.findNodeByLocalName(targetDocument, "myProperty");
+		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
+	}
+	
+	@Test
+ 	public void testPropertyDefinitionParentDocument() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
+		Position pos = new Position(23, 16);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		//Verify the LocationLink points to the right file and node
+		DOMDocument targetDocument = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
+		DOMNode propertyNode = DOMUtils.findNodeByLocalName(targetDocument, "myProperty");
+		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
 	}
 
 	@Test

@@ -216,7 +216,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
 		
 		
-		String mavenProperty = getMavenPropertyInHover(request);
+		String mavenProperty = getMavenPropertyInRequest(request);
 		if (mavenProperty != null) {
 			return collectProperty(request, mavenProperty);
 		}
@@ -238,7 +238,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 
-	public String getMavenPropertyInHover(IPositionRequest request) {
+	public static String getMavenPropertyInRequest(IPositionRequest request) {
 		DOMNode tag = request.getNode();
 		String tagText = tag.getNodeValue();
 
