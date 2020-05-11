@@ -98,6 +98,26 @@
 			<type>pom</type>
 			<scope>test</scope>
 		</dependency>
+	<!-- This is a workaround for CI because it looks like CI cannot connect 
+		to Central during tests -->
+	<!-- Use in LocalPluginTest#testPluginDiagnosticMissingPlugin -->
+	<dependency>
+		<groupId>org.apache.maven.plugins</groupId>
+		<artifactId>maven-enforcer-plugin</artifactId>
+		<version>3.0.0-M3</version>
+		<type>jar</type>
+		<scope>test</scope>
+	</dependency>
+	<!-- This is a workaround for CI because it looks like CI cannot connect 
+		to Central during tests -->
+	<!-- Use in LocalPluginTest#testPluginDiagnosticMissingPlugin -->
+	<dependency>
+		<groupId>org.apache.maven.plugins</groupId>
+		<artifactId>maven-shade-plugin</artifactId>
+		<version>3.2.2</version>
+		<type>pom</type>
+		<scope>test</scope>
+	</dependency>
 	</dependencies>
 
 	<build>

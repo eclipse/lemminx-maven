@@ -107,4 +107,25 @@ public class LocalPluginTest {
 					.anyMatch(message -> message.contains("Invalid goal for this plugin")));
 			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
 		}
+		
+
+		// Tests regressions related to
+		// https://github.com/eclipse/lemminx-maven/issues/48
+		@Test
+		public void testPluginDiagnosticMissingPlugin()
+				throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+			DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-plugin.xml", languageService);
+			System.out.println(languageService.doDiagnostics(document, () -> {
+			}, new XMLValidationSettings()));
+			// One diagnostic should be from a missing groupID (incomplete GAV), another should be
+			// from unresolvable plugin (maven-shade-plugin:3.2.2)
+			assertTrue(languageService.doDiagnostics(document, () -> {
+			}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
+					"Plugin org.apache.maven.plugins:maven-shade-plugin:3.2.2 or one of its dependencies could not be resolved")));
+			assertTrue(languageService.doDiagnostics(document, () -> {
+			}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
+					"Incomplete GAV")));
+			assertTrue(languageService.doDiagnostics(document, () -> {
+			}, new XMLValidationSettings()).size() == 2); 
+		}
 }

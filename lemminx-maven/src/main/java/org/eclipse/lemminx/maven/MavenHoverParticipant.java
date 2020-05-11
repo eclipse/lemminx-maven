@@ -32,7 +32,10 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
+import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
+import org.apache.maven.plugin.PluginDescriptorParsingException;
+import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
@@ -165,19 +168,28 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	private String collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
-		if (pluginDescriptor != null ) {
+		PluginDescriptor pluginDescriptor;
+		try {
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
 					return mojo.getDescription();
 				}
-			}			
+			}
+		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
+			e.printStackTrace();
 		}
 		return null;
 	}
 
 	private String collectPuginConfiguration(IPositionRequest request) {
-		List<Parameter> parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager);
+		List<Parameter> parameters;
+		try {
+			parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager);
+		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
+			e.printStackTrace();
+			return null;
+		}
 		DOMNode node = request.getNode();
 		
 		for (Parameter parameter : parameters) {

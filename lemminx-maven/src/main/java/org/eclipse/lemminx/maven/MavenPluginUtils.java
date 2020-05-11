@@ -47,7 +47,7 @@ public class MavenPluginUtils {
 	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
-			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
+			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession,
 				pluginManager);
 		if (pluginDescriptor == null) {
@@ -74,7 +74,7 @@ public class MavenPluginUtils {
 	}
 
 	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request, MavenProjectCache cache, RepositorySystemSession repositorySystemSession,
-			MavenPluginManager pluginManager) {
+			MavenPluginManager pluginManager) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		MavenProject project = cache.getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
 			return null;
@@ -95,17 +95,14 @@ public class MavenPluginUtils {
 		}
 		Plugin plugin = project.getPlugin(pluginKey);
 		if (plugin == null) {
-			return null;
+			throw new InvalidPluginDescriptorException("Incomplete GAV", Collections.emptyList());
+		}
+		if (plugin.getVersion() == null) {
+			throw new InvalidPluginDescriptorException("Missing version for " + plugin.toString(), Collections.emptyList());
 		}
 
-		try {
-			return pluginManager.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
-					.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()),
-					repositorySystemSession);
-		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
-			return null;
-		}
+		return pluginManager.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
+				.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()), repositorySystemSession);
 	}
 
 }
