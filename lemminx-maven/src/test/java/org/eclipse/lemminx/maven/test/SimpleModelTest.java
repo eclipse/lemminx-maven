@@ -16,6 +16,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -33,6 +34,7 @@ import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -138,6 +140,13 @@ public class SimpleModelTest {
 
  		hover = languageService.doHover(document, new Position(15, 13), new XMLHoverSettings());
  		assertNull(hover);
+	}
+
+	@Test
+	public void testBOMDependency() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-bom.xml", languageService);
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
+		
 	}
 
 }

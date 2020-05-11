@@ -118,6 +118,7 @@ public class MavenProjectCache {
 			}
 		}
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
+		request.setSystemProperties(System.getProperties());
 		request.setLocalRepository(mavenRequest.getLocalRepository());
 		request.setRepositorySession(getRepositorySystemSession());
 		try {
@@ -141,6 +142,7 @@ public class MavenProjectCache {
 				initializeMavenBuildState();
 			}
 			ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
+			request.setSystemProperties(System.getProperties());
 			request.setLocalRepository(mavenRequest.getLocalRepository());
 			request.setRepositorySession(getRepositorySystemSession());
 			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
