@@ -24,10 +24,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.maven.Maven;
@@ -248,6 +250,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "configuration":
 			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
+					.filter(distinctByKey(
+							completionItem -> ((CompletionItem) completionItem).getDocumentation().getLeft()))
 					.forEach(response::addCompletionItem);
 			break;
 //		case "relativePath":
@@ -632,5 +636,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		item.setInsertTextFormat(InsertTextFormat.PlainText);
 		item.setTextEdit(new TextEdit(range, insertText));
 		return item;
+	}
+	
+	/*
+	 * Utility function which can be passed as an argument to filter() to filter out
+	 * duplicate elements by a property.
+	 */
+	public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
+		Map<Object, Boolean> map = new ConcurrentHashMap<>();
+		return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
 	}
 }
