@@ -62,12 +62,26 @@ public class LocalPluginTest {
 				new Position(23, 7), new SharedSettings())
 			.getItems().stream().map(CompletionItem::getLabel).anyMatch("failIfNoTests"::equals));
 	}
+	
+	@Test
+	public void testDuplicateCompletionConfigurationParameters() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		assertTrue(languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
+				new Position(23, 7), new SharedSettings())
+			.getItems().stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
+	}
 
 	@Test
 	public void testCompleteConfigurationParametersInTag() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-plugin-config-tag.xml", languageService),
 				new Position(20, 9), new SharedSettings())
 			.getItems().stream().map(CompletionItem::getLabel).anyMatch("failIfNoTests"::equals));
+	}
+	
+	@Test
+	public void testCompleteConfigurationParametersInTagDuplicates() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		assertTrue(languageService.doComplete(createDOMDocument("/pom-plugin-config-tag.xml", languageService),
+				new Position(20, 9), new SharedSettings())
+			.getItems().stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
 	}
 	
 	// Hover related tests
