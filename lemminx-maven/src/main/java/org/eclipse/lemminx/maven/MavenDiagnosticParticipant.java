@@ -91,7 +91,6 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 		HashMap<String, Function<DiagnosticRequest, Diagnostic>> tagDiagnostics = new HashMap<>();
 		tagDiagnostics.put("configuration", validatePluginConfiguration);
-		tagDiagnostics.put("goal", validatePluginGoal);
 		return tagDiagnostics;
 	}
 
