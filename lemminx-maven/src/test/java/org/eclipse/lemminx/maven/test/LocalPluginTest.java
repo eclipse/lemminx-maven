@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -114,7 +115,9 @@ public class LocalPluginTest {
 			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
 		}
 		
+		// Temporarily disabled
 		@Test
+		@Ignore
 	 	public void testPluginGoalDiagnostics() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 			DOMDocument document = createDOMDocument("/pom-plugin-goal-diagnostic.xml", languageService);
 			assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
