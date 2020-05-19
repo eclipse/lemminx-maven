@@ -95,6 +95,9 @@ public class MavenPluginUtils {
 		}
 		Plugin plugin = project.getPlugin(pluginKey);
 		if (plugin == null) {
+			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
+		}
+		if (plugin == null) {
 			throw new InvalidPluginDescriptorException("Incomplete GAV", Collections.emptyList());
 		}
 		if (plugin.getVersion() == null) {
