@@ -37,6 +37,7 @@ import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.model.building.ModelProblem.Version;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.apache.maven.project.DefaultProjectBuilder;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
@@ -121,6 +122,7 @@ public class MavenProjectCache {
 		request.setSystemProperties(System.getProperties());
 		request.setLocalRepository(mavenRequest.getLocalRepository());
 		request.setRepositorySession(getRepositorySystemSession());
+		request.setResolveDependencies(true);
 		try {
 			MavenProject project = projectBuilder.build(file, request).getProject();
 			return Optional.of(project);
@@ -216,6 +218,7 @@ public class MavenProjectCache {
 			return;
 		}
 		projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
+		System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
 	}
 
 	public PlexusContainer getPlexusContainer() {
