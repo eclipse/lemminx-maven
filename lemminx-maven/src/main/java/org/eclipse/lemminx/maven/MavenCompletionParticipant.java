@@ -453,6 +453,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		edit.setRange(request.getReplaceRange());
 		res.setTextEdit(edit);
 		res.setKind(CompletionItemKind.Field);
+		res.setFilterText(edit.getNewText());
 		return res;
 	}
 
