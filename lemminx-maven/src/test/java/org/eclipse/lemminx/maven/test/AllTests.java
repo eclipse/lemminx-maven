@@ -15,8 +15,14 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@SuiteClasses({ LocalRepoTests.class, MavenParseUtilsTest.class, MavenProjectCacheTest.class, LocalPluginTest.class,
-		RemoteRepositoryTest.class, SimpleModelTest.class })
+@SuiteClasses({ // 
+	LocalRepoTests.class, //
+	MavenParseUtilsTest.class, //
+	MavenProjectCacheTest.class, //
+	LocalPluginTest.class, //
+	RemoteRepositoryTest.class, //
+	SimpleModelTest.class, //
+	PathsTest.class})
 public class AllTests {
 
 	@BeforeClass

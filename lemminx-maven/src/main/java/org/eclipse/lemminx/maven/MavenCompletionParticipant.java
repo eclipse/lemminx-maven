@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -220,7 +222,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			}
 			break;
 		case "module":
-			collectSubModuleCompletion(request, response);
+			collectSubModuleCompletion(request).forEach(response::addCompletionItem);
+			break;
+		case "relativePath":
+			collectRelativePathCompletion(request).forEach(response::addCompletionItem);
 			break;
 		case "dependencies":
 		case "dependency":
@@ -257,9 +262,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 							completionItem -> ((CompletionItem) completionItem).getDocumentation().getLeft()))
 					.forEach(response::addCompletionItem);
 			break;
-//		case "relativePath":
-//			collectLocalPaths(request).stream().map(toCompletionItem(label, description, range))
-//			break;
 		default:
 			initSnippets();
 			TextDocument document = parent.getOwnerDocument().getTextDocument();
@@ -473,6 +475,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 
 		MavenProject project = cache.getLastSuccessfulMavenProject(request.getXMLDocument());
+		if (project == null) {
+			return Collections.emptySet();
+		}
 		Map<String, String> allProps = MavenHoverParticipant.getMavenProjectProperties(project);
 
 		final int offset = initialPropertyOffset;
@@ -565,21 +570,87 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 	}
 
-	private void collectSubModuleCompletion(ICompletionRequest request, ICompletionResponse response) {
+	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
 		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();
-
-		Range range = XMLPositionUtility.createRange(node.getStartTagCloseOffset() + 1, node.getEndTagOpenOffset(),
-				doc);
-		MavenProject mavenProject = cache.getLastSuccessfulMavenProject(doc);
-		if (mavenProject == null) {
-			return;
+		File docFolder = new File(URI.create(doc.getTextDocument().getUri())).getParentFile();
+		String prefix = doc.getText().substring(node.getStartTagCloseOffset() + 1, request.getOffset());
+		File prefixFile = new File(docFolder, prefix);
+		List<File> files = new ArrayList<>();
+		if (!prefix.isEmpty() && !prefix.endsWith("/")) {
+			files.addAll(Arrays.asList(prefixFile.getParentFile().listFiles((dir, name) -> name.startsWith(prefixFile.getName()))));
 		}
-		Model model = mavenProject.getModel();
-		for (String module : model.getModules()) {
-			response.addCompletionItem(toCompletionItem(module, "", range));
+		if (prefixFile.isDirectory()) {
+			files.addAll(Arrays.asList(prefixFile.listFiles(File::isDirectory)));
 		}
+		// make folder that have a pom show higher
+		files.sort(Comparator.comparing((File file) -> new File(file, Maven.POMv4).exists()).reversed().thenComparing(Function.identity()));
+		if (prefix.isEmpty()) {
+			files.add(docFolder.getParentFile());
+		}
+		return files.stream()
+			.map(file -> toFileCompletionItem(file, docFolder, request))
+			.collect(Collectors.toList());
+	}
 
+	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
+		DOMElement node = request.getParentElement();
+		DOMDocument doc = request.getXMLDocument();
+		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
+		File docFolder = docFile.getParentFile();
+		String prefix = doc.getText().substring(node.getStartTagCloseOffset() + 1, request.getOffset());
+		File prefixFile = new File(docFolder, prefix);
+		List<File> files = new ArrayList<>();
+		if (prefix.isEmpty()) {
+			Arrays.stream(docFolder.getParentFile().listFiles())
+				.filter(file -> file.getName().contains("parent"))
+				.map(file -> new File(file, Maven.POMv4))
+				.filter(File::isFile)
+				.forEach(files::add);
+			files.add(docFolder.getParentFile());
+		} else {
+			try {
+				prefixFile = prefixFile.getCanonicalFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			if (!prefix.endsWith("/")) {
+				final File thePrefixFile = prefixFile;
+				files.addAll(Arrays.asList(prefixFile.getParentFile().listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
+			}
+		}
+		if (prefixFile.isDirectory()) {
+			files.addAll(Arrays.asList(prefixFile.listFiles()));
+		}
+		return files.stream()
+			.filter(file -> file.getName().equals(Maven.POMv4) || file.isDirectory())
+			.filter(file -> !(file.equals(docFolder) || file.equals(docFile)))
+			.flatMap(file -> {
+				if (docFile.toPath().startsWith(file.toPath()) || file.getName().contains("parent")) {
+					File pomFile = new File(file, Maven.POMv4);
+					if (pomFile.exists()) {
+						return Stream.of(pomFile, file);
+					}
+				}
+				return Stream.of(file);
+			}).sorted(Comparator
+				.comparing(File::isFile) // pom files before folders
+				.thenComparing(file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath())) || (file.isDirectory() && file.equals(docFolder.getParentFile()))) // `../pom.xml` before ...
+				.thenComparing(file -> file.getParentFile().getName().contains("parent")) // folders containing "parent" before...
+				.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings before...
+				.reversed().thenComparing(Function.identity())// other folders and files
+			).map(file -> toFileCompletionItem(file, docFolder, request))
+			.collect(Collectors.toList());
+	}
+
+	private CompletionItem toFileCompletionItem(File file, File referenceFolder, ICompletionRequest request) {
+		CompletionItem res = new CompletionItem();
+		Path path = referenceFolder.toPath().relativize(file.toPath());
+		res.setLabel(path.toString());
+		res.setFilterText(path.toString());
+		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
+		res.setTextEdit(new TextEdit(request.getReplaceRange(), path.toString()));
+		return res;
 	}
 
 	private void initSnippets() {
