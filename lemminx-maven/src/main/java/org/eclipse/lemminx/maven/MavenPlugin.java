@@ -12,6 +12,7 @@
 package org.eclipse.lemminx.maven;
 
 import java.io.File;
+import java.net.URI;
 
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -233,9 +234,9 @@ public class MavenPlugin implements IXMLExtension {
 	}
 
 	public static boolean match(DOMDocument document) {
-		String uri = document.getDocumentURI();
-		String fileName = uri.substring(uri.lastIndexOf(File.separatorChar) + 1);
-		return (fileName.startsWith("pom") && fileName.endsWith(".xml")) || fileName.endsWith(Maven.POMv4);
+		File file = new File(URI.create(document.getDocumentURI()));
+		return (file.getName().startsWith("pom") && file.getName().endsWith(".xml"))
+				|| file.getName().endsWith(Maven.POMv4);
 	}
 
 	public MavenProjectCache getProjectCache() {
