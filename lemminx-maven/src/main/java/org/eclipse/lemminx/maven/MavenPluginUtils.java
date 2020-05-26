@@ -10,10 +10,12 @@ package org.eclipse.lemminx.maven;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -94,14 +96,21 @@ public class MavenPluginUtils {
 			pluginKey += artifactId.get();
 		}
 		Plugin plugin = project.getPlugin(pluginKey);
-		if (plugin == null) {
+		if (plugin == null && project.getPluginManagement() != null) {
 			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
+			
+			if (plugin == null && artifactId.isPresent()) {
+				//pluginArtifactMap will be empty if PluginManagement is null
+				for (Entry <String, Artifact> entry : project.getPluginArtifactMap().entrySet() ) {
+					if (entry.getValue().getArtifactId().equals(artifactId.get())) {
+						plugin = project.getPlugin(entry.getKey());
+					}
+				}
+			}
 		}
+		
 		if (plugin == null) {
-			throw new InvalidPluginDescriptorException("Incomplete GAV", Collections.emptyList());
-		}
-		if (plugin.getVersion() == null) {
-			throw new InvalidPluginDescriptorException("Missing version for " + plugin.toString(), Collections.emptyList());
+			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey,  Collections.emptyList());
 		}
 
 		return pluginManager.getPluginDescriptor(plugin, project.getPluginRepositories().stream()

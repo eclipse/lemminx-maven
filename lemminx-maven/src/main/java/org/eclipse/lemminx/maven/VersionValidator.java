@@ -8,38 +8,33 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.handler.DefaultArtifactHandler;
 import org.apache.maven.model.Dependency;
-import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
-import org.eclipse.lsp4j.Range;
 
 public class VersionValidator {
 
-	public static Diagnostic validateVersion(DiagnosticRequest diagnosticRequest) {
+	public static Optional<List<Diagnostic>> validateVersion(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
-		DOMDocument xmlDocument = diagnosticRequest.getXMLDocument();
 		Dependency model = MavenParseUtils.parseArtifact(node);
 		Artifact artifact = null;
-		Range range = diagnosticRequest.getRange();
-		Diagnostic diagnostic = null;
 		try {
 			 artifact = new DefaultArtifact(model.getGroupId(), model.getArtifactId(), model.getVersion(), model.getScope(), model.getType(), model.getClassifier(), new DefaultArtifactHandler(model.getType()));
-			 if (!artifact.isSelectedVersionKnown()) {
-				diagnostic = new Diagnostic(range, "Version Error", DiagnosticSeverity.Error,
-						xmlDocument.getDocumentURI(), "XML");
-				diagnosticRequest.getDiagnostics().add(diagnostic);
+			if (!artifact.isSelectedVersionKnown()) {
+				return Optional.of(Collections
+						.singletonList(diagnosticRequest.createDiagnostic("Version Error", DiagnosticSeverity.Error)));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			diagnostic = new Diagnostic(range, e.getMessage(), DiagnosticSeverity.Error,
-					xmlDocument.getDocumentURI(), "XML");
-			diagnosticRequest.getDiagnostics().add(diagnostic);
 		}
-		return diagnostic;
+		return Optional.empty();
 	}
 }

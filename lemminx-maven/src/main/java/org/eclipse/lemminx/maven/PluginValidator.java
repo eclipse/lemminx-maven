@@ -35,44 +35,44 @@ public class PluginValidator {
 		this.repoSession = repoSession;
 		this.pluginManager = pluginManager;
 	}
-	
-	public boolean validatePluginResolution(DiagnosticRequest diagnosticRequest) {
+
+	public Optional<List<Diagnostic>> validatePluginResolution(DiagnosticRequest diagnosticRequest) {
 		try {
-			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession,
-					pluginManager);
+			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession, pluginManager);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			//Add artifactId diagnostic
 			e.printStackTrace();
+			
+			// Add artifactId diagnostic
 			String errorMessage = e.getMessage();
 			DOMNode pluginNode = DOMUtils.findClosestParentNode(diagnosticRequest, "plugin");
-			Optional<DOMNode> artifactNode = pluginNode.getChildren().stream().filter(node -> node.getLocalName().equals("artifactId")).findAny();
+			Optional<DOMNode> artifactNode = pluginNode.getChildren().stream().filter(node -> !node.isComment())
+					.filter(node -> node.getLocalName().equals("artifactId")).findAny();
+			List<Diagnostic> diagnostics = new ArrayList<>();
 			artifactNode.ifPresent(node -> {
-				DiagnosticRequest artifactDiagnosticReq = new DiagnosticRequest(node,
-						diagnosticRequest.getXMLDocument(), diagnosticRequest.getDiagnostics());
-				Diagnostic unresolvablePlugin = new Diagnostic(artifactDiagnosticReq.getRange(),
-						"Plugin could not be resolved. Ensure the plugin's groupId, artifactId and version are present." + MavenPluginUtils.LINE_BREAK + "Additional information: "
-								+ errorMessage, DiagnosticSeverity.Warning,
-				artifactDiagnosticReq.getXMLDocument().getDocumentURI(), "XML");
-				List<Diagnostic> diagnostics = diagnosticRequest.getDiagnostics();
-				if (!diagnostics.contains(unresolvablePlugin)) {
-					diagnosticRequest.getDiagnostics().add(unresolvablePlugin);					
-				}
+				DiagnosticRequest artifactDiagnosticReq = new DiagnosticRequest(artifactNode.get(),
+						diagnosticRequest.getXMLDocument());
+				diagnostics.add(artifactDiagnosticReq.createDiagnostic(
+						"Plugin could not be resolved. Ensure the plugin's groupId, artifactId and version are present."
+								+ MavenPluginUtils.LINE_BREAK + "Additional information: " + errorMessage,
+						DiagnosticSeverity.Warning));
 			});
-			return false;
+			if (!diagnostics.isEmpty()) {
+				return Optional.of(diagnostics);
+			}
 		}
-		return true;
+		return Optional.empty();
 	}
 
-	public Diagnostic validateConfiguration(DiagnosticRequest diagnosticRequest) {
+	public Optional<List<Diagnostic>> validateConfiguration(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
 		if (node == null) {
-			return null;
+			return Optional.empty();
 		}
-		if (!validatePluginResolution(diagnosticRequest)) {
-			return null;
+		Optional<List<Diagnostic>> pluginResolutionError = validatePluginResolution(diagnosticRequest);
+		if (pluginResolutionError.isPresent()) {
+			return pluginResolutionError;
 		}
-		
-		
+
 		List<Parameter> parameters = new ArrayList<>();
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache, repoSession,
@@ -82,80 +82,74 @@ public class PluginValidator {
 			// A diagnostic was already added in validatePluginResolution()
 		}
 		if (parameters.isEmpty()) {
-			return null;
+			return Optional.empty();
 		}
+		
+		List<Diagnostic> diagnostics = new ArrayList<>();
 		if (node.isElement() && node.hasChildNodes()) {
 			for (DOMNode childNode : node.getChildren()) {
-				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode,
-						diagnosticRequest.getXMLDocument(), diagnosticRequest.getDiagnostics());
-				Diagnostic diag = internalValidateConfiguration(childDiagnosticReq, parameters);
-				if (diag != null) {
-					diagnosticRequest.getDiagnostics().add(diag);
-				}
+				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode, diagnosticRequest.getXMLDocument());
+				validateConfigurationElement(childDiagnosticReq, parameters).ifPresent(diagnostics::add);;
 			}
 		}
-		return null;
+		
+		return Optional.of(diagnostics);
 	}
 
-	public Diagnostic validateGoal(DiagnosticRequest diagnosticRequest) {
+	public Optional<List<Diagnostic>> validateGoal(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
 		if (node == null) {
-			return null;
+			return Optional.empty();
 		}
-		if (!validatePluginResolution(diagnosticRequest)) {
-			return null;
+		Optional<List<Diagnostic>> pluginResolutionError = validatePluginResolution(diagnosticRequest);
+		if (pluginResolutionError.isPresent()) {
+			return pluginResolutionError;
 		}
+		
+		List<Diagnostic> diagnostics = new ArrayList<>();
 		if (node.isElement() && node.hasChildNodes()) {
 			PluginDescriptor pluginDescriptor;
 			try {
 				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession,
 						pluginManager);
-				Diagnostic diag = internalValidateGoal(diagnosticRequest, pluginDescriptor);
-				if (diag != null) {
-					diagnosticRequest.getDiagnostics().add(diag);
-				}
+				internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;
+
 			} catch (PluginResolutionException | PluginDescriptorParsingException
 					| InvalidPluginDescriptorException e) {
 				e.printStackTrace();
 				// A diagnostic was already added in validatePluginResolution()
 			}
 		}
-		return null;
+		return Optional.of(diagnostics);
 	}
 
-	private static Diagnostic internalValidateGoal(DiagnosticRequest diagnosticReq, PluginDescriptor pluginDescriptor) {
+	private static Optional<Diagnostic> internalValidateGoal(DiagnosticRequest diagnosticReq, PluginDescriptor pluginDescriptor) {
 		DOMNode node = diagnosticReq.getNode();
 		if (!node.hasChildNodes()) {
-			return null;
+			return Optional.empty();
 		}
 
 		String goal = node.getChild(0).getNodeValue();
 		for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 			if (!goal.isEmpty() && goal.equals(mojo.getGoal())) {
-				return null;
+				return Optional.empty();
 			}
 		}
-
-		return new Diagnostic(diagnosticReq.getRange(), "Invalid goal for this plugin: " + goal,
-				DiagnosticSeverity.Warning, diagnosticReq.getXMLDocument().getDocumentURI(), "XML");
-
+		return Optional.of(diagnosticReq.createDiagnostic("Invalid goal for this plugin: " + goal, DiagnosticSeverity.Warning));
 	}
 
-	private static Diagnostic internalValidateConfiguration(DiagnosticRequest diagnosticReq,
-			List<Parameter> parameters) {
+	private static Optional<Diagnostic> validateConfigurationElement(DiagnosticRequest diagnosticReq, List<Parameter> parameters) {
 		DOMNode node = diagnosticReq.getNode();
 		if (node.getLocalName() == null) {
-			return null;
+			return Optional.empty();
 		}
 		for (Parameter parameter : parameters) {
 			if (node.getLocalName().equals(parameter.getName())) {
-				return null;
+				return Optional.empty();
 			}
 		}
-		return new Diagnostic(diagnosticReq.getRange(),
-				"Invalid plugin configuration: " + diagnosticReq.getCurrentTag(), DiagnosticSeverity.Warning,
-				diagnosticReq.getXMLDocument().getDocumentURI(), "XML");
-
+		return Optional.of(diagnosticReq.createDiagnostic("Invalid plugin configuration: " + diagnosticReq.getCurrentTag(),
+				DiagnosticSeverity.Warning));
 	}
 
 }

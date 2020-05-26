@@ -12,15 +12,16 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
-import org.eclipse.lsp4j.Range;
 
 public class SubModuleValidator {
 	Model model;
@@ -32,23 +33,18 @@ public class SubModuleValidator {
 		model = mavenreader.read(new FileReader(pomFile));
 	}
 
-	public Diagnostic validateSubModuleExistence(DiagnosticRequest diagnosticRequest) {
+	public Optional<List<Diagnostic>> validateSubModuleExistence(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
-		DOMDocument xmlDocument = diagnosticRequest.getXMLDocument();
-		Diagnostic diagnostic = null;
-		Range range = diagnosticRequest.getRange();
 		String tagContent = null;
 		if (node.hasChildNodes()) {
 			tagContent = node.getChild(0).getNodeValue(); // tagContent is the module to validate eg.
 															// <module>tagContent</module>
 		}
 		if (node.hasChildNodes() && !model.getModules().contains(tagContent)) {
-			diagnostic = new Diagnostic(range, String.format("Module '%s' does not exist", tagContent),
-					DiagnosticSeverity.Error, xmlDocument.getDocumentURI(), "XML");
-			diagnosticRequest.getDiagnostics().add(diagnostic);
+			return Optional.of(Collections.singletonList(diagnosticRequest.createDiagnostic(
+					String.format("Module '%s' does not exist", tagContent), DiagnosticSeverity.Error)));
 		}
-		return diagnostic;
-
+		return Optional.empty();
 	}
 
 }

@@ -15,6 +15,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -134,18 +135,28 @@ public class LocalPluginTest {
 	public void testPluginDiagnosticMissingPlugin()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-plugin.xml", languageService);
-		System.out.println(languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings()));
-		// One diagnostic should be from a missing groupID (incomplete GAV), another should be
-		// from unresolvable plugin (maven-shade-plugin:3.2.2)
-		assertTrue(languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
+		}, new XMLValidationSettings());
+		// Only one diagnostic should be present from unresolvable plugin (maven-shade-plugin:3.2.2)
+		assertTrue(diagnostics.stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
 				"Plugin org.apache.maven.plugins:maven-shade-plugin:3.2.2 or one of its dependencies could not be resolved")));
+		assertTrue(diagnostics.size() == 1); 
+	}
+	
+	@Test
+	public void testDiagnosticMissingGroupId() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-groupid.xml", languageService);
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
+		}, new XMLValidationSettings());
+		assertTrue(diagnostics.size() == 0); 
+	}
+	
+	@Test
+	public void testGoalDiagnosticsNoFalsePositives()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-plugin-valid-goal-diagnostic.xml", languageService);
 		assertTrue(languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
-				"Incomplete GAV")));
-		assertTrue(languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings()).size() == 2); 
+		}, new XMLValidationSettings()).size() == 0);
 	}
 
 	@Test
