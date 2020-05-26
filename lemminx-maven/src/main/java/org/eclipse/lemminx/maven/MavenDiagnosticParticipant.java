@@ -12,7 +12,10 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 
@@ -50,8 +53,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		
 		projectCache.getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
 		DOMElement documentElement = xmlDocument.getDocumentElement();
-		HashMap<String, Function<DiagnosticRequest, Diagnostic>> tagDiagnostics = configureDiagnosticFunctions(
-				xmlDocument);
+		HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
 		Deque<DOMNode> nodes = new ArrayDeque<>();
 		for (DOMNode node : documentElement.getChildren()) {
@@ -59,20 +61,16 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 		while (!nodes.isEmpty()) {
 			DOMNode node = nodes.pop();
-			for (String tagToValidate : tagDiagnostics.keySet()) {
-				if (node.getLocalName() != null && node.getLocalName().equals(tagToValidate)) {
-					Diagnostic diagnostic = null;
-					try {
-						diagnostic = tagDiagnostics.get(tagToValidate)
-								.apply(new DiagnosticRequest(node, xmlDocument, diagnostics));
-					} catch (Exception e) {
-						// TODO: Use plug-in error logger
-						e.printStackTrace();
-					}
-
-					if (diagnostic != null) {
-						diagnostics.add(diagnostic);
-					}
+			for (Entry<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> entry : tagDiagnostics
+					.entrySet()) {
+				if (node.getLocalName() != null && node.getLocalName().equals(entry.getKey())) {
+					entry.getValue().apply(new DiagnosticRequest(node, xmlDocument))
+							.ifPresent(diagnosticList -> {
+								// Don't add a diagnostic if it already exists
+								diagnostics.addAll(
+										diagnosticList.stream().filter(diagnostic -> !diagnostics.contains(diagnostic))
+												.collect(Collectors.toList()));
+							});
 				}
 			}
 			if (node.hasChildNodes()) {
@@ -83,14 +81,15 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 	}
 
-	private HashMap<String, Function<DiagnosticRequest, Diagnostic>> configureDiagnosticFunctions(
-			DOMDocument xmlDocument) {
+	private HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions() {
 		PluginValidator pluginValidator = new PluginValidator(projectCache, repoSession, pluginManager);
-		Function<DiagnosticRequest, Diagnostic> validatePluginConfiguration = pluginValidator::validateConfiguration;
-		Function<DiagnosticRequest, Diagnostic> validatePluginGoal = pluginValidator::validateGoal;
 
-		HashMap<String, Function<DiagnosticRequest, Diagnostic>> tagDiagnostics = new HashMap<>();
+		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginConfiguration = pluginValidator::validateConfiguration;
+		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginGoal = pluginValidator::validateGoal;
+
+		HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = new HashMap<>();
 		tagDiagnostics.put("configuration", validatePluginConfiguration);
+		tagDiagnostics.put("goal", validatePluginGoal);
 		return tagDiagnostics;
 	}
 

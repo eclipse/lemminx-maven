@@ -8,8 +8,6 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
-import java.util.List;
-
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
@@ -18,48 +16,42 @@ import org.eclipse.lemminx.dom.LineIndentInfo;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 public class DiagnosticRequest implements IPositionRequest {
 	private DOMNode node;
 	private DOMDocument xmlDocument;
-	private List<Diagnostic> diagnostics;
-
-	public DiagnosticRequest(DOMNode node, DOMDocument xmlDocument, List<Diagnostic> diagnostics) {
-		this.setNode(node);
-		this.setXMLDocument(xmlDocument);
-		this.setDiagnostics(diagnostics);
+	
+	/**
+	 * A diagnosticRequest allows creation of diagnostics for a supplied node.
+	 * 
+	 * @param node        The node where diagnostics should be added.
+	 * @param xmlDocument The XMLDocument where the diagnostics will appear
+	 */
+	public DiagnosticRequest(DOMNode node, DOMDocument xmlDocument) {
+		this.node = node;
+		this.xmlDocument = xmlDocument;
 	}
-
+	
+	public Diagnostic createDiagnostic(String errorMessage, DiagnosticSeverity severity) {
+		return new Diagnostic(this.getRange(), errorMessage, severity, this.getXMLDocument().getDocumentURI(), "XML");
+	}
+	
+	private Range getRange() {
+		return XMLPositionUtility.createRange(((DOMElement) node).getStartTagCloseOffset() + 1,
+				((DOMElement) node).getEndTagOpenOffset(), xmlDocument);
+	}
+	
+	@Override
 	public DOMDocument getXMLDocument() {
 		return xmlDocument;
-	}
-
-	private void setXMLDocument(DOMDocument xmlDocument) {
-		this.xmlDocument = xmlDocument;
 	}
 
 	@Override
 	public DOMNode getNode() {
 		return node;
-	}
-
-	private void setNode(DOMNode node) {
-		this.node = node;
-	}
-
-	public List<Diagnostic> getDiagnostics() {
-		return diagnostics;
-	}
-
-	private void setDiagnostics(List<Diagnostic> diagnostics) {
-		this.diagnostics = diagnostics;
-	}
-
-	public Range getRange() {
-		return XMLPositionUtility.createRange(((DOMElement) node).getStartTagCloseOffset() + 1,
-				((DOMElement) node).getEndTagOpenOffset(), xmlDocument);
 	}
 
 	@Override
