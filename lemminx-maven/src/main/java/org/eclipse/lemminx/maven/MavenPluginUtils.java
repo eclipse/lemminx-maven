@@ -16,8 +16,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Repository;
+import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -49,7 +51,7 @@ public class MavenPluginUtils {
 	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
-			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager, MavenSession mavenSession) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession,
 				pluginManager);
 		if (pluginDescriptor == null) {
@@ -65,10 +67,19 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
+		// Wrap these into MojoParameters that could be used? Might be duplicating work if they're present in the MojoParameters that get retrieved afterwards
 		List<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
 				.collect(Collectors.toList());
+		MavenProject project =  cache.getLastSuccessfulMavenProject(request.getXMLDocument());
+		// TODO: project could be null..
+		mavenSession.setProjects(Collections.singletonList(project));
+		// TODO: This isin't currently being used, just here for debugging purposes
+		List<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper.loadMojoParameters(pluginDescriptor, mojo, mavenSession, buildPluginManager).stream()
+		).collect(Collectors.toList());
+		
 		return parameters;
 	}
+
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
 		Builder builder = new RemoteRepository.Builder(modelRepo.getId(), modelRepo.getLayout(), modelRepo.getLayout());
