@@ -27,11 +27,13 @@ import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
+import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -56,13 +58,17 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenPluginManager pluginManager;
 	private final LocalRepositorySearcher localRepoSearcher;
 	private final RepositorySystemSession repoSession;
+	private final MavenSession mavenSession;
+	private final BuildPluginManager buildPluginManager;
 
-	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
+	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
 		this.cache = cache;
 		this.localRepoSearcher = localRepoSearcher;
 		this.indexSearcher = indexSearcher;
 		this.repoSession = repoSession;
+		this.mavenSession = mavenSession;
 		this.pluginManager = pluginManager;
+		this.buildPluginManager = buildPluginManager;
 	}
 
 	@Override
@@ -185,7 +191,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	private String collectPuginConfiguration(IPositionRequest request) {
 		List<Parameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager);
+			parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			return null;

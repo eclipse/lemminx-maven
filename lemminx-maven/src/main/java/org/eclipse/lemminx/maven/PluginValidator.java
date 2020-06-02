@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -28,12 +30,16 @@ public class PluginValidator {
 	private final MavenProjectCache cache;
 	private final MavenPluginManager pluginManager;
 	private final RepositorySystemSession repoSession;
+	private final MavenSession mavenSession;
+	private final BuildPluginManager buildPluginManager;
 
-	public PluginValidator(MavenProjectCache cache, RepositorySystemSession repoSession,
-			MavenPluginManager pluginManager) {
+	public PluginValidator(MavenProjectCache cache, RepositorySystemSession repoSession, MavenSession mavenSession,
+			MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
 		this.cache = cache;
 		this.repoSession = repoSession;
 		this.pluginManager = pluginManager;
+		this.mavenSession = mavenSession;
+		this.buildPluginManager = buildPluginManager;
 	}
 
 	public Optional<List<Diagnostic>> validatePluginResolution(DiagnosticRequest diagnosticRequest) {
@@ -76,7 +82,7 @@ public class PluginValidator {
 		List<Parameter> parameters = new ArrayList<>();
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache, repoSession,
-					pluginManager);
+					pluginManager, buildPluginManager, mavenSession);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			// A diagnostic was already added in validatePluginResolution()

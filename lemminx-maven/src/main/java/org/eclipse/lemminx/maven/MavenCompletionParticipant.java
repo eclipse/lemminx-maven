@@ -38,11 +38,13 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -100,13 +102,17 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private final RemoteRepositoryIndexSearcher indexSearcher;
 	private final MavenPluginManager pluginManager;
 	private final RepositorySystemSession repoSession;
+	private final MavenSession mavenSession;
+	private final BuildPluginManager buildPluginManager;
 
-	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenPluginManager pluginManager) {
+	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
 		this.cache = cache;
 		this.localRepositorySearcher = localRepositorySearcher;
 		this.indexSearcher = indexSearcher;
 		this.repoSession = repoSession;
+		this.mavenSession = mavenSession;
 		this.pluginManager = pluginManager;
+		this.buildPluginManager = buildPluginManager;
 	}
 	
 	@Override
@@ -117,7 +123,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 		
 		if ("configuration".equals(request.getParentElement().getLocalName())) {
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager).stream()
+			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
 					.forEach(response::addCompletionItem);
 		}
@@ -260,7 +266,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			collectGoals(request).forEach(response::addCompletionItem);
 			break;
 		case "configuration":
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager).stream()
+			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession).stream()
 					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
 					.filter(distinctByKey(
 							completionItem -> ((CompletionItem) completionItem).getDocumentation().getLeft()))
