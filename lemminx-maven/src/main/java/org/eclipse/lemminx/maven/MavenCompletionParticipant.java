@@ -34,6 +34,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
@@ -220,6 +221,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// TODO localRepo
 				// TODO remoteRepos
 			}
+			if (allArtifactInfos.isEmpty()) {
+				response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
+			}
 			break;
 		case "module":
 			collectSubModuleCompletion(request).forEach(response::addCompletionItem);
@@ -289,6 +293,24 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		if (request.getNode().isText() && (allArtifactInfos.isEmpty() || request.getNode().getTextContent().contains("$"))) {
 			completeProperties(request).forEach(response::addCompletionAttribute);
 		}
+	}
+
+	private CompletionItem toTextCompletionItem(ICompletionRequest request, String text) throws BadLocationException {
+		CompletionItem res = new CompletionItem(text);
+		res.setFilterText(text);
+		TextEdit edit = new TextEdit();
+		edit.setNewText(text);
+		res.setTextEdit(edit);
+		Position endOffset = request.getXMLDocument().positionAt(request.getOffset());
+		for (int startOffset = Math.max(0, request.getOffset() - text.length()); startOffset <= request.getOffset(); startOffset++) {
+			String prefix = request.getXMLDocument().getText().substring(startOffset, request.getOffset());
+			if (text.startsWith(prefix)) {
+				edit.setRange(new Range(request.getXMLDocument().positionAt(startOffset), endOffset));
+				return res;
+			}
+		}
+		edit.setRange(new Range(endOffset, endOffset));
+		return res;
 	}
 
 	private ArtifactInfo toArtifactInfo(Gav gav) {
@@ -480,26 +502,26 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 		Map<String, String> allProps = MavenHoverParticipant.getMavenProjectProperties(project);
 
-		final int offset = initialPropertyOffset;
 		return allProps.entrySet().stream().map(property -> {
-			CompletionItem item = new CompletionItem();
-			item.setLabel("${" + property.getKey() + '}');
-			item.setDocumentation("Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
 			try {
-				TextEdit textEdit = new TextEdit();
-				textEdit.setNewText(item.getLabel());
-				Range range = new Range(xmlDocument.positionAt(offset),
-						xmlDocument.positionAt(request.getOffset()));
-				textEdit.setRange(range);
-				item.setTextEdit(textEdit);
+				CompletionItem item = toTextCompletionItem(request, "${" + property.getKey() + '}');
+				item.setDocumentation("Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
+				item.setKind(CompletionItemKind.Property);
+				return item;
 			} catch (BadLocationException e) {
 				e.printStackTrace();
-				item.setInsertText(item.getLabel());
+				return toErrorCompletionItem(e);
 			}
-			return item;
 		}).collect(Collectors.toList());
 	}
 	
+	private CompletionItem toErrorCompletionItem(Throwable e) {
+		CompletionItem res = new CompletionItem("Error: " + e.getMessage());
+		res.setDocumentation(ExceptionUtils.getStackTrace(e));
+		res.setInsertText("");
+		return res;
+	}
+
 	private void internalCollectRemoteGAVCompletion(ICompletionRequest request, boolean onlyPlugins, Collection<ArtifactInfo> artifactInfosCollector, ICompletionResponse nonArtifactCollector) {
 		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();

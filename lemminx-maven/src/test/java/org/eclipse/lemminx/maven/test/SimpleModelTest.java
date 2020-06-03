@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -181,7 +182,14 @@ public class SimpleModelTest {
 	public void testBOMDependency() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-bom.xml", languageService);
 		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
-		
 	}
 
+	@Test
+	public void testCompleteSNAPSHOT() throws Exception {
+		DOMDocument document = createDOMDocument("/pom-version.xml", languageService);
+		Optional<TextEdit> edit = languageService.doComplete(document, new Position(0, 11), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).findFirst();
+		assertTrue(edit.isPresent());
+		assertEquals("-SNAPSHOT", edit.get().getNewText());
+		assertEquals(new Range(new Position(0, 9), new Position(0, 11)), edit.get().getRange());
+	}
 }
