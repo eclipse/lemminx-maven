@@ -29,6 +29,8 @@ import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.graph.DependencyFilter;
+import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -49,6 +51,23 @@ public class MavenPluginUtils {
 						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parameter.getDefaultValue()
 						+ LINE_BREAK + parameter.getDescription());
 	}
+	
+	// TODO: Handle the fact that MojoParameter's content (eg. DefaultValue) can be null
+	public static MarkupContent getMarkupDescription(MojoParameter parameter) {
+		return new MarkupContent("markdown",
+				"**required:** " + parameter.isRequired() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
+						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parameter.getDefaultValue()
+						+ LINE_BREAK + parameter.getDescription());
+	}
+	
+	// TODO: fix code duplication..
+	// TODO: add a note about using description and default valuefrom parent
+	public static MarkupContent getMarkupDescriptionUsingParent(MojoParameter parameter, MojoParameter parentParameter) {
+		return new MarkupContent("markdown",
+				"**required:** " + parameter.isRequired() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
+						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parentParameter.getDefaultValue()
+						+ LINE_BREAK + parentParameter.getDescription());
+	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
 			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager, MavenSession mavenSession) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
@@ -67,17 +86,48 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		// Wrap these into MojoParameters that could be used? Might be duplicating work if they're present in the MojoParameters that get retrieved afterwards
 		List<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
 				.collect(Collectors.toList());
-		MavenProject project =  cache.getLastSuccessfulMavenProject(request.getXMLDocument());
-		// TODO: project could be null..
-		mavenSession.setProjects(Collections.singletonList(project));
-		// TODO: This isin't currently being used, just here for debugging purposes
-		List<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper.loadMojoParameters(pluginDescriptor, mojo, mavenSession, buildPluginManager).stream()
-		).collect(Collectors.toList());
-		
 		return parameters;
+	}
+	
+	
+	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
+			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager, MavenSession mavenSession) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession,
+				pluginManager);
+		if (pluginDescriptor == null) {
+			return Collections.emptySet();
+		}
+		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
+		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, "execution");
+		if (executionElementDomNode != null) {
+			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
+					.filter(node -> "goals".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(node -> "goal".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(DOMNode::isText).map(DOMNode::getTextContent).collect(Collectors.toSet());
+			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
+					.collect(Collectors.toList());
+		}
+		MavenProject project =  cache.getLastSuccessfulMavenProject(request.getXMLDocument());
+		if (project == null) {
+			return Collections.emptySet();
+		}
+		project.setExtensionDependencyFilter(new DependencyFilter() {
+			
+			@Override
+			public boolean accept(DependencyNode node, List<DependencyNode> parents) {
+				// TODO Auto-generated method stub
+				System.out.println("Dependency: " + node.getDependency().getArtifact().getArtifactId());
+				System.out.println(node.getRepositories());
+				return true;
+			}
+		});
+		mavenSession.setProjects(Collections.singletonList(project));
+		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper.loadMojoParameters(pluginDescriptor, mojo, mavenSession, buildPluginManager).stream()
+		).collect(Collectors.toSet());
+		
+		return mojoParams;
 	}
 
 

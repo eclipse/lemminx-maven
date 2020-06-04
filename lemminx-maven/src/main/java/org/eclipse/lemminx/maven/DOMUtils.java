@@ -76,4 +76,25 @@ public class DOMUtils {
 		oneLevelIndent = oneLevelIndent.substring(0, oneLevelIndent.length() / nodeDepth);
 		return oneLevelIndent;
 	}
+
+	public static DOMNode findAncestorThatIsAChildOf(IPositionRequest request, String parentName) {
+		if (parentName == null || request == null) {
+			return null;
+		}
+		DOMNode parentNode = request.getNode().getParentNode();
+		DOMNode ancestorNode = parentNode;
+		try {
+			while (!parentName.equals(parentNode.getLocalName())) {
+				ancestorNode = parentNode;
+				parentNode = parentNode.getParentNode();
+			}
+		} catch (NullPointerException e) {
+			return null;
+		}
+
+		if (parentName.equals(parentNode.getLocalName())) {
+			return ancestorNode;
+		}
+		return null;
+	}
 }

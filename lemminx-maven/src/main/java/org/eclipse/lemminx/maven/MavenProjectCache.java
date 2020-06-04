@@ -147,6 +147,7 @@ public class MavenProjectCache {
 			request.setSystemProperties(System.getProperties());
 			request.setLocalRepository(mavenRequest.getLocalRepository());
 			request.setRepositorySession(getRepositorySystemSession());
+			request.setResolveDependencies(true);
 			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
 				@Override
 				public InputStream getInputStream() throws IOException {
