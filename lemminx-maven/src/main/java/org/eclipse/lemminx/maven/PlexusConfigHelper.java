@@ -273,12 +273,12 @@ public class PlexusConfigHelper {
 		Class<?> paramClass = getRawType(paramType);
 
 		if (paramClass == null || isInline(paramClass)) {
-			MojoParameter container = new MojoParameter(toSingularName(name), getTypeDisplayName(paramType)).multiple();
+			MojoParameter container = new MojoParameter(toSingularName(name), paramType).multiple();
 			return Collections.singletonList(container);
 		}
 
 		if (Map.class.isAssignableFrom(paramClass) || Properties.class.isAssignableFrom(paramClass)) {
-			MojoParameter container = new MojoParameter(toSingularName(name), getTypeDisplayName(paramType)).multiple()
+			MojoParameter container = new MojoParameter(toSingularName(name), paramType).multiple()
 					.map();
 			return Collections.singletonList(container);
 		}
@@ -324,10 +324,10 @@ public class PlexusConfigHelper {
 
 		// inline
 		if (isInline(paramClass)) {
-			parameters.add(configure(new MojoParameter(name, getTypeDisplayName(paramType)), required, expression,
+			parameters.add(configure(new MojoParameter(name, paramType), required, expression,
 					description, defaultValue));
 			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, getTypeDisplayName(paramType)), required, expression,
+				parameters.add(configure(new MojoParameter(alias, paramType), required, expression,
 						description, defaultValue));
 			}
 			return;
@@ -336,10 +336,10 @@ public class PlexusConfigHelper {
 		// map
 		if (Map.class.isAssignableFrom(paramClass)) {
 			// we can't do anything with maps, unfortunately
-			parameters.add(configure(new MojoParameter(name, getTypeDisplayName(paramType)).map(), required, expression,
+			parameters.add(configure(new MojoParameter(name, paramType).map(), required, expression,
 					description, defaultValue));
 			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, getTypeDisplayName(paramType)).map(), required,
+				parameters.add(configure(new MojoParameter(alias, paramType).map(), required,
 						expression, description, defaultValue));
 			}
 			return;
@@ -351,10 +351,10 @@ public class PlexusConfigHelper {
 			MojoParameter nested = new MojoParameter("property", "property",
 					Arrays.asList(new MojoParameter("name", "String"), new MojoParameter("value", "String")));
 
-			parameters.add(configure(new MojoParameter(name, getTypeDisplayName(paramType), nested), required,
+			parameters.add(configure(new MojoParameter(name, paramType, nested), required,
 					expression, description, defaultValue));
 			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, getTypeDisplayName(paramType), nested), required,
+				parameters.add(configure(new MojoParameter(alias, paramType, nested), required,
 						expression, description, defaultValue));
 			}
 		}
@@ -364,7 +364,7 @@ public class PlexusConfigHelper {
 		if (itemType != null) {
 			List<MojoParameter> nested = getItemParameters(realm, enclosingClass, name, itemType);
 
-			parameters.add(configure(new MojoParameter(name, getTypeDisplayName(paramType), nested), required,
+			parameters.add(configure(new MojoParameter(name, paramType, nested), required,
 					expression, description, defaultValue));
 
 			if (alias != null) {
@@ -400,6 +400,7 @@ public class PlexusConfigHelper {
 			if (clazz == null) {
 				if (descriptor.getClassRealm() == null) {
 					// TODO: Maybe this should occur in MavenPluginUtils.collectPluginConfigurationParameters()?
+					descriptor.setIsolatedRealm(true);
 					buildPluginManager.getPluginRealm(mavenSession, descriptor);
 				}
 				clazz = descriptor.getClassRealm().loadClass(mojo.getImplementation());

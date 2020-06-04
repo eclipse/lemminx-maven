@@ -13,10 +13,17 @@
  *******************************************************************************/
 package org.eclipse.lemminx.maven;
 
+import java.lang.reflect.Type;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Objects;
+
+// TODO: Make Maven bug about moving this upstream
 public class MojoParameter {
 
 	private String name;
@@ -37,18 +44,30 @@ public class MojoParameter {
 
 	private boolean map;
 
+	private Type paramType;
+
 	public MojoParameter(String name, String type, List<MojoParameter> parameters) {
 		this.name = name;
 		this.type = type;
 		nested = parameters;
 	}
+	public MojoParameter(String name, Type paramType, List<MojoParameter> parameters) {
+		this(name, PlexusConfigHelper.getTypeDisplayName(paramType), parameters);
+		this.setParamType(paramType);
+	}
 
-	public MojoParameter(String name, String type, MojoParameter parameter) {
-		this(name, type, Collections.singletonList(parameter));
+	public MojoParameter(String name, Type paramType, MojoParameter parameter) {
+		this(name, PlexusConfigHelper.getTypeDisplayName(paramType), Collections.singletonList(parameter));
+		this.setParamType(paramType);
 	}
 
 	public MojoParameter(String name, String type) {
 		this(name, type, Collections.<MojoParameter>emptyList());
+	}
+
+	public MojoParameter(String name, Type paramType) {
+		this(name, PlexusConfigHelper.getTypeDisplayName(paramType));
+		this.setParamType(paramType);
 	}
 
 	public MojoParameter multiple() {
@@ -71,6 +90,24 @@ public class MojoParameter {
 
 	public List<MojoParameter> getNestedParameters() {
 		return nested == null ? Collections.<MojoParameter>emptyList() : Collections.unmodifiableList(nested);
+	}
+	
+	public List<MojoParameter> getFlattenedNestedParameters(){
+		Deque<MojoParameter> parametersToCheck = new ArrayDeque<>();
+		List<MojoParameter> nestedParameters = new ArrayList<MojoParameter>();
+		for (MojoParameter node : getNestedParameters()) {
+			parametersToCheck.push(node);
+		}
+		while (!parametersToCheck.isEmpty()) {
+			MojoParameter parameter = parametersToCheck.pop();
+			if (!parameter.getNestedParameters().isEmpty()) {
+				for (MojoParameter nestedParameter : parameter.getNestedParameters()) {
+					parametersToCheck.push(nestedParameter);
+				}
+			} 
+			nestedParameters.add(parameter);
+		}
+		return nestedParameters;
 	}
 
 	public String getName() {
@@ -155,6 +192,36 @@ public class MojoParameter {
 		}
 
 		return param;
+	}
+	
+	public Type getParamType() {
+		return paramType;
+	}
+
+	public void setParamType(Type paramType) {
+		this.paramType = paramType;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hashCode(required, map, multiple, type, getNestedParameters().size(), name, expression, description,
+				defaultValue);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null || !(obj instanceof MojoParameter)) {
+			return false;
+		}
+		MojoParameter otherMojo = (MojoParameter) obj;
+
+		return (this.isRequired() == otherMojo.isRequired()) && (this.isMap() == otherMojo.isMap())
+				&& (this.isMultiple() == otherMojo.isMultiple()) && (Objects.equal(this.getType(), otherMojo.getType()))
+				&& (Objects.equal(this.getNestedParameters(), otherMojo.getNestedParameters()))
+				&& (Objects.equal(this.getName(), otherMojo.getName())
+						&& (Objects.equal(this.getExpression(), otherMojo.getExpression())
+								&& (Objects.equal(this.getDescription(), otherMojo.getDescription()))))
+				&& (Objects.equal(this.getDefaultValue(), otherMojo.getDefaultValue()));
 	}
 
 }

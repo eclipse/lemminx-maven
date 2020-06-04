@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +40,6 @@ import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
-import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.RepositorySystemSession;
@@ -94,15 +94,32 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		if (tag.getLocalName() == null) {
 			return null;
 		}
+		
+		if (isADescendantOf(tag, "configuration")) {
+			return collectPluginConfiguration(request);
+		}
 
+		// TODO: Get rid of this?
 		switch (parent.getLocalName()) {
 		case "configuration":
-			return collectPuginConfiguration(request);
+			return collectPluginConfiguration(request);
 		default:
 			break;
 		}
 
 		return null;
+	}
+
+	// Move to DOMUtils
+	private boolean isADescendantOf(DOMNode tag, String parentName) {
+		DOMNode parent = tag.getParentNode();
+		while (parent != null) {
+			if (parent.getLocalName() != null && parent.getLocalName().equals(parentName)) {
+				return true;
+			}
+			parent = parent.getParentNode();
+		}
+		return false;
 	}
 
 	private String collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
@@ -188,19 +205,59 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	private String collectPuginConfiguration(IPositionRequest request) {
-		List<Parameter> parameters;
+	private String collectPluginConfiguration(IPositionRequest request) {
+		Set<MojoParameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			return null;
 		}
 		DOMNode node = request.getNode();
+		String parentName = node.getParentNode().getLocalName();
+		if (parentName != null && parentName.equals("configuration")) {
+			// The configuration element being hovered is at the top level
+			for (MojoParameter parameter : parameters) {
+				// TODO: Is !parameterMultiple() really required?
+				if (node.getLocalName().equals(parameter.getName()) && !parameter.isMultiple()) {
+					return MavenPluginUtils.getMarkupDescription(parameter).getValue();
+				}
+			}
+		}
 		
-		for (Parameter parameter : parameters) {
-			if (node.getLocalName().equals(parameter.getName())) {
-				return MavenPluginUtils.getMarkupDescription(parameter).getValue();
+		// Nested case: node is a grand child of configuration
+		
+		// Get the node's ancestor which is a child of configuration
+		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, "configuration");
+		if (parentParameterNode != null) {
+			List<MojoParameter> parentParameters = parameters.stream()
+					.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
+					.collect(Collectors.toList());
+			if (!parentParameters.isEmpty()) {
+				MojoParameter parentParameter = parentParameters.get(0);
+				
+				if (parentParameter.getNestedParameters().size() == 1) {
+					// The parent parameter must be a collection of a type
+					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
+					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
+					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
+						return MavenPluginUtils.getMarkupDescriptionUsingParent(nestedParameter, parentParameter).getValue();
+					}
+				}
+				
+				// Get all deeply nested parameters
+				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
+				nestedParameters.add(parentParameter);
+				for (MojoParameter parameter : nestedParameters) {
+					if (node.getLocalName().equals(parameter.getName())) {
+						return parameter.getDescription() == null
+								? MavenPluginUtils.getMarkupDescriptionUsingParent(parameter, parentParameter)
+										.getValue()
+								: MavenPluginUtils.getMarkupDescription(parameter).getValue();
+					}
+				}
+				// Fallback case is to return parent's hover info
+				return MavenPluginUtils.getMarkupDescription(parentParameter).getValue();
 			}
 		}
 		return null;
