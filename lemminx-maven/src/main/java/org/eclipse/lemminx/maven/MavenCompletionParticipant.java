@@ -668,10 +668,21 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private CompletionItem toFileCompletionItem(File file, File referenceFolder, ICompletionRequest request) {
 		CompletionItem res = new CompletionItem();
 		Path path = referenceFolder.toPath().relativize(file.toPath());
-		res.setLabel(path.toString());
-		res.setFilterText(path.toString());
+		StringBuilder builder = new StringBuilder(path.toString().length());
+		Path current = path;
+		while (current != null) {
+			if (!current.equals(path)) {
+				// Only append "/" for parent directories
+				builder.insert(0, '/');
+			}
+			builder.insert(0, current.getFileName());
+			current = current.getParent();
+		}
+		String pathString = builder.toString();
+		res.setLabel(pathString);
+		res.setFilterText(pathString);
 		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
-		res.setTextEdit(new TextEdit(request.getReplaceRange(), path.toString()));
+		res.setTextEdit(new TextEdit(request.getReplaceRange(), pathString));
 		return res;
 	}
 
