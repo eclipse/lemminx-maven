@@ -29,8 +29,6 @@ import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.graph.DependencyFilter;
-import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -113,16 +111,8 @@ public class MavenPluginUtils {
 		if (project == null) {
 			return Collections.emptySet();
 		}
-		project.setExtensionDependencyFilter(new DependencyFilter() {
-			
-			@Override
-			public boolean accept(DependencyNode node, List<DependencyNode> parents) {
-				// TODO Auto-generated method stub
-				System.out.println("Dependency: " + node.getDependency().getArtifact().getArtifactId());
-				System.out.println(node.getRepositories());
-				return true;
-			}
-		});
+		//System.out.println("plugin: " + pluginDescriptor.getPluginLookupKey());
+		//pluginDescriptor.getDependencies().forEach(dep -> System.out.println("    plugin dependency: " + dep.getArtifactId() + ":" + dep.getVersion()));
 		mavenSession.setProjects(Collections.singletonList(project));
 		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper.loadMojoParameters(pluginDescriptor, mojo, mavenSession, buildPluginManager).stream()
 		).collect(Collectors.toSet());
