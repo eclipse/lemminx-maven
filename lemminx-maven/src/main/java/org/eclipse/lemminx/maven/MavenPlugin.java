@@ -74,7 +74,7 @@ public class MavenPlugin implements IXMLExtension {
 
 	private PlexusContainer container;
 	private MavenExecutionRequest mavenRequest;
-	private RepositorySystemSession repositorySystemSession;
+	private static RepositorySystemSession repositorySystemSession;
 	private MavenPluginManager mavenPluginManager;
 
 	private XMLExtensionsRegistry currentRegistry;
@@ -103,11 +103,11 @@ public class MavenPlugin implements IXMLExtension {
 		this.params = params;
 		this.currentRegistry = registry;
 		initialize(params != null ? params.getInitializationOptions() : null);
-		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, repositorySystemSession, mavenSession, mavenPluginManager, buildPluginManager);
+		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, getRepositorySystemSession(), mavenSession, mavenPluginManager, buildPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
-		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, repositorySystemSession, mavenSession, buildPluginManager);
+		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, getRepositorySystemSession(), mavenSession, buildPluginManager);
 		registry.registerDiagnosticsParticipant(diagnosticParticipant);
-		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, repositorySystemSession, mavenSession, mavenPluginManager, buildPluginManager);
+		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, getRepositorySystemSession(), mavenSession, mavenPluginManager, buildPluginManager);
 		registry.registerHoverParticipant(hoverParticipant);
 		definitionParticipant = new MavenDefinitionParticipant(cache, localRepositorySearcher);
 		registry.registerDefinitionParticipant(definitionParticipant);
@@ -121,12 +121,12 @@ public class MavenPlugin implements IXMLExtension {
 			repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
-			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
+			mavenSession = new MavenSession(container, getRepositorySystemSession(), mavenRequest, mavenResult);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		cache = new MavenProjectCache(container, mavenRequest);
-		localRepositorySearcher = new LocalRepositorySearcher(repositorySystemSession.getLocalRepository().getBasedir());
+		localRepositorySearcher = new LocalRepositorySearcher(getRepositorySystemSession().getLocalRepository().getBasedir());
 		indexSearcher = new RemoteRepositoryIndexSearcher(container);
 		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
 		mavenPluginManager = null;
@@ -254,5 +254,9 @@ public class MavenPlugin implements IXMLExtension {
 
 	public MavenProjectCache getProjectCache() {
 		return this.cache;
+	}
+
+	public static RepositorySystemSession getRepositorySystemSession() {
+		return repositorySystemSession;
 	}
 }

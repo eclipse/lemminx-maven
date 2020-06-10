@@ -20,6 +20,7 @@ import org.junit.runners.Suite.SuiteClasses;
 	MavenParseUtilsTest.class, //
 	MavenProjectCacheTest.class, //
 	LocalPluginTest.class, //
+	PluginResolutionTest.class, //
 	RemoteRepositoryTest.class, //
 	SimpleModelTest.class, //
 	PathsTest.class})
