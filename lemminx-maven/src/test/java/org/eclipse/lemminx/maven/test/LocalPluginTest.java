@@ -168,21 +168,6 @@ public class LocalPluginTest {
 		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
 	}
 	
-
-	// Tests regressions related to
-	// https://github.com/eclipse/lemminx-maven/issues/48
-	@Test
-	public void testPluginDiagnosticMissingPlugin()
-			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-plugin.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings());
-		// Only one diagnostic should be present from unresolvable plugin (maven-shade-plugin:3.2.2)
-		assertTrue(diagnostics.stream().map(Diagnostic::getMessage).anyMatch(message -> message.contains(
-				"Plugin org.apache.maven.plugins:maven-shade-plugin:3.2.2 or one of its dependencies could not be resolved")));
-		assertTrue(diagnostics.size() == 1); 
-	}
-	
 	@Test
 	public void testDiagnosticMissingGroupId() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-groupid.xml", languageService);

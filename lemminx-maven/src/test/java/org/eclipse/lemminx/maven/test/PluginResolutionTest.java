@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * Copyright (c) 2020 Red Hat Inc. and others.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *******************************************************************************/
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
@@ -9,6 +17,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.io.FileUtils;
 import org.eclipse.lemminx.maven.MavenPlugin;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.XMLHoverSettings;
@@ -25,53 +34,45 @@ public class PluginResolutionTest {
 
 	private XMLLanguageService languageService;
 
-	private File mavenPluginApiDirectory;
+	private File initialMavenPluginApiDirectory;
+	private File movedMavenPluginApiDirectory;
 
 	@Before
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 		languageService.initializeIfNeeded();
 		File mavenRepo = MavenPlugin.getRepositorySystemSession().getLocalRepository().getBasedir();
-		System.out.println("Maven repo: " + mavenRepo);
-		mavenPluginApiDirectory = new File(mavenRepo, "/org/apache/maven/maven-plugin-api/3.0");
-		System.out.println(mavenPluginApiDirectory);
-		if (mavenPluginApiDirectory.exists()) {
-			System.out.println("[NOTICE]: Deleting maven-plugin-api:3.0 files...");
-			// Iteratively delete all of the directory's contents
-			for (File file : mavenPluginApiDirectory.listFiles()) {
-				System.out.println("[NOTICE]: Deleting " + file);
-				file.delete();
+		initialMavenPluginApiDirectory = new File(mavenRepo, "org/apache/maven/maven-plugin-api/3.0");
+		if (initialMavenPluginApiDirectory.exists()) {
+			movedMavenPluginApiDirectory = new File(initialMavenPluginApiDirectory.getParent(), initialMavenPluginApiDirectory.getName() + "-moved");
+			if (!movedMavenPluginApiDirectory.exists()) {
+				initialMavenPluginApiDirectory.renameTo(movedMavenPluginApiDirectory);
 			}
-			// Delete the now-empty directory
-			mavenPluginApiDirectory.delete();
-		} else {
-			System.out.println("[NOTICE]: maven-plugin-api:3.0 was already non-existent");
 		}
+		FileUtils.deleteDirectory(initialMavenPluginApiDirectory);
 	}
 
 	@After
-	public void tearDown() throws InterruptedException, ExecutionException {
+	public void tearDown() throws InterruptedException, ExecutionException, IOException {
 		languageService.dispose();
 		languageService = null;
-		// TODO: Restore the mavenPluginApiDirectory?
+		if (movedMavenPluginApiDirectory != null) {
+			movedMavenPluginApiDirectory.renameTo(initialMavenPluginApiDirectory);
+			FileUtils.deleteDirectory(movedMavenPluginApiDirectory);
+		}
 	}
 
 	@Test
-	public void testPluginConfigurationHover()
+	public void testPluginConfigurationHoverMissingTransitiveDependency()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		assertFalse(mavenPluginApiDirectory.exists());
-		
+		assertFalse(initialMavenPluginApiDirectory.exists());
 		// <compilerArguments> hover
 		String hoverContents = languageService
 				.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
 						new Position(15, 8), new XMLHoverSettings())
 				.getContents().getRight().getValue();
-		
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
-
 	}
-
-
 
 }

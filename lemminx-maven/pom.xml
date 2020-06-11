@@ -75,6 +75,11 @@
 			<version>1.1.0</version>
 		</dependency>
 		<dependency>
+			<groupId>io.takari.aether</groupId>
+			<artifactId>aether-connector-okhttp</artifactId>
+			<version>1.0.1-alpha</version>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.maven.indexer</groupId>
 			<artifactId>indexer-core</artifactId>
 			<version>6.0.0</version>
