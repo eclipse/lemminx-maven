@@ -50,21 +50,30 @@ public class MavenPluginUtils {
 						+ LINE_BREAK + parameter.getDescription());
 	}
 	
-	// TODO: Handle the fact that MojoParameter's content (eg. DefaultValue) can be null
-	public static MarkupContent getMarkupDescription(MojoParameter parameter) {
-		return new MarkupContent("markdown",
-				"**required:** " + parameter.isRequired() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
-						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parameter.getDefaultValue()
-						+ LINE_BREAK + parameter.getDescription());
-	}
-	
-	// TODO: fix code duplication..
-	// TODO: add a note about using description and default valuefrom parent
-	public static MarkupContent getMarkupDescriptionUsingParent(MojoParameter parameter, MojoParameter parentParameter) {
-		return new MarkupContent("markdown",
-				"**required:** " + parameter.isRequired() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
-						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parentParameter.getDefaultValue()
-						+ LINE_BREAK + parentParameter.getDescription());
+	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter) {
+		final String fromParent = "**From parent configuration element:**" + LINE_BREAK;
+		String type = parameter.getType() != null ? parameter.getType() : "";
+		String expression = parameter.getExpression() != null ? parameter.getExpression() : "";
+		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "";
+		String description = parameter.getDescription() != null ? parameter.getDescription() : "";
+		
+		if (defaultValue.isEmpty() && parentParameter != null && parentParameter.getDefaultValue() != null) {
+			defaultValue = fromParent + parentParameter.getDefaultValue();
+		}
+
+		if (description.isEmpty() && parentParameter != null) {
+			description = fromParent + parentParameter.getDescription();
+		}
+
+		// @formatter:off
+		String markdownDescription = 
+				"**required:** " + parameter.isRequired() + LINE_BREAK 
+				+ "**Type:** "+ type + LINE_BREAK 
+				+ "Expression: " + expression + LINE_BREAK 
+				+ "Default Value: " + defaultValue + LINE_BREAK 
+				+ description;
+		// @formatter:on
+		return new MarkupContent("markdown", markdownDescription);
 	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,

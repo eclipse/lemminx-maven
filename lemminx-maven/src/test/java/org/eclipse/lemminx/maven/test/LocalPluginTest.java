@@ -120,7 +120,6 @@ public class LocalPluginTest {
 		assertTrue(hoverContents.contains("**Type:** String"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 		
-		
 		//<annotationProcessorPath> hover
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
 				new Position(20, 9), new XMLHoverSettings()).getContents().getRight().getValue();
