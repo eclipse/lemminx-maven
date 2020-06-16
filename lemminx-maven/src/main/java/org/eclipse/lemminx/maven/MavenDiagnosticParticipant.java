@@ -43,10 +43,10 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 	private final MavenSession mavenSession;
 	private final BuildPluginManager buildPluginManager;
 
-	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager, RepositorySystemSession repoSession, MavenSession mavenSession, BuildPluginManager buildPluginManager) {
+	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager,MavenSession mavenSession, BuildPluginManager buildPluginManager) {
 		this.projectCache = projectCache;
 		this.pluginManager = pluginManager;
-		this.repoSession = repoSession;
+		this.repoSession = mavenSession.getRepositorySession();
 		this.mavenSession = mavenSession;
 		this.buildPluginManager = buildPluginManager;
 	}

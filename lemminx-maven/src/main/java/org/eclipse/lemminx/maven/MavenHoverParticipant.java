@@ -61,11 +61,11 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenSession mavenSession;
 	private final BuildPluginManager buildPluginManager;
 
-	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
+	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
 		this.cache = cache;
 		this.localRepoSearcher = localRepoSearcher;
 		this.indexSearcher = indexSearcher;
-		this.repoSession = repoSession;
+		this.repoSession = mavenSession.getRepositorySession();
 		this.mavenSession = mavenSession;
 		this.pluginManager = pluginManager;
 		this.buildPluginManager = buildPluginManager;
