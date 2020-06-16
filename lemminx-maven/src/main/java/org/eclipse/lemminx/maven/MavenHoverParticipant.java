@@ -218,9 +218,8 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		if (parentName != null && parentName.equals("configuration")) {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
-				// TODO: Is !parameterMultiple() really required?
-				if (node.getLocalName().equals(parameter.getName()) && !parameter.isMultiple()) {
-					return MavenPluginUtils.getMarkupDescription(parameter).getValue();
+				if (node.getLocalName().equals(parameter.getName())) {
+					return MavenPluginUtils.getMarkupDescription(parameter, null).getValue();
 				}
 			}
 		}
@@ -241,7 +240,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
 					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-						return MavenPluginUtils.getMarkupDescriptionUsingParent(nestedParameter, parentParameter).getValue();
+						return MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter).getValue();
 					}
 				}
 				
@@ -250,14 +249,9 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				nestedParameters.add(parentParameter);
 				for (MojoParameter parameter : nestedParameters) {
 					if (node.getLocalName().equals(parameter.getName())) {
-						return parameter.getDescription() == null
-								? MavenPluginUtils.getMarkupDescriptionUsingParent(parameter, parentParameter)
-										.getValue()
-								: MavenPluginUtils.getMarkupDescription(parameter).getValue();
+						return MavenPluginUtils.getMarkupDescription(parameter, parentParameter).getValue();
 					}
 				}
-				// Fallback case is to return parent's hover info
-				return MavenPluginUtils.getMarkupDescription(parentParameter).getValue();
 			}
 		}
 		return null;
