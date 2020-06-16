@@ -105,12 +105,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private final MavenSession mavenSession;
 	private final BuildPluginManager buildPluginManager;
 
-	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, RepositorySystemSession repoSession, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
+	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
 		this.cache = cache;
+		this.mavenSession = mavenSession;
 		this.localRepositorySearcher = localRepositorySearcher;
 		this.indexSearcher = indexSearcher;
-		this.repoSession = repoSession;
-		this.mavenSession = mavenSession;
+		this.repoSession = mavenSession.getRepositorySession();
 		this.pluginManager = pluginManager;
 		this.buildPluginManager = buildPluginManager;
 	}

@@ -103,11 +103,11 @@ public class MavenPlugin implements IXMLExtension {
 		this.params = params;
 		this.currentRegistry = registry;
 		initialize(params != null ? params.getInitializationOptions() : null);
-		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher, getRepositorySystemSession(), mavenSession, mavenPluginManager, buildPluginManager);
+		completionParticipant = new MavenCompletionParticipant(cache, localRepositorySearcher, indexSearcher,  mavenSession, mavenPluginManager, buildPluginManager);
 		registry.registerCompletionParticipant(completionParticipant);
-		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, getRepositorySystemSession(), mavenSession, buildPluginManager);
+		diagnosticParticipant = new MavenDiagnosticParticipant(cache, mavenPluginManager, mavenSession, buildPluginManager);
 		registry.registerDiagnosticsParticipant(diagnosticParticipant);
-		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher, getRepositorySystemSession(), mavenSession, mavenPluginManager, buildPluginManager);
+		hoverParticipant = new MavenHoverParticipant(cache, localRepositorySearcher, indexSearcher,  mavenSession, mavenPluginManager, buildPluginManager);
 		registry.registerHoverParticipant(hoverParticipant);
 		definitionParticipant = new MavenDefinitionParticipant(cache, localRepositorySearcher);
 		registry.registerDefinitionParticipant(definitionParticipant);
@@ -126,7 +126,7 @@ public class MavenPlugin implements IXMLExtension {
 			e.printStackTrace();
 		}
 		cache = new MavenProjectCache(container, mavenRequest);
-		localRepositorySearcher = new LocalRepositorySearcher(getRepositorySystemSession().getLocalRepository().getBasedir());
+		localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
 		indexSearcher = new RemoteRepositoryIndexSearcher(container);
 		cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
 		mavenPluginManager = null;
