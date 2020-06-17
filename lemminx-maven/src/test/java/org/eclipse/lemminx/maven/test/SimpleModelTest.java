@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -155,7 +156,24 @@ public class SimpleModelTest {
 		});
 		
 		DOMDocument targetDocument = document;
-		DOMNode propertyNode = DOMUtils.findNodeByLocalName(targetDocument, "myProperty");
+		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "myProperty").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);;
+		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
+	}
+	
+	@Test
+ 	public void testPropertyDefinitionSameDocumentBug() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-definition-wrong-tag-bug.xml", languageService);
+		Position pos = new Position(22, 40);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		DOMDocument targetDocument = document;
+		
+		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "lemminx.maven.indexDirectory").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);
+		assertTrue(propertyNode.getParentNode().getLocalName().equals("properties"));
 		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
@@ -171,7 +189,7 @@ public class SimpleModelTest {
 		
 		//Verify the LocationLink points to the right file and node
 		DOMDocument targetDocument = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
-		DOMNode propertyNode = DOMUtils.findNodeByLocalName(targetDocument, "myProperty");
+		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "myProperty").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);;
 		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));

@@ -1,0 +1,31 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.test</groupId>
+	<artifactId>test</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<properties>
+		<lemminx.maven.indexDirectory>${project.build.directory}/test-index</lemminx.maven.indexDirectory>
+		<maven.repo.local>${settings.localRepository}</maven.repo.local>
+	</properties>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.22.2</version> <!-- Need to be same as in tests so we're sure version in in local repo -->
+				<configuration>
+					<test>org.eclipse.lemminx.maven.test.AllTests</test>
+					<systemPropertyVariables>
+						<lemminx.maven.indexDirectory>${lemminx.maven.indexDirectory}</lemminx.maven.indexDirectory>
+						<maven.repo.local>${maven.repo.local}</maven.repo.local>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	
+</project>
