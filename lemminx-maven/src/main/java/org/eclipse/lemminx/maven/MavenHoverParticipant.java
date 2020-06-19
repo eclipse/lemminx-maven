@@ -51,6 +51,8 @@ import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.MarkupContent;
 
 public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
@@ -72,17 +74,17 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 	@Override
-	public String onAttributeName(IHoverRequest request) throws Exception {
+	public Hover onAttributeName(IHoverRequest request) throws Exception {
 		return null;
 	}
 
 	@Override
-	public String onAttributeValue(IHoverRequest request) throws Exception {
+	public Hover onAttributeValue(IHoverRequest request) throws Exception {
 		return null;
 	}
 
 	@Override
-	public String onTag(IHoverRequest request) throws Exception {
+	public Hover onTag(IHoverRequest request) throws Exception {
 		if (!MavenPlugin.match(request.getXMLDocument())) {
 			  return null;
 		}
@@ -122,7 +124,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return false;
 	}
 
-	private String collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
+	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
 		Collection<String> possibleHovers = Collections.synchronizedSet(new LinkedHashSet<>());
 		DOMNode node = request.getNode();
 		DOMDocument doc = request.getXMLDocument();
@@ -150,7 +152,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				.map(model -> model.getName() + "\n\n" + model.getDescription())
 				.map(message -> (message.length() > 2 ? message : null));
 			if (localDescription.isPresent()) {
-				return localDescription.get();
+				return new Hover(new MarkupContent("plaintext", localDescription.get()));
 			}
 		} catch (Exception e1) {
 			e1.printStackTrace();
@@ -186,17 +188,18 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		if (possibleHovers.isEmpty()) {
 			return null;
 		}
-		return possibleHovers.iterator().next();
+		
+		return new Hover(new MarkupContent("plaintext", possibleHovers.iterator().next()));
 	}
 
-	private String collectGoal(IPositionRequest request) {
+	private Hover collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
 		PluginDescriptor pluginDescriptor;
 		try {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
-					return mojo.getDescription();
+					return new Hover(new MarkupContent("plaintext", mojo.getDescription()));
 				}
 			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
@@ -205,7 +208,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	private String collectPluginConfiguration(IPositionRequest request) {
+	private Hover collectPluginConfiguration(IPositionRequest request) {
 		Set<MojoParameter> parameters;
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
@@ -219,7 +222,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
 				if (node.getLocalName().equals(parameter.getName())) {
-					return MavenPluginUtils.getMarkupDescription(parameter, null).getValue();
+					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null));
 				}
 			}
 		}
@@ -240,7 +243,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
 					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-						return MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter).getValue();
+						return new Hover(MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter));
 					}
 				}
 				
@@ -249,7 +252,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				nestedParameters.add(parentParameter);
 				for (MojoParameter parameter : nestedParameters) {
 					if (node.getLocalName().equals(parameter.getName())) {
-						return MavenPluginUtils.getMarkupDescription(parameter, parentParameter).getValue();
+						return new Hover(MavenPluginUtils.getMarkupDescription(parameter, parentParameter));
 					}
 				}
 			}
@@ -258,7 +261,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 	@Override
-	public String onText(IHoverRequest request) throws Exception {
+	public Hover onText(IHoverRequest request) throws Exception {
 		if (!MavenPlugin.match(request.getXMLDocument())) {
 			  return null;
 		}
@@ -315,7 +318,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	private String collectProperty(IPositionRequest request, String property) {
+	private Hover collectProperty(IPositionRequest request, String property) {
 		DOMDocument doc = request.getXMLDocument();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		if (project != null) {
@@ -324,8 +327,8 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
 				if (property.equals(mavenProperty)) {
-					return "Property: " + mavenProperty + MavenPluginUtils.LINE_BREAK + "Value: " + prop.getValue()
-							+ MavenPluginUtils.LINE_BREAK;
+					return new Hover(new MarkupContent("plaintext", "Property: " + mavenProperty
+							+ MavenPluginUtils.LINE_BREAK + "Value: " + prop.getValue() + MavenPluginUtils.LINE_BREAK));
 				}
 			}
 		}

@@ -119,7 +119,7 @@ public class SnippetRegistry {
 			return contextFilter.test(s.getContext());
 		}).map(snippet -> {
 			String filter = snippet.getPrefix();
-			int startOffset = StringUtils.findExprBeforeAt(document.getText(), filter, completionOffset);
+			int startOffset = findExprBeforeAt(document.getText(), filter, completionOffset);
 			if (startOffset == -1) {
 				startOffset = completionOffset;
 			}
@@ -194,5 +194,31 @@ public class SnippetRegistry {
 			replaceStart = offset;
 		}
 		return new Range(document.positionAt(replaceStart), document.positionAt(replaceEnd));
+	}
+	
+	private static int findExprBeforeAt(String text, String expr, int offset) {
+		if (offset <= 0) {
+			return -1;
+		}
+		expr = expr.toUpperCase();
+		int startOffset = -1;
+		char first = expr.charAt(0);
+		int length = Math.min(offset, expr.length());
+		int i = 0;
+		for (i = 1; i <= length; i++) {
+			if (Character.toUpperCase(text.charAt(offset - i)) == first) {
+				startOffset = offset - i;
+				break;
+			}
+		}
+		if (startOffset == -1) {
+			return -1;
+		}
+		for (int j = 0; j < i; j++) {
+			if (Character.toUpperCase(text.charAt(startOffset + j)) != expr.charAt(j)) {
+				return -1;
+			}
+		}
+		return startOffset - 1;
 	}
 }
