@@ -20,7 +20,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lemminx.maven.MavenPlugin;
 import org.eclipse.lemminx.services.XMLLanguageService;
-import org.eclipse.lemminx.settings.XMLHoverSettings;
+import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Position;
 import org.junit.After;
 import org.junit.Before;
@@ -69,7 +69,7 @@ public class PluginResolutionTest {
 		// <compilerArguments> hover
 		String hoverContents = languageService
 				.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-						new Position(15, 8), new XMLHoverSettings())
+						new Position(15, 8), new SharedSettings())
 				.getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));

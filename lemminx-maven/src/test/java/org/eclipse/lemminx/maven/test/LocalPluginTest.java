@@ -23,7 +23,6 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
-import org.eclipse.lemminx.settings.XMLHoverSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Position;
@@ -102,27 +101,27 @@ public class LocalPluginTest {
 	@Test
  	public void testPluginConfigurationHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-configuration-hover.xml", languageService),
-				new Position(15, 6), new XMLHoverSettings()).getContents().getRight().getValue().contains("cause a failure if there are no tests to run"));
+				new Position(15, 6), new SharedSettings()).getContents().getRight().getValue().contains("cause a failure if there are no tests to run"));
 	}
 	
 	@Test
  	public void testPluginNestedConfigurationHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		//<compilerArguments> hover
 		String hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(15, 8), new XMLHoverSettings()).getContents().getRight().getValue();
+				new Position(15, 8), new SharedSettings()).getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 		
 		//<arg> hover, child of compilerArguments
 		//Should have a different type, but sames description
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(16, 8), new XMLHoverSettings()).getContents().getRight().getValue();
+				new Position(16, 8), new SharedSettings()).getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** String"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 		
 		//<annotationProcessorPath> hover
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(20, 9), new XMLHoverSettings()).getContents().getRight().getValue();
+				new Position(20, 9), new SharedSettings()).getContents().getRight().getValue();
 		//annotationProcessorPath type should be a DependencyCoordinate and its description should be that of annotationsProcessorPath
 		assertTrue(hoverContents.contains("org.apache.maven.plugin.compiler.DependencyCoordinate"));
 		assertTrue(hoverContents.contains("Classpath elements to supply as annotation processor path."));
@@ -130,7 +129,7 @@ public class LocalPluginTest {
 		
 		//<groupId> hover
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(21, 9), new XMLHoverSettings()).getContents().getRight().getValue();
+				new Position(21, 9), new SharedSettings()).getContents().getRight().getValue();
 		//GroupId type should be a string and its description should be that of annotationsProcessorPath
 		assertTrue(hoverContents.contains("**Type:** String"));
 		assertTrue(hoverContents.contains("Classpath elements to supply as annotation processor path."));
@@ -140,13 +139,13 @@ public class LocalPluginTest {
 	@Test
  	public void testPluginGoalHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-goal-hover.xml", languageService),
-				new Position(18, 22), new XMLHoverSettings()).getContents().getRight().getValue().contains("Run tests using Surefire."));
+				new Position(18, 22), new SharedSettings()).getContents().getRight().getValue().contains("Run tests using Surefire."));
 	}
 	
 	@Test
  	public void testPluginArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException, TimeoutException {
 		assertTrue(languageService.doHover(createDOMDocument("/pom-plugin-artifact-hover.xml", languageService),
-				new Position(14, 18), new XMLHoverSettings()).getContents().getRight().getValue().contains("Maven Surefire MOJO in maven-surefire-plugin"));
+				new Position(14, 18), new SharedSettings()).getContents().getRight().getValue().contains("Maven Surefire MOJO in maven-surefire-plugin"));
 	}
 	
 	// Diagnostic related tests

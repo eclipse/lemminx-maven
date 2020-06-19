@@ -30,7 +30,6 @@ import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSetting
 import org.eclipse.lemminx.maven.DOMUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
-import org.eclipse.lemminx.settings.XMLHoverSettings;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
@@ -138,13 +137,13 @@ public class SimpleModelTest {
 	@Test
  	public void testPropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
-		Hover hover = languageService.doHover(document, new Position(15, 20), new XMLHoverSettings());
+		Hover hover = languageService.doHover(document, new Position(15, 20), new SharedSettings());
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("$")));
 
- 		hover = languageService.doHover(document, new Position(15, 35), new XMLHoverSettings());
+ 		hover = languageService.doHover(document, new Position(15, 35), new SharedSettings());
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("0.0.1-SNAPSHOT")));
 
- 		hover = languageService.doHover(document, new Position(15, 13), new XMLHoverSettings());
+ 		hover = languageService.doHover(document, new Position(15, 13), new SharedSettings());
  		assertNull(hover);
 	}
 	

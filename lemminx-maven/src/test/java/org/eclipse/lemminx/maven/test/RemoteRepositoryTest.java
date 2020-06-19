@@ -19,7 +19,6 @@ import java.util.concurrent.ExecutionException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
-import org.eclipse.lemminx.settings.XMLHoverSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
@@ -83,7 +82,7 @@ public class RemoteRepositoryTest {
 		final Position position = new Position(14, 18);
  		Hover hover;
  		do {
- 	 		hover = languageService.doHover(document, position, new XMLHoverSettings());
+ 	 		hover = languageService.doHover(document, position, new SharedSettings());
  	 		Thread.sleep(500);
  		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
  		// if got out of the loop without timeout, then test is PASSED
