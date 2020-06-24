@@ -131,7 +131,7 @@ public class MavenPluginUtils {
 
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
-		Builder builder = new RemoteRepository.Builder(modelRepo.getId(), modelRepo.getLayout(), modelRepo.getLayout());
+		Builder builder = new RemoteRepository.Builder(modelRepo.getId(), modelRepo.getLayout(), modelRepo.getUrl());
 		return builder.build();
 	}
 
