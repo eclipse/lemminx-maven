@@ -1,0 +1,20 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.google.guava</groupId>
+	<artifactId>guava</artifactId>
+	<version>27.0.1-jre</version>
+	<name>Guava: Google Core Libraries for Java</name>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>failureaccess</artifactId>
+			<version>1.0.1</version>
+			<scope>system</scope>
+			<!--<systemPath>${java.home}/../src.zip</systemPath> -->
+			<systemPath>${env.JAVA_HOME}/myLogger/MyLogger.jar</systemPath>
+		</dependency>
+	</dependencies>
+</project>

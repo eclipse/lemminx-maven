@@ -10,6 +10,7 @@ package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -114,6 +115,15 @@ public class SimpleModelTest {
 		textDocument.setVersion(textDocument.getVersion() + 1);
 		document = DOMParser.getInstance().parse(textDocument, languageService.getResolverExtensionManager());
 		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
+	}
+	
+	@Test
+	public void testSystemPathDiagnosticBug()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
+		}, new XMLValidationSettings());
+		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("${env")));
 	}
 
 	@Test(timeout=15000)
