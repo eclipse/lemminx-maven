@@ -19,15 +19,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.apache.maven.artifact.InvalidRepositoryException;
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
 import org.apache.maven.execution.MavenExecutionRequest;
-import org.apache.maven.execution.MavenExecutionRequestPopulationException;
 import org.apache.maven.model.Build;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.building.DefaultModelProblem;
@@ -44,11 +43,10 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.apache.maven.settings.io.SettingsParseException;
+import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 
 public class MavenProjectCache {
@@ -60,10 +58,10 @@ public class MavenProjectCache {
 
 	private final MavenExecutionRequest mavenRequest;
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
-	private DefaultRepositorySystemSession repositorySystemSession;
 	private ProjectBuilder projectBuilder;
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
+	private Properties systemProperties;
 
 	public MavenProjectCache(PlexusContainer container, MavenExecutionRequest mavenRequest) {
 		this.mavenRequest = mavenRequest;
@@ -71,6 +69,10 @@ public class MavenProjectCache {
 		this.lastCheckedVersion = new HashMap<URI, Integer>();
 		this.projectCache = new HashMap<URI, MavenProject>();
 		this.problemCache = new HashMap<URI, Collection<ModelProblem>>();
+		systemProperties = new Properties();
+		EnvironmentUtils.addEnvVars(systemProperties);
+		systemProperties.putAll(System.getProperties());
+		initializeMavenBuildState();
 	}
 
 	/**
@@ -110,18 +112,10 @@ public class MavenProjectCache {
 		if (lastKnownVersionMavenProject != null) {
 			return Optional.of(lastKnownVersionMavenProject);
 		}
-		if (mavenRequest == null) {
-			try {
-				initializeMavenBuildState();
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
-		request.setSystemProperties(System.getProperties());
+		request.setSystemProperties(systemProperties);
 		request.setLocalRepository(mavenRequest.getLocalRepository());
-		request.setRepositorySession(getRepositorySystemSession());
+		request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
 		request.setResolveDependencies(true);
 		try {
 			MavenProject project = projectBuilder.build(file, request).getProject();
@@ -140,13 +134,10 @@ public class MavenProjectCache {
 		URI uri = URI.create(document.getDocumentURI());
 		Collection<ModelProblem> problems = new ArrayList<ModelProblem>();
 		try {
-			if (mavenRequest == null) {
-				initializeMavenBuildState();
-			}
 			ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
-			request.setSystemProperties(System.getProperties());
+			request.setSystemProperties(systemProperties);
 			request.setLocalRepository(mavenRequest.getLocalRepository());
-			request.setRepositorySession(getRepositorySystemSession());
+			request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
 			request.setResolveDependencies(true);
 			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
 				@Override
@@ -213,13 +204,16 @@ public class MavenProjectCache {
 		problemCache.put(uri, problems);
 	}
 
-	private void initializeMavenBuildState() throws ComponentLookupException, InvalidRepositoryException,
-			SettingsParseException, IOException, MavenExecutionRequestPopulationException {
+	private void initializeMavenBuildState() {
 		if (projectBuilder != null) {
 			return;
 		}
-		projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
-		System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
+		try {
+			projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
+			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
+		} catch (ComponentLookupException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public PlexusContainer getPlexusContainer() {
@@ -228,15 +222,6 @@ public class MavenProjectCache {
 
 	public void addProjectParsedListener(Consumer<MavenProject> listener) {
 		this.projectParsedListeners.add(listener);
-	}
-
-	public DefaultRepositorySystemSession getRepositorySystemSession() {
-		try {
-			initializeMavenBuildState();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return repositorySystemSession;
 	}
 
 }

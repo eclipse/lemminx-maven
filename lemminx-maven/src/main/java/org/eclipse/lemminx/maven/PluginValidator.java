@@ -118,8 +118,9 @@ public class PluginValidator {
 			try {
 				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession,
 						pluginManager);
-				internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;
-
+				if (pluginDescriptor != null) {
+					internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;					
+				}
 			} catch (PluginResolutionException | PluginDescriptorParsingException
 					| InvalidPluginDescriptorException e) {
 				e.printStackTrace();
