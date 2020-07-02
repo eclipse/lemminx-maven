@@ -327,7 +327,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
 				if (property.equals(mavenProperty)) {
-					return new Hover(new MarkupContent("plaintext", "Property: " + mavenProperty
+					return new Hover(new MarkupContent("markdown", "Property: " + mavenProperty
 							+ MavenPluginUtils.LINE_BREAK + "Value: " + prop.getValue() + MavenPluginUtils.LINE_BREAK));
 				}
 			}
