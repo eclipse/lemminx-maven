@@ -9,7 +9,10 @@
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -17,6 +20,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.maven.MavenPlugin;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
@@ -86,6 +90,26 @@ public class RemoteRepositoryTest {
  	 		Thread.sleep(500);
  		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
  		// if got out of the loop without timeout, then test is PASSED
+	}
+	
+	@Test(timeout=15000)
+ 	public void testDownloadArtifactOnHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		languageService.initializeIfNeeded();
+		File mavenRepo = MavenPlugin.getRepositorySystemSession().getLocalRepository().getBasedir();
+		File artifactDirectory = new File(mavenRepo, "org/glassfish/jersey/project/2.19");
+		String description = "Jersey is the open source (under dual CDDL+GPL license) JAX-RS 2.0 (JSR 339)";
+		final DOMDocument document = createDOMDocument("/pom-remote-artifact-download-hover.xml", languageService);
+		final Position position = new Position(14, 18);
+		assertFalse(artifactDirectory.exists());
+ 		Hover hover;
+ 		do {
+ 	 		hover = languageService.doHover(document, position, new SharedSettings());
+ 	 		Thread.sleep(500);
+ 		} while (hover == null);
+ 		
+ 		assertTrue(artifactDirectory.exists());
+ 		assertTrue(artifactDirectory.listFiles().length > 0);
+ 		assertTrue(hover.getContents().getRight().getValue().contains(description));
 	}
 	
 	@Test(timeout=15000)
