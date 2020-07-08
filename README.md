@@ -60,12 +60,13 @@ Then, just start the LemMinX Language Server as documented on the LemMinX docume
 
 ### Eclipse IDE
 
-This extension is used from the "Generic Text Editor" when Eclipse m2e and [Wild Web Developer](https://github.com/eclipse/wildwebdeveloper) are installed.
+This extension is already used from the "Generic Text Editor" in Eclipse 4.16+ when m2e is installed.
+If you don't have m2e installed, you can get it with the latest snapshot LemMinX-Maven below.
 
 #### m2e download site with LemMinX-Maven included
 
 ```
-https://download.eclipse.org/technology/m2e/snapshots/1.16.0/latest/
+https://download.eclipse.org/technology/m2e/snapshots/1.16.1/latest/
 ```
 
 ### VSCode
