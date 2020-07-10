@@ -9,8 +9,10 @@
 package org.eclipse.lemminx.maven;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.BuildPluginManager;
@@ -79,7 +81,7 @@ public class PluginValidator {
 			return pluginResolutionError;
 		}
 
-		List<Parameter> parameters = new ArrayList<>();
+		Set<Parameter> parameters = new HashSet<Parameter>();
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache, repoSession,
 					pluginManager, buildPluginManager, mavenSession);
@@ -145,7 +147,7 @@ public class PluginValidator {
 		return Optional.of(diagnosticReq.createDiagnostic("Invalid goal for this plugin: " + goal, DiagnosticSeverity.Warning));
 	}
 
-	private static Optional<Diagnostic> validateConfigurationElement(DiagnosticRequest diagnosticReq, List<Parameter> parameters) {
+	private static Optional<Diagnostic> validateConfigurationElement(DiagnosticRequest diagnosticReq, Set<Parameter> parameters) {
 		DOMNode node = diagnosticReq.getNode();
 		if (node.getLocalName() == null) {
 			return Optional.empty();

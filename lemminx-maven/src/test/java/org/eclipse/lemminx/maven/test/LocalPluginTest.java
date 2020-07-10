@@ -67,9 +67,10 @@ public class LocalPluginTest {
 	
 	@Test
 	public void testDuplicateCompletionConfigurationParameters() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		assertTrue(languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
+		List<CompletionItem> completions = languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
 				new Position(23, 7), new SharedSettings())
-			.getItems().stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
+			.getItems();
+		assertTrue(completions.stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
 	}
 
 	@Test
@@ -81,9 +82,18 @@ public class LocalPluginTest {
 	
 	@Test
 	public void testCompleteConfigurationParametersInTagDuplicates() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		assertTrue(languageService.doComplete(createDOMDocument("/pom-plugin-config-tag.xml", languageService),
+		List<CompletionItem> completions = languageService.doComplete(createDOMDocument("/pom-plugin-config-tag.xml", languageService),
 				new Position(20, 9), new SharedSettings())
-			.getItems().stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
+			.getItems();
+		assertTrue(completions.stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
+	}
+	
+	@Test
+	public void testCompleteConfigurationParametersDuplicates() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		List<CompletionItem> completions = languageService.doComplete(createDOMDocument("/pom-duplicate-configuration-completion.xml", languageService),
+				new Position(15, 4), new SharedSettings())
+			.getItems();
+		assertTrue(completions.stream().map(CompletionItem::getLabel).filter("compilePath"::equals).count() == 1);
 	}
 	
 	// Test related to https://github.com/eclipse/lemminx-maven/issues/75
