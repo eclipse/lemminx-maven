@@ -44,10 +44,12 @@ public class MavenPluginUtils {
 	}
 
 	public static MarkupContent getMarkupDescription(Parameter parameter) {
+		String description = parameter.getDescription();
+		description = htmlXMLToMarkdown(description);
 		return new MarkupContent("markdown",
 				"**required:** " + parameter.getRequirement() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
 						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parameter.getDefaultValue()
-						+ LINE_BREAK + parameter.getDescription());
+						+ LINE_BREAK + description);
 	}
 	
 	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter) {
@@ -64,6 +66,8 @@ public class MavenPluginUtils {
 		if (description.isEmpty() && parentParameter != null) {
 			description = fromParent + parentParameter.getDescription();
 		}
+		
+		description = htmlXMLToMarkdown(description);
 
 		// @formatter:off
 		String markdownDescription = 
@@ -74,6 +78,19 @@ public class MavenPluginUtils {
 				+ description;
 		// @formatter:on
 		return new MarkupContent("markdown", markdownDescription);
+	}
+
+	private static String htmlXMLToMarkdown(String description) {
+		if (description.contains("<pre>") && description.contains("&lt;")) {
+			//Add markdown formatting to XML
+			String xmlContent = description.substring(description.indexOf("<pre>") + 6, description.indexOf("</pre>") - 1);
+			description = description.substring(0, description.indexOf("<pre>"));
+			xmlContent = xmlContent.replaceAll("&lt;", "<");
+			xmlContent = xmlContent.replaceAll("&gt;", ">");
+			xmlContent = "```XML" + "\n" + xmlContent + "\n" + "```";
+			description = description + LINE_BREAK + xmlContent;
+		}
+		return description;
 	}
 
 	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
