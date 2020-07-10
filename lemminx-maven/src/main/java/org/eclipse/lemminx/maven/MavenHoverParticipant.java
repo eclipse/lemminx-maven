@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -42,6 +43,7 @@ import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
@@ -338,8 +340,11 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	// TODO: Move this function to a utility class
 	public static Map<String, String> getMavenProjectProperties(MavenProject project) {
 		Map<String, String> allProps = new HashMap<>();
+		
+		Properties projectProperties = project.getProperties();
+		EnvironmentUtils.addEnvVars(projectProperties);
 		if (project.getProperties() != null) {
-			for (Entry<Object, Object> prop : project.getProperties().entrySet()) {
+			for (Entry<Object, Object> prop : projectProperties.entrySet()) {
 				allProps.put((String) prop.getKey(), (String) prop.getValue());
 			}
 		}
@@ -352,6 +357,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		allProps.put("project.build.directory", project.getBuild() == null ? "unknown" : project.getBuild().getDirectory());
 		allProps.put("project.build.outputDirectory",
 				project.getBuild() == null ? "unknown" : project.getBuild().getOutputDirectory());
+		
 		return allProps;
 	}
 	

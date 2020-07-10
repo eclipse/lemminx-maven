@@ -11,6 +11,7 @@ package org.eclipse.lemminx.maven.test;
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -125,6 +126,24 @@ public class SimpleModelTest {
 		}, new XMLValidationSettings());
 		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("${env")));
 	}
+	
+	@Test
+	public void testEnvironmentVariablePropertyHover()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		String hoverContents = languageService.doHover(createDOMDocument("/pom-environment-variable-property.xml", languageService),
+				new Position(16, 18), new SharedSettings()).getContents().getRight().getValue();
+		// We can't test the value of an environment variable as it is platform-dependent
+		assertNotNull(hoverContents);
+	}
+	
+	@Test
+	public void testCompletionEnvironmentVariableProperty()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
+		List<CompletionItem> completions = languageService.doComplete(document, new Position(16, 54), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("${env.JAVA_HOME}"::equals));
+	}
 
 	@Test(timeout=15000)
 	public void testCompleteScope() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -219,15 +238,5 @@ public class SimpleModelTest {
 		assertEquals("-SNAPSHOT", edit.get().getNewText());
 		assertEquals(new Range(new Position(0, 9), new Position(0, 11)), edit.get().getRange());
 	}
-	
 
-	@Test
-	public void testEnvironmentVariablePropertyHover()
-			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		String hoverContents = languageService.doHover(createDOMDocument("/pom-environment-variable-property.xml", languageService),
-				new Position(16, 16), new SharedSettings()).getContents().getRight().getValue();
-		
-		System.out.println(hoverContents);
-
-	}
 }
