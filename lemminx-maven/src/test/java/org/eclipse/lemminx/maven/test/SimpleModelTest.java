@@ -219,4 +219,15 @@ public class SimpleModelTest {
 		assertEquals("-SNAPSHOT", edit.get().getNewText());
 		assertEquals(new Range(new Position(0, 9), new Position(0, 11)), edit.get().getRange());
 	}
+	
+
+	@Test
+	public void testEnvironmentVariablePropertyHover()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		String hoverContents = languageService.doHover(createDOMDocument("/pom-environment-variable-property.xml", languageService),
+				new Position(16, 16), new SharedSettings()).getContents().getRight().getValue();
+		
+		System.out.println(hoverContents);
+
+	}
 }
