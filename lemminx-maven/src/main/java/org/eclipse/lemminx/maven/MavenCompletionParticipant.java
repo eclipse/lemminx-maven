@@ -513,6 +513,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				CompletionItem item = toTextCompletionItem(request, "${" + property.getKey() + '}');
 				item.setDocumentation("Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
 				item.setKind(CompletionItemKind.Property);
+				if (property.getKey().contains("env.")) {
+					// We don't want environment variables at the top of the completion proposals
+					item.setSortText("${zzz" + property.getKey() + "}");
+				}
 				return item;
 			} catch (BadLocationException e) {
 				e.printStackTrace();
