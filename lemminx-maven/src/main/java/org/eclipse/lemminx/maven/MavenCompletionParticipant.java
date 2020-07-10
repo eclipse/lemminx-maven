@@ -265,13 +265,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "goal":
 			collectGoals(request).forEach(response::addCompletionItem);
 			break;
-		case "configuration":
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession).stream()
-					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
-					.filter(distinctByKey(
-							completionItem -> ((CompletionItem) completionItem).getDocumentation().getLeft()))
-					.forEach(response::addCompletionItem);
-			break;
 		default:
 			initSnippets();
 			TextDocument document = parent.getOwnerDocument().getTextDocument();

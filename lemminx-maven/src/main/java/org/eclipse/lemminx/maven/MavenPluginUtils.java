@@ -93,12 +93,12 @@ public class MavenPluginUtils {
 		return description;
 	}
 
-	public static List<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
+	public static Set<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
 			MavenProjectCache cache, RepositorySystemSession repoSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager, MavenSession mavenSession) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession,
 				pluginManager);
 		if (pluginDescriptor == null) {
-			return Collections.emptyList();
+			return Collections.emptySet();
 		}
 		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
 		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, "execution");
@@ -110,8 +110,8 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		List<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
-				.collect(Collectors.toList());
+		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
+				.collect(Collectors.toSet());
 		return parameters;
 	}
 	
