@@ -301,6 +301,9 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	public static String getMavenPropertyInRequest(IPositionRequest request) {
 		DOMNode tag = request.getNode();
 		String tagText = tag.getNodeValue();
+		if (tagText == null) {
+			return null;
+		}
 
 		int hoverLocation = request.getOffset();
 		int propertyOffset = request.getNode().getStart();

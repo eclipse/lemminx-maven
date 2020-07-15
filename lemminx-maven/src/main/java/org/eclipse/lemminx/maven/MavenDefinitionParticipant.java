@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
+import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -29,6 +30,7 @@ import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.w3c.dom.DOMException;
 
 public class MavenDefinitionParticipant implements IDefinitionParticipant {
 
@@ -55,7 +57,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		}
 		
 		DOMElement element = findInterestingElement(request.getNode());
-		if (element.getLocalName().equals("module")) {
+		if (element != null && element.getLocalName().equals("module")) {
 			File subModuleFile = new File(currentFolder, element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
 			if (subModuleFile.isFile()) {
 				locations.add(toLocationNoRange(subModuleFile, element));
@@ -83,7 +85,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 				return;
 			}
 		}
-		if (dependency != null) {
+		if (dependency != null && element != null) {
 			File artifactLocation = getArtifactLocation(dependency);
 			LocationLink location = toLocationNoRange(artifactLocation, element);
 			if (location != null) {
@@ -124,7 +126,21 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		if (propertyDeclaration == null) {
 			return null;
 		}
-		return toLocation(childProj.getFile(), propertyDeclaration, request.getNode());		
+		
+
+		String mavenPropertyText = "${" + mavenProperty + "}";
+		Position propertyStart;
+		try {
+			propertyStart = new Position(request.getPosition().getLine(),
+					request.getXMLDocument().positionAt(request.getNode().getStart()).getCharacter()
+					+ request.getNode().getNodeValue().indexOf(mavenPropertyText));
+			Range propertyRange = new Range(propertyStart,
+					new Position(request.getPosition().getLine(), propertyStart.getCharacter() + mavenPropertyText.length()));
+			return toLocation(childProj.getFile(), propertyDeclaration, propertyRange);	
+		} catch (DOMException | BadLocationException e) {
+			e.printStackTrace();
+		}
+		return null;	
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {
@@ -152,6 +168,12 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	private LocationLink toLocation(File target, DOMNode targetNode, DOMNode originNode) {
 		Range targetRange = XMLPositionUtility.createRange(targetNode);
 		LocationLink link = new LocationLink(target.toURI().toString(), targetRange, targetRange, XMLPositionUtility.createRange(originNode));
+		return link;
+	}
+	
+	private LocationLink toLocation(File target, DOMNode targetNode, Range originRange) {
+		Range targetRange = XMLPositionUtility.createRange(targetNode);
+		LocationLink link = new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
 		return link;
 	}
 
