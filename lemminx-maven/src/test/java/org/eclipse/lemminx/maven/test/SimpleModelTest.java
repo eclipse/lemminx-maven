@@ -192,6 +192,48 @@ public class SimpleModelTest {
 	}
 	
 	@Test
+ 	public void testMultiplePropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-with-multiple-properties.xml", languageService);
+		Position pos = new Position(16, 12);
+		Hover hover = languageService.doHover(document,pos, new SharedSettings());
+		Range firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("$")));
+ 		
+ 		pos = new Position(16, 21);
+ 		hover = languageService.doHover(document,pos, new SharedSettings());
+ 		Range secondHoverRange = hover.getRange();
+  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("test")));
+  		assertFalse(firstHoverRange.equals(secondHoverRange));
+	}
+	
+	@Test
+	public void testMultiplePropertyDefinitionRangeSameTag()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-with-multiple-properties.xml", languageService);
+		Position pos = new Position(16, 12);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+
+		assertTrue(definitionLinks.size() == 1);
+		assertTrue(definitionLinks.size() > 0);
+		Range firstDefinitionRange = definitionLinks.get(0).getOriginSelectionRange();
+
+		pos = new Position(16, 21);
+		definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		assertTrue(definitionLinks.size() > 0);
+		Range secondDefinitionRange = definitionLinks.get(0).getOriginSelectionRange();
+
+		assertFalse(firstDefinitionRange.equals(secondDefinitionRange));
+
+		List<DOMNode> nameNodes = DOMUtils.findNodesByLocalName(document, "name");
+		assertTrue(nameNodes.size() == 1);
+		Range parentNodeRange = XMLPositionUtility.createRange(nameNodes.get(0));
+		assertFalse(firstDefinitionRange.equals(parentNodeRange));
+		assertFalse(secondDefinitionRange.equals(parentNodeRange));
+	}
+	
+	@Test
  	public void testPropertyDefinitionSameDocumentBug() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-definition-wrong-tag-bug.xml", languageService);
 		Position pos = new Position(22, 40);

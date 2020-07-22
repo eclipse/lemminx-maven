@@ -28,6 +28,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.execution.MavenSession;
@@ -54,9 +56,11 @@ import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.Range;
 
 public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
@@ -299,7 +303,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
 		
 		
-		String mavenProperty = getMavenPropertyInRequest(request);
+		Pair<Range, String> mavenProperty = getMavenPropertyInRequest(request);
 		if (mavenProperty != null) {
 			return collectProperty(request, mavenProperty);
 		}
@@ -321,7 +325,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 
-	public static String getMavenPropertyInRequest(IPositionRequest request) {
+	public static Pair<Range, String> getMavenPropertyInRequest(IPositionRequest request) {
 		DOMNode tag = request.getNode();
 		String tagText = tag.getNodeValue();
 		if (tagText == null) {
@@ -339,15 +343,19 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		int indexCloseBefore = beforeHoverText.lastIndexOf('}');
 		int indexCloseAfter = afterHoverText.indexOf('}');
 		if (indexOpen > indexCloseBefore) {
-			return tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
+
+			String propertyText = tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
+			int textStart = request.getNode().getStart();
+			Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
+					textStart + indexCloseAfter - 1, request.getXMLDocument());
+			return new ImmutablePair<Range, String>(propertyRange, propertyText);
 		}
 		return null;
 	}
 
-	private Hover collectProperty(IHoverRequest request, String property) {
+	private Hover collectProperty(IHoverRequest request, Pair<Range, String> property) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-		
 		DOMDocument doc = request.getXMLDocument();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		if (project != null) {
@@ -356,13 +364,15 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
-				if (property.equals(mavenProperty)) {
+				if (property.getRight().equals(mavenProperty)) {
 					String message = toBold.apply("Property: ") + mavenProperty 
 							+ lineBreak
 							+ toBold.apply("Value: ") + prop.getValue() 
 							+ lineBreak;
 					
-					return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
+					Hover hover = new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
+					hover.setRange(property.getLeft());
+					return hover;
 				}
 			}
 		}

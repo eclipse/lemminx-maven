@@ -15,10 +15,10 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
-import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -30,7 +30,6 @@ import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
-import org.w3c.dom.DOMException;
 
 public class MavenDefinitionParticipant implements IDefinitionParticipant {
 
@@ -96,7 +95,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
-		String mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
+		Pair<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {
 			return null; 
 		}
@@ -106,7 +105,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return null;
 		}
 		MavenProject childProj = project;
-		while (project != null && project.getProperties().containsKey(mavenProperty)) {
+		while (project != null && project.getProperties().containsKey(mavenProperty.getRight())) {
 			childProj = project;
 			project = project.getParent();
 		}
@@ -116,31 +115,18 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		
 		if (childProj.getFile().toURI().toString().equals(xmlDocument.getDocumentURI())) {
 			// Property is defined in the same file as the request
-			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
+			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getRight()).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		} else {
 			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(childProj.getFile().toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
-			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
+			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getRight()).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		}
 		
 		if (propertyDeclaration == null) {
 			return null;
 		}
 		
-
-		String mavenPropertyText = "${" + mavenProperty + "}";
-		Position propertyStart;
-		try {
-			propertyStart = new Position(request.getPosition().getLine(),
-					request.getXMLDocument().positionAt(request.getNode().getStart()).getCharacter()
-					+ request.getNode().getNodeValue().indexOf(mavenPropertyText));
-			Range propertyRange = new Range(propertyStart,
-					new Position(request.getPosition().getLine(), propertyStart.getCharacter() + mavenPropertyText.length()));
-			return toLocation(childProj.getFile(), propertyDeclaration, propertyRange);	
-		} catch (DOMException | BadLocationException e) {
-			e.printStackTrace();
-		}
-		return null;	
+		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getLeft());	
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {
