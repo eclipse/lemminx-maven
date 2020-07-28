@@ -11,6 +11,7 @@ package org.eclipse.lemminx.maven;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.function.UnaryOperator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -34,63 +35,61 @@ import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 
 public class MavenPluginUtils {
 	
-	static final String LINE_BREAK = "\n\n";
-
 	private MavenPluginUtils() {
 		// Utility class, not meant to be instantiated
 	}
 
-	public static MarkupContent getMarkupDescription(Parameter parameter) {
+	public static MarkupContent getMarkupDescription(Parameter parameter, boolean supportsMarkdown) {
+		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+		
 		String description = parameter.getDescription();
-		description = htmlXMLToMarkdown(description);
-		return new MarkupContent("markdown",
-				"**required:** " + parameter.getRequirement() + LINE_BREAK + "**Type:** " + parameter.getType() + LINE_BREAK
-						+ "Expression: " + parameter.getExpression() + LINE_BREAK + "Default Value: " + parameter.getDefaultValue()
-						+ LINE_BREAK + description);
+		description = MarkdownUtils.htmlXMLToMarkdown(description);
+		
+		String expression = parameter.getExpression() != null ? parameter.getExpression() : "(none)";
+		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "(unset)";
+	
+		String markdownDescription = 
+				toBold.apply("Required: ") + parameter.isRequired() + lineBreak + 
+				toBold.apply("Type: ") + parameter.getType() + lineBreak + 
+				toBold.apply("Expression: ") + expression + lineBreak + 
+				toBold.apply("Default Value: ") + defaultValue + lineBreak + 
+				description;
+	
+		return new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, markdownDescription);
 	}
 	
-	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter) {
-		final String fromParent = "**From parent configuration element:**" + LINE_BREAK;
+	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter, boolean supportsMarkdown) {
+		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+		
+		final String fromParent = toBold.apply("From parent configuration element:") + lineBreak;
 		String type = parameter.getType() != null ? parameter.getType() : "";
-		String expression = parameter.getExpression() != null ? parameter.getExpression() : "";
-		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "";
+		String expression = parameter.getExpression() != null ? parameter.getExpression() : "(none)";
+		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "(unset)";
 		String description = parameter.getDescription() != null ? parameter.getDescription() : "";
 		
 		if (defaultValue.isEmpty() && parentParameter != null && parentParameter.getDefaultValue() != null) {
 			defaultValue = fromParent + parentParameter.getDefaultValue();
 		}
-
 		if (description.isEmpty() && parentParameter != null) {
 			description = fromParent + parentParameter.getDescription();
 		}
 		
-		description = htmlXMLToMarkdown(description);
-
-		// @formatter:off
+		description = MarkdownUtils.htmlXMLToMarkdown(description);
+		
 		String markdownDescription = 
-				"**required:** " + parameter.isRequired() + LINE_BREAK 
-				+ "**Type:** "+ type + LINE_BREAK 
-				+ "Expression: " + expression + LINE_BREAK 
-				+ "Default Value: " + defaultValue + LINE_BREAK 
-				+ description;
-		// @formatter:on
-		return new MarkupContent("markdown", markdownDescription);
-	}
-
-	private static String htmlXMLToMarkdown(String description) {
-		if (description.contains("<pre>") && description.contains("&lt;")) {
-			//Add markdown formatting to XML
-			String xmlContent = description.substring(description.indexOf("<pre>") + 6, description.indexOf("</pre>") - 1);
-			description = description.substring(0, description.indexOf("<pre>"));
-			xmlContent = xmlContent.replaceAll("&lt;", "<");
-			xmlContent = xmlContent.replaceAll("&gt;", ">");
-			xmlContent = "```XML" + "\n" + xmlContent + "\n" + "```";
-			description = description + LINE_BREAK + xmlContent;
-		}
-		return description;
+				toBold.apply("Required: ") + parameter.isRequired() + lineBreak + 
+				toBold.apply("Type: ") + type + lineBreak + 
+				toBold.apply("Expression: ") + expression + lineBreak + 
+				toBold.apply("Default Value: ") + defaultValue + lineBreak +
+				description;
+		
+		return new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, markdownDescription);
 	}
 
 	public static Set<Parameter> collectPluginConfigurationParameters(IPositionRequest request,

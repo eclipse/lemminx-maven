@@ -69,6 +69,7 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
@@ -122,9 +123,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			  return;
 		}
 		
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		if ("configuration".equals(request.getParentElement().getLocalName())) {
 			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession).stream()
-					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter), request))
+					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter, supportsMarkdown), request))
 					.forEach(response::addCompletionItem);
 		}
 	}

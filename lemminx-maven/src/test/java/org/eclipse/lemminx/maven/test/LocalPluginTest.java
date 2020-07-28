@@ -14,6 +14,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -25,6 +26,8 @@ import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.HoverCapabilities;
+import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.After;
@@ -37,6 +40,17 @@ public class LocalPluginTest {
 	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
 	private XMLLanguageService languageService;
+	
+	private SharedSettings getMarkdownSharedSettings () {
+		SharedSettings settings = new SharedSettings();
+		HoverCapabilities hover = new HoverCapabilities();
+		String capabilities[] = { MarkupKind.MARKDOWN };
+		hover.setContentFormat(Arrays.asList(capabilities));
+		
+		settings.getHoverSettings().setCapabilities(hover);
+		
+		return settings;
+	}
 
 	@Before
 	public void setUp() throws IOException {
@@ -118,20 +132,20 @@ public class LocalPluginTest {
  	public void testPluginNestedConfigurationHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		//<compilerArguments> hover
 		String hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(15, 8), new SharedSettings()).getContents().getRight().getValue();
+				new Position(15, 8), getMarkdownSharedSettings()).getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 		
 		//<arg> hover, child of compilerArguments
 		//Should have a different type, but sames description
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(16, 8), new SharedSettings()).getContents().getRight().getValue();
+				new Position(16, 8), getMarkdownSharedSettings()).getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** String"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 		
 		//<annotationProcessorPath> hover
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(20, 9), new SharedSettings()).getContents().getRight().getValue();
+				new Position(20, 9), getMarkdownSharedSettings()).getContents().getRight().getValue();
 		//annotationProcessorPath type should be a DependencyCoordinate and its description should be that of annotationsProcessorPath
 		assertTrue(hoverContents.contains("org.apache.maven.plugin.compiler.DependencyCoordinate"));
 		assertTrue(hoverContents.contains("Classpath elements to supply as annotation processor path."));
@@ -139,7 +153,7 @@ public class LocalPluginTest {
 		
 		//<groupId> hover
 		hoverContents = languageService.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-				new Position(21, 9), new SharedSettings()).getContents().getRight().getValue();
+				new Position(21, 9), getMarkdownSharedSettings()).getContents().getRight().getValue();
 		//GroupId type should be a string and its description should be that of annotationsProcessorPath
 		assertTrue(hoverContents.contains("**Type:** String"));
 		assertTrue(hoverContents.contains("Classpath elements to supply as annotation processor path."));
