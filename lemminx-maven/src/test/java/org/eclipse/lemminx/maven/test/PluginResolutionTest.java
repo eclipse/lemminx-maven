@@ -15,12 +15,16 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lemminx.maven.MavenPlugin;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
+import org.eclipse.lsp4j.HoverCapabilities;
+import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.junit.After;
 import org.junit.Before;
@@ -67,9 +71,17 @@ public class PluginResolutionTest {
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertFalse(initialMavenPluginApiDirectory.exists());
 		// <compilerArguments> hover
+		
+		SharedSettings settings = new SharedSettings();
+		HoverCapabilities hover = new HoverCapabilities();
+		String capabilities[] = { MarkupKind.MARKDOWN };
+		hover.setContentFormat(Arrays.asList(capabilities));
+		
+		settings.getHoverSettings().setCapabilities(hover);
+		
 		String hoverContents = languageService
 				.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
-						new Position(15, 8), new SharedSettings())
+						new Position(15, 8), settings)
 				.getContents().getRight().getValue();
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));

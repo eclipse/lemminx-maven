@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -55,6 +56,7 @@ import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 
 public class MavenHoverParticipant implements IHoverParticipant {
 	private final MavenProjectCache cache;
@@ -130,6 +132,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	}
 
 	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Collection<String> possibleHovers = Collections.synchronizedSet(new LinkedHashSet<>());
 		DOMNode node = request.getNode();
 		DOMDocument doc = request.getXMLDocument();
@@ -154,10 +157,24 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				.findFirst()
 				.map(localRepoSearcher::findLocalFile)
 				.map(file -> builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
-				.map(model -> model.getName() + "\n\n" + model.getDescription())
+				.map(model -> {
+					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+					String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+					String message = "";
+					
+					if (model.getName() != null) {
+						message += toBold.apply(model.getName());
+					}
+					
+					if (model.getDescription() != null) {
+						message += lineBreak + model.getDescription();
+					}
+					
+					return message;
+				})
 				.map(message -> (message.length() > 2 ? message : null));
 			if (localDescription.isPresent()) {
-				return new Hover(new MarkupContent("plaintext", localDescription.get()));
+				return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, localDescription.get()));
 			}
 		} catch (Exception e1) {
 			e1.printStackTrace();
@@ -194,7 +211,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			return null;
 		}
 		
-		return new Hover(new MarkupContent("plaintext", possibleHovers.iterator().next()));
+		return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, possibleHovers.iterator().next()));
 	}
 
 	private Hover collectGoal(IPositionRequest request) {
@@ -204,7 +221,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
-					return new Hover(new MarkupContent("plaintext", mojo.getDescription()));
+					return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
 				}
 			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
@@ -213,7 +230,8 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	private Hover collectPluginConfiguration(IPositionRequest request) {
+	private Hover collectPluginConfiguration(IHoverRequest request) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Set<MojoParameter> parameters;
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
@@ -227,7 +245,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
 				if (node.getLocalName().equals(parameter.getName())) {
-					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null));
+					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null, supportsMarkdown));
 				}
 			}
 		}
@@ -248,7 +266,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
 					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-						return new Hover(MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter));
+						return new Hover(MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown));
 					}
 				}
 				
@@ -257,7 +275,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				nestedParameters.add(parentParameter);
 				for (MojoParameter parameter : nestedParameters) {
 					if (node.getLocalName().equals(parameter.getName())) {
-						return new Hover(MavenPluginUtils.getMarkupDescription(parameter, parentParameter));
+						return new Hover(MavenPluginUtils.getMarkupDescription(parameter, parentParameter, supportsMarkdown));
 					}
 				}
 			}
@@ -326,17 +344,25 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	private Hover collectProperty(IPositionRequest request, String property) {
+	private Hover collectProperty(IHoverRequest request, String property) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
+		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+		
 		DOMDocument doc = request.getXMLDocument();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			Map<String, String> allProps = getMavenProjectProperties(project);
+			UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
 				if (property.equals(mavenProperty)) {
-					return new Hover(new MarkupContent("markdown", "Property: " + mavenProperty
-							+ MavenPluginUtils.LINE_BREAK + "Value: " + prop.getValue() + MavenPluginUtils.LINE_BREAK));
+					String message = toBold.apply("Property: ") + mavenProperty 
+							+ lineBreak
+							+ toBold.apply("Value: ") + prop.getValue() 
+							+ lineBreak;
+					
+					return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
 				}
 			}
 		}
