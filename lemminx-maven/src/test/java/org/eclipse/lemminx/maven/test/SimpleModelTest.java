@@ -223,6 +223,39 @@ public class SimpleModelTest {
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
 	}
+	
+	@Test
+	public void testModuleDefinition() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-module-definition.xml", languageService);
+		Position pos = new Position(11, 5);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		DOMDocument targetDocument = createDOMDocument("/multi-module/pom.xml", languageService);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+	}
+	
+	@Test
+	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
+		Position pos = new Position(6, 9);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		DOMDocument targetDocument = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+	}
+	
+	@Test
+	public void testParentDefinitionWithoutRelativePath() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/multi-module/folder1/pom.xml", languageService);
+		Position pos = new Position(6, 9);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		
+		DOMDocument targetDocument = createDOMDocument("/multi-module/pom.xml", languageService);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+	}
 
 	@Test
 	public void testBOMDependency() throws IOException, URISyntaxException {
