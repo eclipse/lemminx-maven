@@ -598,10 +598,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
-		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();
 		File docFolder = new File(URI.create(doc.getTextDocument().getUri())).getParentFile();
-		String prefix = doc.getText().substring(node.getStartTagCloseOffset() + 1, request.getOffset());
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
 		if (!prefix.isEmpty() && !prefix.endsWith("/")) {
@@ -621,11 +620,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
-		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
 		File docFolder = docFile.getParentFile();
-		String prefix = doc.getText().substring(node.getStartTagCloseOffset() + 1, request.getOffset());
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
 		if (prefix.isEmpty()) {
@@ -683,11 +681,35 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			builder.insert(0, current.getFileName());
 			current = current.getParent();
 		}
+		
+		Range replaceRange = request.getReplaceRange();
+		
+		/* Temporary workaround for https://github.com/eclipse/lemminx-maven/pull/127
+		 * Workaround involves overriding the replace range of the entire node text 
+		 * rather than some portion after the file separator. 
+		 * TODO: Remove try catch block after upstream fix has been merged.
+		 * Upstream fix: https://github.com/eclipse/lemminx/issues/723
+		 * */
+		try {
+			DOMElement parentElement = request.getParentElement();
+			int startOffset = parentElement.getStartTagCloseOffset() + 1;
+			Position start = parentElement.getOwnerDocument().positionAt(startOffset);
+			Position end = request.getPosition();
+			int endOffset = parentElement.getEndTagOpenOffset();
+			if (endOffset > 0) {
+				end = request.getXMLDocument().positionAt(endOffset);
+			}
+			replaceRange = new Range(start, end);
+		} catch (BadLocationException e) {
+			e.printStackTrace();
+		}
+		
 		String pathString = builder.toString();
 		res.setLabel(pathString);
 		res.setFilterText(pathString);
 		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
-		res.setTextEdit(new TextEdit(request.getReplaceRange(), pathString));
+		res.setTextEdit(new TextEdit(replaceRange, pathString));
+		
 		return res;
 	}
 

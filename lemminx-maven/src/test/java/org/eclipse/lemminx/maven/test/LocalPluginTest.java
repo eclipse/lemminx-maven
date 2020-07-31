@@ -29,6 +29,7 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.After;
 import org.junit.Before;
@@ -118,6 +119,19 @@ public class LocalPluginTest {
 				pos, new SharedSettings())
 			.getItems();
 		assertTrue(completions.stream().map(CompletionItem::getLabel).anyMatch("release"::equals));
+	}
+	
+	// Test related to https://github.com/eclipse/lemminx-maven/issues/114
+	@Test
+	public void testFileCompletionDuplicatePrefix() throws IOException, URISyntaxException {
+		Position pos = new Position(11, 26);
+		List<CompletionItem> completions = languageService.doComplete(createDOMDocument("/pom-complete-file-path.xml", languageService),
+				pos, new SharedSettings())
+			.getItems();
+		// Expected replace range is the whole text node range
+		Range expectedReplaceRange = new Range(new Position(11, 10), new Position(11, 26));
+		
+		assertTrue(completions.stream().map(item -> item.getTextEdit().getRange()).anyMatch(expectedReplaceRange::equals));
 	}
 	
 	// Hover related tests
