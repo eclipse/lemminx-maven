@@ -108,7 +108,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			return null;
 		}
 		
-		if (isADescendantOf(tag, "configuration")) {
+		if (DOMUtils.isADescendantOf(tag, "configuration")) {
 			return collectPluginConfiguration(request);
 		}
 
@@ -123,17 +123,6 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		return null;
 	}
 
-	// Move to DOMUtils
-	private boolean isADescendantOf(DOMNode tag, String parentName) {
-		DOMNode parent = tag.getParentNode();
-		while (parent != null) {
-			if (parent.getLocalName() != null && parent.getLocalName().equals(parentName)) {
-				return true;
-			}
-			parent = parent.getParentNode();
-		}
-		return false;
-	}
 
 	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);

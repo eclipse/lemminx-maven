@@ -123,13 +123,66 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			  return;
 		}
 		
-		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
-		if ("configuration".equals(request.getParentElement().getLocalName())) {
-			MavenPluginUtils.collectPluginConfigurationParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession).stream()
-					.map(parameter -> toTag(parameter.getName(), MavenPluginUtils.getMarkupDescription(parameter, supportsMarkdown), request))
-					.forEach(response::addCompletionItem);
+		DOMNode tag = request.getNode();
+		if (DOMUtils.isADescendantOf(tag, "configuration")) {
+			collectPluginConfiguration(request).forEach(response::addCompletionItem);
+			return;
 		}
 	}
+	
+	// TODO: Factor this with MavenHoverParticipant's equivalent method
+	private List<CompletionItem> collectPluginConfiguration(ICompletionRequest request) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
+		Set<MojoParameter> parameters;
+		try {
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession,
+					pluginManager, buildPluginManager, mavenSession);
+		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
+			e.printStackTrace();
+			return null;
+		}
+
+		String parentName = request.getParentElement().getLocalName();
+		if (parentName != null && parentName.equals("configuration")) {
+			// The configuration element being completed is at the top level
+			return parameters.stream()
+					.map(param -> toTag(param.getName(),
+							MavenPluginUtils.getMarkupDescription(param, null, supportsMarkdown), request))
+					.collect(Collectors.toList());
+		}
+
+		// Nested case: node is a grand child of configuration
+		// Get the node's ancestor which is a child of configuration
+		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, "configuration");
+		if (parentParameterNode != null) {
+			List<MojoParameter> parentParameters = parameters.stream()
+					.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
+					.collect(Collectors.toList());
+			if (!parentParameters.isEmpty()) {
+				MojoParameter parentParameter = parentParameters.get(0);
+
+				if (parentParameter.getNestedParameters().size() == 1) {
+					// The parent parameter must be a collection of a type
+					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
+					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
+					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
+						return Collections.singletonList(toTag(nestedParameter.getName(), MavenPluginUtils
+								.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown), request));
+					}
+				}
+
+				// Get all deeply nested parameters
+				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
+				nestedParameters.add(parentParameter);
+				return nestedParameters.stream()
+						.map(param -> toTag(param.getName(),
+								MavenPluginUtils.getMarkupDescription(param, parentParameter, supportsMarkdown), request))
+						.collect(Collectors.toList());
+			}
+		}
+		return null;
+	}
+
 
 	@Override
 	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
@@ -479,6 +532,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		res.setTextEdit(edit);
 		res.setKind(CompletionItemKind.Field);
 		res.setFilterText(edit.getNewText());
+		res.setSortText(name);
 		return res;
 	}
 
@@ -508,9 +562,11 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				CompletionItem item = toTextCompletionItem(request, "${" + property.getKey() + '}');
 				item.setDocumentation("Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
 				item.setKind(CompletionItemKind.Property);
+				// '$' sorts before alphabet characters, so we add z to make it appear later in proposals
+				item.setSortText("z${" + property.getKey() + "}");
 				if (property.getKey().contains("env.")) {
 					// We don't want environment variables at the top of the completion proposals
-					item.setSortText("${zzz" + property.getKey() + "}");
+					item.setSortText("z${zzz" + property.getKey() + "}");
 				}
 				return item;
 			} catch (BadLocationException e) {
