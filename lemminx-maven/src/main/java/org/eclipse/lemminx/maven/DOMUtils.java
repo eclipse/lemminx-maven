@@ -61,6 +61,20 @@ public class DOMUtils {
 		}
 		return foundNodes;
 	}
+	
+	public static boolean isADescendantOf(DOMNode tag, String parentName) {
+		if (tag.getLocalName() != null && tag.getLocalName().equals(parentName)) {
+			return true;
+		}
+		DOMNode parent = tag.getParentNode();
+		while (parent != null) {
+			if (parent.getLocalName() != null && parent.getLocalName().equals(parentName)) {
+				return true;
+			}
+			parent = parent.getParentNode();
+		}
+		return false;
+	}
 
 	public static Optional<String> findChildElementText(DOMNode pluginNode, final String elementName) {
 		return pluginNode.getChildren().stream().filter(node -> elementName.equals(node.getLocalName()))
