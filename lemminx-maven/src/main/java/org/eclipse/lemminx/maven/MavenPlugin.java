@@ -13,6 +13,8 @@ package org.eclipse.lemminx.maven;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -139,7 +141,7 @@ public class MavenPlugin implements IXMLExtension {
 		}
 	}
 
-	private MavenExecutionRequest initMavenRequest(PlexusContainer container, Object initializationOptions) throws Exception {
+	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, Object initializationOptions) throws Exception {
 		JsonObject options = initializationOptions != null ? (JsonObject)initializationOptions : new JsonObject();
 		if (options.has("xml")) {
 			options = options.getAsJsonObject("xml");
@@ -182,10 +184,13 @@ public class MavenPlugin implements IXMLExtension {
 		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
 		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
 		mavenRequest.setLocalRepository(localRepo);
+		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
+		mavenRequest.setRemoteRepositories(defaultRemoteRepositories);
+		mavenRequest.setPluginArtifactRepositories(defaultRemoteRepositories);
 		return mavenRequest;
 	}
 
-	private File getFileFromOptons(JsonElement element, File defaults) {
+	private static File getFileFromOptons(JsonElement element, File defaults) {
 		if (element == null || !element.isJsonPrimitive()) {
 			return defaults;
 		}

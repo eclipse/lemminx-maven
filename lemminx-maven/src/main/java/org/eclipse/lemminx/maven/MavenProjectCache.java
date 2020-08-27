@@ -66,9 +66,9 @@ public class MavenProjectCache {
 	public MavenProjectCache(PlexusContainer container, MavenExecutionRequest mavenRequest) {
 		this.mavenRequest = mavenRequest;
 		this.plexusContainer = container;
-		this.lastCheckedVersion = new HashMap<URI, Integer>();
-		this.projectCache = new HashMap<URI, MavenProject>();
-		this.problemCache = new HashMap<URI, Collection<ModelProblem>>();
+		this.lastCheckedVersion = new HashMap<>();
+		this.projectCache = new HashMap<>();
+		this.problemCache = new HashMap<>();
 		systemProperties = new Properties();
 		EnvironmentUtils.addEnvVars(systemProperties);
 		systemProperties.putAll(System.getProperties());
@@ -103,7 +103,6 @@ public class MavenProjectCache {
 		Integer last = lastCheckedVersion.get(URI.create(document.getTextDocument().getUri()));
 		if (last == null || last.intValue() < document.getTextDocument().getVersion()) {
 			parseAndCache(document);
-
 		}
 	}
 
@@ -112,13 +111,8 @@ public class MavenProjectCache {
 		if (lastKnownVersionMavenProject != null) {
 			return Optional.of(lastKnownVersionMavenProject);
 		}
-		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
-		request.setSystemProperties(systemProperties);
-		request.setLocalRepository(mavenRequest.getLocalRepository());
-		request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
-		request.setResolveDependencies(true);
 		try {
-			MavenProject project = projectBuilder.build(file, request).getProject();
+			MavenProject project = projectBuilder.build(file, newProjectBuildingRequest()).getProject();
 			return Optional.of(project);
 		} catch (ProjectBuildingException e) {
 			List<ProjectBuildingResult> result = e.getResults();
@@ -132,19 +126,14 @@ public class MavenProjectCache {
 
 	private void parseAndCache(DOMDocument document) {
 		URI uri = URI.create(document.getDocumentURI());
-		Collection<ModelProblem> problems = new ArrayList<ModelProblem>();
+		Collection<ModelProblem> problems = new ArrayList<>();
 		try {
-			ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
-			request.setSystemProperties(systemProperties);
-			request.setLocalRepository(mavenRequest.getLocalRepository());
-			request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
-			request.setResolveDependencies(true);
 			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
 				@Override
 				public InputStream getInputStream() throws IOException {
 					return new ByteArrayInputStream(document.getText().getBytes());
 				}
-			}, request);
+			}, newProjectBuildingRequest());
 			problems.addAll(buildResult.getProblems());
 			if (buildResult.getProject() != null) {
 				// setFile should ideally be invoked during project build, but related methods
@@ -202,6 +191,18 @@ public class MavenProjectCache {
 
 		lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
 		problemCache.put(uri, problems);
+	}
+
+	private ProjectBuildingRequest newProjectBuildingRequest() {
+		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
+		request.setSystemProperties(systemProperties);
+		request.setLocalRepository(mavenRequest.getLocalRepository());
+		request.setRemoteRepositories(mavenRequest.getRemoteRepositories());
+		request.setPluginArtifactRepositories(mavenRequest.getPluginArtifactRepositories());
+		// TODO more to transfer from mavenRequest to ProjectBuildingRequest?
+		request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
+		request.setResolveDependencies(true);
+		return request;
 	}
 
 	private void initializeMavenBuildState() {

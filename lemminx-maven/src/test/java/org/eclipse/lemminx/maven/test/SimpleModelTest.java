@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -36,6 +37,7 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupContent;
@@ -314,4 +316,9 @@ public class SimpleModelTest {
 		assertEquals(new Range(new Position(0, 9), new Position(0, 11)), edit.get().getRange());
 	}
 
+	@Test
+	public void testResolveParentFromCentralWhenAnotherRepoIsDeclared() throws Exception {
+		DOMDocument document = createDOMDocument("/it1/pom.xml", languageService);
+		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+	}
 }

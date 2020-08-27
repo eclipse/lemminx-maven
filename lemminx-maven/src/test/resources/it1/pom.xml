@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2010, 2019 Sonatype, Inc, and others.
+  All rights reserved. This program and the accompanying materials
+  are made available under the terms of the Eclipse Public License 2.0
+  which accompanies this distribution, and is available at
+  https://www.eclipse.org/legal/epl-2.0/
+
+  SPDX-License-Identifier: EPL-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <!-- Artifact that's very unlikely already in central repo -->
+    <groupId>org.sonatype.forge</groupId>
+    <artifactId>forge-parent</artifactId>
+    <version>1</version>
+    <relativePath />
+  </parent>
+
+  <groupId>org.eclipse.lemminx.test</groupId>
+  <artifactId>test-parent</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <repositories>
+    <repository>
+      <id>platform</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/eclipse/updates/4.16/</url>
+    </repository>
+  </repositories>
+
+</project>
