@@ -57,7 +57,7 @@ public class MavenProjectCacheTest {
 
 	@Test
 	public void testParentChangeReflectedToChild()
-			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenPlugin plugin = new MavenPlugin();
 		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();

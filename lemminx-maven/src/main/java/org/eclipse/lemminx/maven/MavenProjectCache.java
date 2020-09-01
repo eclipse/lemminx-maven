@@ -54,18 +54,21 @@ public class MavenProjectCache {
 	private final Map<URI, Integer> lastCheckedVersion;
 	private final Map<URI, MavenProject> projectCache;
 	private final Map<URI, Collection<ModelProblem>> problemCache;
-	private final PlexusContainer plexusContainer;
 
+	private final MavenPlugin lemminxMavenPlugin;
+	private final PlexusContainer plexusContainer;
 	private final MavenExecutionRequest mavenRequest;
+	
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
 	private ProjectBuilder projectBuilder;
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
 	private Properties systemProperties;
 
-	public MavenProjectCache(PlexusContainer container, MavenExecutionRequest mavenRequest) {
-		this.mavenRequest = mavenRequest;
-		this.plexusContainer = container;
+	public MavenProjectCache(MavenPlugin lemminxMavenPlugin) {
+		this.lemminxMavenPlugin = lemminxMavenPlugin;
+		this.mavenRequest = lemminxMavenPlugin.getMavenSession().getRequest();
+		this.plexusContainer = lemminxMavenPlugin.getPlexusContainer();
 		this.lastCheckedVersion = new HashMap<>();
 		this.projectCache = new HashMap<>();
 		this.problemCache = new HashMap<>();
@@ -200,7 +203,7 @@ public class MavenProjectCache {
 		request.setRemoteRepositories(mavenRequest.getRemoteRepositories());
 		request.setPluginArtifactRepositories(mavenRequest.getPluginArtifactRepositories());
 		// TODO more to transfer from mavenRequest to ProjectBuildingRequest?
-		request.setRepositorySession(MavenPlugin.getRepositorySystemSession());
+		request.setRepositorySession(lemminxMavenPlugin.getMavenSession().getRepositorySession());
 		request.setResolveDependencies(true);
 		return request;
 	}

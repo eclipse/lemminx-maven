@@ -45,7 +45,12 @@ public class PluginResolutionTest {
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 		languageService.initializeIfNeeded();
-		File mavenRepo = MavenPlugin.getRepositorySystemSession().getLocalRepository().getBasedir();
+		File mavenRepo = languageService.getExtensions().stream() //
+				.filter(MavenPlugin.class::isInstance) //
+				.map(MavenPlugin.class::cast) //
+				.findAny() //
+				.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
+				.get();
 		initialMavenPluginApiDirectory = new File(mavenRepo, "org/apache/maven/maven-plugin-api/3.0");
 		if (initialMavenPluginApiDirectory.exists()) {
 			movedMavenPluginApiDirectory = new File(initialMavenPluginApiDirectory.getParent(), initialMavenPluginApiDirectory.getName() + "-moved");

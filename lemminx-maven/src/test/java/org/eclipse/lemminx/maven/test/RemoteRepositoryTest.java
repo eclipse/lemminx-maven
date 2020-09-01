@@ -95,7 +95,12 @@ public class RemoteRepositoryTest {
 	@Test(timeout=15000)
  	public void testDownloadArtifactOnHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		languageService.initializeIfNeeded();
-		File mavenRepo = MavenPlugin.getRepositorySystemSession().getLocalRepository().getBasedir();
+		File mavenRepo = languageService.getExtensions().stream() //
+			.filter(MavenPlugin.class::isInstance) //
+			.map(MavenPlugin.class::cast) //
+			.findAny() //
+			.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
+			.get();
 		File artifactDirectory = new File(mavenRepo, "org/glassfish/jersey/project/2.19");
 		String description = "Jersey is the open source (under dual CDDL+GPL license) JAX-RS 2.0 (JSR 339)";
 		final DOMDocument document = createDOMDocument("/pom-remote-artifact-download-hover.xml", languageService);

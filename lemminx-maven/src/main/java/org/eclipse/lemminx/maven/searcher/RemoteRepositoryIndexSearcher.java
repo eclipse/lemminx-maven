@@ -23,8 +23,11 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.search.BooleanClause.Occur;
@@ -48,7 +51,6 @@ import org.apache.maven.index.updater.WagonHelper;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.wagon.Wagon;
 import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
@@ -73,16 +75,20 @@ public class RemoteRepositoryIndexSearcher {
 
 	private List<IndexCreator> indexers = new ArrayList<>();
 
-	private static final File INDEX_PATH;
-	static {
-		String property = System.getProperty("lemminx.maven.indexDirectory");
-		INDEX_PATH = property != null && !property.trim().isEmpty() ? new File(property) : new File(System.getProperty("user.home") + "/.lemminx/index");
-	}
+	private final File indexPath;
 
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
 	private Map<IndexingContext, CompletableFuture<IndexingContext>> indexDownloadJobs = new HashMap<>();
 
-	public RemoteRepositoryIndexSearcher(PlexusContainer plexusContainer) {
+	public RemoteRepositoryIndexSearcher(MavenPlugin lemminxMavenPlugin, PlexusContainer plexusContainer, Optional<File> configuredIndexLocation) {
+		indexPath = Optional.ofNullable(System.getProperty("lemminx.maven.indexDirectory"))
+				.filter(Objects::nonNull)
+				.map(String::trim)
+				.filter(Predicate.not(String::isEmpty))
+				.map(File::new)
+				.or(() -> configuredIndexLocation)
+				.orElse(new File(lemminxMavenPlugin.getMavenSession().getLocalRepository().getBasedir() + "/index"));
+		indexPath.mkdirs();
 		try {
 			indexer = plexusContainer.lookup(Indexer.class);
 			indexUpdater = plexusContainer.lookup(IndexUpdater.class);
@@ -111,8 +117,6 @@ public class RemoteRepositoryIndexSearcher {
 		if (!disableCentralIndex) {
 			knownRepositories.add(CENTRAL_REPO);
 		}
-		File localRepository = new File(RepositorySystem.defaultUserLocalRepository.getAbsolutePath());
-		INDEX_PATH.mkdirs();
 		knownRepositories.stream().map(RemoteRepository::getUrl).map(URI::create).forEach(this::getIndexingContext);
 		// TODO knownRepositories.addAll(readRepositoriesFromSettings());
 	}
@@ -263,8 +267,8 @@ public class RemoteRepositoryIndexSearcher {
 
 	private IndexingContext initializeContext(URI repoUrl) {
 		String fileSystemFriendlyName = repoUrl.getHost() + repoUrl.hashCode();
-		File repoFile = new File(INDEX_PATH, fileSystemFriendlyName + "-cache");
-		File repoIndex = new File(INDEX_PATH, fileSystemFriendlyName + "-index");
+		File repoFile = new File(indexPath, fileSystemFriendlyName + "-cache");
+		File repoIndex = new File(indexPath, fileSystemFriendlyName + "-index");
 		try {
 			return indexer.createIndexingContext(repoUrl.toString(), repoUrl.toString(),
 					repoFile, repoIndex, repoUrl.toString(), null, true, true, indexers);
