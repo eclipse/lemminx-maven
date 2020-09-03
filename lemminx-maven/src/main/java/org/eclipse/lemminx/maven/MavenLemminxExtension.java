@@ -41,7 +41,6 @@ import org.codehaus.plexus.PlexusContainerException;
 import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
@@ -62,9 +61,9 @@ import com.google.gson.JsonObject;
  * Extension for pom.xml.
  *
  */
-public class MavenPlugin implements IXMLExtension {
+public class MavenLemminxExtension implements IXMLExtension {
 
-	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenPlugin.class.getName();
+	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
@@ -87,7 +86,7 @@ public class MavenPlugin implements IXMLExtension {
 
 	private BuildPluginManager buildPluginManager;
 
-	public MavenPlugin() {
+	public MavenLemminxExtension() {
 	}
 
 	@Override

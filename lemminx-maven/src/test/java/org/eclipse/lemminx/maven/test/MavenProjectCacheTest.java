@@ -22,7 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
-import org.eclipse.lemminx.maven.MavenPlugin;
+import org.eclipse.lemminx.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.maven.MavenProjectCache;
 import org.junit.Test;
 
@@ -35,7 +35,7 @@ public class MavenProjectCacheTest {
 		URI uri = getClass().getResource("/pom-with-properties.xml").toURI();
 		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		MavenPlugin plugin = new MavenPlugin();
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
 		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
@@ -48,7 +48,7 @@ public class MavenProjectCacheTest {
 		File pomFile = new File(uri);
 		String content = FileUtils.readFileToString(pomFile, "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		MavenPlugin plugin = new MavenPlugin();
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
 		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
@@ -58,7 +58,7 @@ public class MavenProjectCacheTest {
 	@Test
 	public void testParentChangeReflectedToChild()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
-		MavenPlugin plugin = new MavenPlugin();
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
 		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		DOMDocument doc = getDocument("/pom-with-properties-in-parent.xml");

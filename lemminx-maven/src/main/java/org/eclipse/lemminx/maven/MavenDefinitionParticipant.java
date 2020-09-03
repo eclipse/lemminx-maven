@@ -43,7 +43,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	
 	@Override
 	public void findDefinition(IDefinitionRequest request, List<LocationLink> locations, CancelChecker cancelChecker) {
-		if (!MavenPlugin.match(request.getXMLDocument())) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			  return;
 		}
 		

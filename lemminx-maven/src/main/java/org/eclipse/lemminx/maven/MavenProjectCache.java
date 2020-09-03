@@ -55,7 +55,7 @@ public class MavenProjectCache {
 	private final Map<URI, MavenProject> projectCache;
 	private final Map<URI, Collection<ModelProblem>> problemCache;
 
-	private final MavenPlugin lemminxMavenPlugin;
+	private final MavenLemminxExtension lemminxMavenPlugin;
 	private final PlexusContainer plexusContainer;
 	private final MavenExecutionRequest mavenRequest;
 	
@@ -65,7 +65,7 @@ public class MavenProjectCache {
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
 	private Properties systemProperties;
 
-	public MavenProjectCache(MavenPlugin lemminxMavenPlugin) {
+	public MavenProjectCache(MavenLemminxExtension lemminxMavenPlugin) {
 		this.lemminxMavenPlugin = lemminxMavenPlugin;
 		this.mavenRequest = lemminxMavenPlugin.getMavenSession().getRequest();
 		this.plexusContainer = lemminxMavenPlugin.getPlexusContainer();

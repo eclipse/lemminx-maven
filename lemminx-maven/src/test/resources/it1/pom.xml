@@ -24,6 +24,14 @@
   <version>0.0.1-SNAPSHOT</version>
   <packaging>pom</packaging>
 
+<dependencies>
+<dependency>
+<groupId>org.sonatype.forge</groupId>
+<artifactId>forge-parent</artifactId>
+<version>10</version>
+</dependency>
+</dependencies>
+
   <repositories>
     <repository>
       <id>platform</id>

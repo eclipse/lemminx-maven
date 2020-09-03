@@ -119,7 +119,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	@Override
 	public void onTagOpen(ICompletionRequest request, ICompletionResponse response)
 			throws Exception {
-		if (!MavenPlugin.match(request.getXMLDocument())) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			  return;
 		}
 		
@@ -186,7 +186,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 	@Override
 	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
-		if (!MavenPlugin.match(request.getXMLDocument())) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			  return;
 		}
 		
