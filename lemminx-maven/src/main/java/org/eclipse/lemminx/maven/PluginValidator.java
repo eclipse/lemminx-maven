@@ -29,24 +29,16 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 
 public class PluginValidator {
-	private final MavenProjectCache cache;
-	private final MavenPluginManager pluginManager;
-	private final RepositorySystemSession repoSession;
-	private final MavenSession mavenSession;
-	private final BuildPluginManager buildPluginManager;
 
-	public PluginValidator(MavenProjectCache cache, RepositorySystemSession repoSession, MavenSession mavenSession,
-			MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
-		this.cache = cache;
-		this.repoSession = repoSession;
-		this.pluginManager = pluginManager;
-		this.mavenSession = mavenSession;
-		this.buildPluginManager = buildPluginManager;
+	private MavenLemminxExtension plugin;
+
+	public PluginValidator(MavenLemminxExtension plugin) {
+		this.plugin = plugin;
 	}
 
 	public Optional<List<Diagnostic>> validatePluginResolution(DiagnosticRequest diagnosticRequest) {
 		try {
-			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession, pluginManager);
+			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			
@@ -83,8 +75,7 @@ public class PluginValidator {
 
 		Set<Parameter> parameters = new HashSet<Parameter>();
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, cache, repoSession,
-					pluginManager, buildPluginManager, mavenSession);
+			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			// A diagnostic was already added in validatePluginResolution()
@@ -118,8 +109,7 @@ public class PluginValidator {
 		if (node.isElement() && node.hasChildNodes()) {
 			PluginDescriptor pluginDescriptor;
 			try {
-				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, cache, repoSession,
-						pluginManager);
+				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
 				if (pluginDescriptor != null) {
 					internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;					
 				}

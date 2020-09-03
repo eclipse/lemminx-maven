@@ -22,7 +22,6 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.services.extensions.IDefinitionParticipant;
 import org.eclipse.lemminx.services.extensions.IDefinitionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
@@ -33,12 +32,10 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenDefinitionParticipant implements IDefinitionParticipant {
 
-	private LocalRepositorySearcher localRepositorySearcher;
-	private MavenProjectCache cache;
+	private final MavenLemminxExtension plugin;
 
-	public MavenDefinitionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher) {
-		this.cache = cache;
-		this.localRepositorySearcher = localRepositorySearcher;
+	public MavenDefinitionParticipant(MavenLemminxExtension plugin) {
+		this.plugin = plugin;
 	}
 	
 	@Override
@@ -100,7 +97,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return null; 
 		}
 		DOMDocument xmlDocument = request.getXMLDocument();
-		MavenProject project = cache.getLastSuccessfulMavenProject(xmlDocument);
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(xmlDocument);
 		if (project == null) {
 			return null;
 		}
@@ -130,7 +127,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {
-		MavenProject p = cache.getSnapshotProject(relativeFile).get();
+		MavenProject p = plugin.getProjectCache().getSnapshotProject(relativeFile).get();
 		return p != null &&
 				p.getGroupId().equals(dependency.getGroupId()) &&
 				p.getArtifactId().equals(dependency.getArtifactId()) &&
@@ -138,7 +135,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private File getArtifactLocation(Dependency dependency) {
-		File localArtifact = localRepositorySearcher.findLocalFile(dependency);
+		File localArtifact = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
 		if (localArtifact != null) {
 			return localArtifact;
 		}

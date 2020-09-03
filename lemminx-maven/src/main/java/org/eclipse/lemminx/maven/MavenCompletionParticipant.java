@@ -38,27 +38,22 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
-import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
-import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
-import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.maven.snippets.SnippetRegistry;
 import org.eclipse.lemminx.services.extensions.CompletionParticipantAdapter;
@@ -98,22 +93,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private boolean snippetsLoaded;
-	private final LocalRepositorySearcher localRepositorySearcher;
-	private final MavenProjectCache cache;
-	private final RemoteRepositoryIndexSearcher indexSearcher;
-	private final MavenPluginManager pluginManager;
-	private final RepositorySystemSession repoSession;
-	private final MavenSession mavenSession;
-	private final BuildPluginManager buildPluginManager;
+	private final MavenLemminxExtension plugin;
 
-	public MavenCompletionParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepositorySearcher, RemoteRepositoryIndexSearcher indexSearcher, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
-		this.cache = cache;
-		this.mavenSession = mavenSession;
-		this.localRepositorySearcher = localRepositorySearcher;
-		this.indexSearcher = indexSearcher;
-		this.repoSession = mavenSession.getRepositorySession();
-		this.pluginManager = pluginManager;
-		this.buildPluginManager = buildPluginManager;
+	public MavenCompletionParticipant(MavenLemminxExtension plugin) {
+		this.plugin = plugin;
 	}
 	
 	@Override
@@ -135,8 +118,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Set<MojoParameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession,
-					pluginManager, buildPluginManager, mavenSession);
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			return null;
@@ -239,7 +221,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// TODO remoteRepos
 			} else {
 				// TODO if artifactId is set and match existing content, suggest only matching groupId
-				collectSimpleCompletionItems(isPlugin ? localRepositorySearcher.searchPluginGroupIds() : localRepositorySearcher.searchGroupIds(),
+				collectSimpleCompletionItems(isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds() : plugin.getLocalRepositorySearcher().searchGroupIds(),
 						Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
 				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
 			}
@@ -253,7 +235,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// TODO localRepo
 				// TODO remoteRepos
 			} else {
-				allArtifactInfos.addAll((isPlugin ? localRepositorySearcher.getLocalPluginArtifacts() : localRepositorySearcher.getLocalArtifactsLastVersion()).stream()
+				allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts() : plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
 					.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
 					// TODO pass description as documentation
 					.map(this::toArtifactInfo)
@@ -264,7 +246,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "version":
 			if (!isParentDeclaration) {
 				if (artifactId.isPresent()) {
-					localRepositorySearcher.getLocalArtifactsLastVersion().stream()
+					plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 						.filter(gav -> gav.getGroupId().equals(artifactId.get()))
 						.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
 						.findAny()
@@ -295,7 +277,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "dependencies":
 		case "dependency":
 			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(localRepositorySearcher.getLocalArtifactsLastVersion().stream()
+			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 				.map(this::toArtifactInfo)
 				.collect(Collectors.toList()));
 			internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, response);
@@ -303,7 +285,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case "plugins":
 		case "plugin":
 			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(localRepositorySearcher.getLocalPluginArtifacts().stream()
+			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
 				.map(this::toArtifactInfo)
 				.collect(Collectors.toList()));
 			internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, response);
@@ -407,7 +389,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			referencedTargetPomFile = new File(referencedTargetPomFile, Maven.POMv4);
 		}
 		if (referencedTargetPomFile.isFile()) {
-			return cache.getSnapshotProject(referencedTargetPomFile);
+			return plugin.getProjectCache().getSnapshotProject(referencedTargetPomFile);
 		}
 		return Optional.empty();
 	}
@@ -431,7 +413,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private Collection<CompletionItem> collectGoals(ICompletionRequest request) {
 		PluginDescriptor pluginDescriptor;
 		try {
-			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal, MojoDescriptor::getDescription, request);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
@@ -551,7 +533,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			}
 		}
 
-		MavenProject project = cache.getLastSuccessfulMavenProject(request.getXMLDocument());
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
 			return Collections.emptySet();
 		}
@@ -591,11 +573,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				doc);
 		List<String> remoteArtifactRepositories = Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
-		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			remoteArtifactRepositories = project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl).collect(Collectors.toList());
 		}
 		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(remoteArtifactRepositories.size()));
+		RemoteRepositoryIndexSearcher indexSearcher = plugin.getIndexSearcher();
 		try {
 			CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
 				final CompletionItem updatingItem = new CompletionItem("Updating index for " + repository);

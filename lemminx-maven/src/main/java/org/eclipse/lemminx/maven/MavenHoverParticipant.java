@@ -32,26 +32,21 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
-import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
-import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.properties.internal.EnvironmentUtils;
-import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
@@ -63,23 +58,11 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Range;
 
 public class MavenHoverParticipant implements IHoverParticipant {
-	private final MavenProjectCache cache;
-	private final RemoteRepositoryIndexSearcher indexSearcher;
-	private final MavenPluginManager pluginManager;
-	private final LocalRepositorySearcher localRepoSearcher;
-	private final RepositorySystemSession repoSession;
-	private final MavenSession mavenSession;
-	private final BuildPluginManager buildPluginManager;
 	private static Properties environmentProperties;
+	private final MavenLemminxExtension lemminxMavenPlugin;
 
-	public MavenHoverParticipant(MavenProjectCache cache, LocalRepositorySearcher localRepoSearcher, RemoteRepositoryIndexSearcher indexSearcher, MavenSession mavenSession, MavenPluginManager pluginManager, BuildPluginManager buildPluginManager) {
-		this.cache = cache;
-		this.localRepoSearcher = localRepoSearcher;
-		this.indexSearcher = indexSearcher;
-		this.repoSession = mavenSession.getRepositorySession();
-		this.mavenSession = mavenSession;
-		this.pluginManager = pluginManager;
-		this.buildPluginManager = buildPluginManager;
+	public MavenHoverParticipant(MavenLemminxExtension lemminxMavenPlugin) {
+		this.lemminxMavenPlugin = lemminxMavenPlugin;
 		environmentProperties = new Properties();
 		EnvironmentUtils.addEnvVars(environmentProperties);
 	}
@@ -133,22 +116,22 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		List<String> remoteArtifactRepositories = Collections
 				.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
-		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
+		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			remoteArtifactRepositories = project.getRemoteArtifactRepositories().stream()
 					.map(ArtifactRepository::getUrl).collect(Collectors.toList());
 		}
 
 		try {
-			ModelBuilder builder = cache.getPlexusContainer().lookup(ModelBuilder.class);
-			Optional<String> localDescription = localRepoSearcher.getLocalArtifactsLastVersion().stream()
+			ModelBuilder builder = lemminxMavenPlugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
+			Optional<String> localDescription = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 				.filter(gav ->
 					(artifactToSearch.getGroupId() == null || artifactToSearch.getGroupId().equals(gav.getGroupId())) &&
 					(artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().equals(gav.getArtifactId())) &&
 					(artifactToSearch.getVersion() == null || artifactToSearch.getVersion().equals(gav.getVersion())))
 				.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
 				.findFirst()
-				.map(localRepoSearcher::findLocalFile)
+				.map(lemminxMavenPlugin.getLocalRepositorySearcher()::findLocalFile)
 				.map(file -> builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
 				.map(model -> {
 					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
@@ -172,7 +155,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		} catch (Exception e1) {
 			e1.printStackTrace();
 		}
-
+		var indexSearcher = lemminxMavenPlugin.getIndexSearcher();
 		try {
 			CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
 				final String updatingItem = "Updating index for " + repository;
@@ -211,7 +194,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		DOMNode node = request.getNode();
 		PluginDescriptor pluginDescriptor;
 		try {
-			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, cache, repoSession, pluginManager);
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, lemminxMavenPlugin);
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
 					return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
@@ -227,7 +210,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Set<MojoParameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, cache, repoSession, pluginManager, buildPluginManager, mavenSession);
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, lemminxMavenPlugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			e.printStackTrace();
 			return null;
@@ -346,7 +329,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 		DOMDocument doc = request.getXMLDocument();
-		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
+		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			Map<String, String> allProps = getMavenProjectProperties(project);
 			UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();

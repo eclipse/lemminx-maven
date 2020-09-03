@@ -19,12 +19,8 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
-import org.apache.maven.plugin.BuildPluginManager;
-import org.apache.maven.plugin.MavenPluginManager;
-import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -37,18 +33,10 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
-	private MavenProjectCache projectCache;
-	MavenPluginManager pluginManager;
-	private final RepositorySystemSession repoSession;
-	private final MavenSession mavenSession;
-	private final BuildPluginManager buildPluginManager;
+	private final MavenLemminxExtension lemminxMavenPlugin;
 
-	public MavenDiagnosticParticipant(MavenProjectCache projectCache, MavenPluginManager pluginManager,MavenSession mavenSession, BuildPluginManager buildPluginManager) {
-		this.projectCache = projectCache;
-		this.pluginManager = pluginManager;
-		this.repoSession = mavenSession.getRepositorySession();
-		this.mavenSession = mavenSession;
-		this.buildPluginManager = buildPluginManager;
+	public MavenDiagnosticParticipant(MavenLemminxExtension lemminxMavenPlugin) {
+		this.lemminxMavenPlugin = lemminxMavenPlugin;
 	}
 
 	@Override
@@ -57,7 +45,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			  return;
 		}
 		
-		projectCache.getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
+		lemminxMavenPlugin.getProjectCache().getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
 		DOMElement documentElement = xmlDocument.getDocumentElement();
 		HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
@@ -88,7 +76,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 	}
 
 	private HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions() {
-		PluginValidator pluginValidator = new PluginValidator(projectCache, repoSession, mavenSession, pluginManager, buildPluginManager);
+		PluginValidator pluginValidator = new PluginValidator(lemminxMavenPlugin);
 
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginConfiguration = pluginValidator::validateConfiguration;
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginGoal = pluginValidator::validateGoal;
