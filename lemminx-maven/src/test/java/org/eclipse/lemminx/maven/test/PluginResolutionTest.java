@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
-import org.eclipse.lemminx.maven.MavenPlugin;
+import org.eclipse.lemminx.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.HoverCapabilities;
@@ -46,8 +46,8 @@ public class PluginResolutionTest {
 		languageService = new XMLLanguageService();
 		languageService.initializeIfNeeded();
 		File mavenRepo = languageService.getExtensions().stream() //
-				.filter(MavenPlugin.class::isInstance) //
-				.map(MavenPlugin.class::cast) //
+				.filter(MavenLemminxExtension.class::isInstance) //
+				.map(MavenLemminxExtension.class::cast) //
 				.findAny() //
 				.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
 				.get();

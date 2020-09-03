@@ -53,7 +53,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	@Override
 	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics, CancelChecker monitor) {
-		if (!MavenPlugin.match(xmlDocument)) {
+		if (!MavenLemminxExtension.match(xmlDocument)) {
 			  return;
 		}
 		

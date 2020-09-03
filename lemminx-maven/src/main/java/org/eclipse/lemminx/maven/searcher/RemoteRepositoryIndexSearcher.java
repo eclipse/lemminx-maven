@@ -56,7 +56,7 @@ import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.codehaus.plexus.PlexusContainer;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.lemminx.maven.MavenPlugin;
+import org.eclipse.lemminx.maven.MavenLemminxExtension;
 
 public class RemoteRepositoryIndexSearcher {
 	private static final String PACKAGING_TYPE_JAR = "jar";
@@ -80,7 +80,7 @@ public class RemoteRepositoryIndexSearcher {
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
 	private Map<IndexingContext, CompletableFuture<IndexingContext>> indexDownloadJobs = new HashMap<>();
 
-	public RemoteRepositoryIndexSearcher(MavenPlugin lemminxMavenPlugin, PlexusContainer plexusContainer, Optional<File> configuredIndexLocation) {
+	public RemoteRepositoryIndexSearcher(MavenLemminxExtension lemminxMavenPlugin, PlexusContainer plexusContainer, Optional<File> configuredIndexLocation) {
 		indexPath = Optional.ofNullable(System.getProperty("lemminx.maven.indexDirectory"))
 				.filter(Objects::nonNull)
 				.map(String::trim)

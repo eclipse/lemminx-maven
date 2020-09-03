@@ -96,7 +96,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	@Override
 	public Hover onTag(IHoverRequest request) throws Exception {
-		if (!MavenPlugin.match(request.getXMLDocument())) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			  return null;
 		}
 		
@@ -278,7 +278,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 	@Override
 	public Hover onText(IHoverRequest request) throws Exception {
-		if (!MavenPlugin.match(request.getXMLDocument())) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			  return null;
 		}
 		
