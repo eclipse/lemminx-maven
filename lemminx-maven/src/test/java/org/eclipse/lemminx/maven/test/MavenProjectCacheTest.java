@@ -36,7 +36,6 @@ public class MavenProjectCacheTest {
 		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -49,7 +48,6 @@ public class MavenProjectCacheTest {
 		String content = FileUtils.readFileToString(pomFile, "UTF-8");
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -59,7 +57,6 @@ public class MavenProjectCacheTest {
 	public void testParentChangeReflectedToChild()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initialize(null);
 		MavenProjectCache cache = plugin.getProjectCache();
 		DOMDocument doc = getDocument("/pom-with-properties-in-parent.xml");
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
