@@ -260,9 +260,15 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	public static boolean match(DOMDocument document) {
-		File file = new File(URI.create(document.getDocumentURI()));
-		return (file.getName().startsWith("pom") && file.getName().endsWith(".xml"))
-				|| file.getName().endsWith(Maven.POMv4);
+		try {
+			File file = new File(URI.create(document.getDocumentURI()));
+			return (file.getName().startsWith("pom") && file.getName().endsWith(".xml"))
+					|| file.getName().endsWith(Maven.POMv4);
+		} catch (Exception ex) {
+			// usually because of not so tolerant Java URI API
+			ex.printStackTrace();
+			return false;
+		}
 	}
 
 	public MavenProjectCache getProjectCache() {

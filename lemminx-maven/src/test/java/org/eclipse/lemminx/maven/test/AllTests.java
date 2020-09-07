@@ -23,7 +23,8 @@ import org.junit.runners.Suite.SuiteClasses;
 	PluginResolutionTest.class, //
 	RemoteRepositoryTest.class, //
 	SimpleModelTest.class, //
-	PathsTest.class})
+	PathsTest.class, //
+	MatchTest.class})
 public class AllTests {
 
 	@BeforeClass
