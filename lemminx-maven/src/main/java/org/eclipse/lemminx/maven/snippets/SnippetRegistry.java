@@ -16,6 +16,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.eclipse.lemminx.commons.BadLocationException;
@@ -35,6 +37,7 @@ import com.google.gson.stream.JsonReader;
 
 public class SnippetRegistry {
 
+	private static final Logger LOGGER = Logger.getLogger(SnippetRegistry.class.getName());
 	private static final SnippetRegistry INSTANCE = new SnippetRegistry();
 
 	public static SnippetRegistry getInstance() {
@@ -68,7 +71,7 @@ public class SnippetRegistry {
 				whitespacesIndent = StringUtils.getStartWhitespaces(lineText);
 			} catch (BadLocationException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			}
 		}
 
@@ -110,7 +113,7 @@ public class SnippetRegistry {
 	}
 
 	public Collection<CompletionItem> getCompletionItems(TextDocument document, int completionOffset,
-			boolean canSupportMarkdown, Predicate<SnippetContext> contextFilter) {
+														 boolean canSupportMarkdown, Predicate<SnippetContext> contextFilter) {
 		LineContext lineContext = new LineContext(document, completionOffset);
 		return getSnippets().stream().filter(s -> {
 			if (s.getContext() == null) {
@@ -137,7 +140,7 @@ public class SnippetRegistry {
 				item.setInsertTextFormat(InsertTextFormat.Snippet);
 				return item;
 			} catch (BadLocationException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 				return null;
 			}
 
@@ -145,7 +148,7 @@ public class SnippetRegistry {
 	}
 
 	private static MarkupContent createDocumentation(Snippet snippet, boolean canSupportMarkdown,
-			LineContext lineContext) {
+													 LineContext lineContext) {
 		String description = snippet.getDescription();
 		StringBuilder doc = new StringBuilder(description);
 		doc.append(System.lineSeparator());
@@ -195,7 +198,7 @@ public class SnippetRegistry {
 		}
 		return new Range(document.positionAt(replaceStart), document.positionAt(replaceEnd));
 	}
-	
+
 	private static int findExprBeforeAt(String text, String expr, int offset) {
 		if (offset <= 0) {
 			return -1;

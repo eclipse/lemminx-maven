@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.BuildPluginManager;
@@ -51,13 +53,15 @@ import com.google.common.reflect.ClassPath.ClassInfo;
  * discovering how a PlexusConfiguration can be applied to an arbitrary object
  * tree. This class was copied from m2e's
  * org.eclipse.m2e.editor.mojo.PlexusConfigHelper
- * 
+ *
  * @see org.codehaus.plexus.component.configurator.BasicComponentConfigurator
  * @see org.codehaus.plexus.component.configurator.converters.lookup.DefaultConverterLookup
  * @see org.codehaus.plexus.component.configurator.converters.composite.ObjectWithFieldsConverter
  */
 public class PlexusConfigHelper {
 	// TODO: Rename this class maybe?
+
+	private static final Logger LOGGER = Logger.getLogger(PlexusConfigHelper.class.getName());
 
 	// TODO: Maybe using a static variable is bug prone? Although this variable is
 	// the only "state" held by this class
@@ -134,7 +138,7 @@ public class PlexusConfigHelper {
 	}
 
 	public static MojoParameter configure(MojoParameter p, boolean required, String expression, String description,
-			String defaultValue) {
+										  String defaultValue) {
 		p.setRequired(required);
 		p.setExpression(expression);
 		p.setDescription(description);
@@ -211,7 +215,7 @@ public class PlexusConfigHelper {
 			try {
 				cp = ClassPath.from(realm);
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 				return Collections.singletonList(enclosingClass);
 			}
 
@@ -220,7 +224,7 @@ public class PlexusConfigHelper {
 				try {
 					clazz = realm.loadClass(ci.getName());
 				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
+					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 					continue;
 				}
 
@@ -257,7 +261,7 @@ public class PlexusConfigHelper {
 		if (parameters == null) {
 			parameters = new ArrayList<>();
 			processedClasses.put(paramClass, parameters);
-			
+
 			Map<String, Type> properties = getClassProperties(paramClass);
 			for (Map.Entry<String, Type> e : properties.entrySet()) {
 				addParameter(realm, paramClass, e.getValue(), e.getKey(), null, parameters, false, null, null, null);
@@ -268,7 +272,7 @@ public class PlexusConfigHelper {
 	}
 
 	public static List<MojoParameter> getItemParameters(ClassRealm realm, Class<?> enclosingClass, String name,
-			Type paramType) {
+														Type paramType) {
 
 		Class<?> paramClass = getRawType(paramType);
 
@@ -314,8 +318,8 @@ public class PlexusConfigHelper {
 	}
 
 	public static void addParameter(ClassRealm realm, Class<?> enclosingClass, Type paramType, String name,
-			String alias, List<MojoParameter> parameters, boolean required, String expression, String description,
-			String defaultValue) {
+									String alias, List<MojoParameter> parameters, boolean required, String expression, String description,
+									String defaultValue) {
 
 		Class<?> paramClass = getRawType(paramType);
 		if (paramClass == null) {
@@ -393,7 +397,7 @@ public class PlexusConfigHelper {
 	}
 
 	public static List<MojoParameter> loadMojoParameters(PluginDescriptor descriptor, MojoDescriptor mojo,
-			MavenSession mavenSession, BuildPluginManager buildPluginManager) {
+														 MavenSession mavenSession, BuildPluginManager buildPluginManager) {
 		Class<?> clazz;
 		try {
 			clazz = mojo.getImplementationClass();
@@ -407,7 +411,7 @@ public class PlexusConfigHelper {
 			}
 		} catch (ClassNotFoundException | TypeNotPresentException | PluginResolutionException
 				| PluginManagerException ex) {
-			ex.printStackTrace();
+			LOGGER.log(Level.WARNING, ex.getCause().toString(), ex);
 			return Collections.emptyList();
 		}
 

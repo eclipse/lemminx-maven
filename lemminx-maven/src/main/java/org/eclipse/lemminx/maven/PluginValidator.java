@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.BuildPluginManager;
@@ -30,6 +32,8 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 
 public class PluginValidator {
 
+	private static final Logger LOGGER = Logger.getLogger(PluginValidator.class.getName());
+
 	private MavenLemminxExtension plugin;
 
 	public PluginValidator(MavenLemminxExtension plugin) {
@@ -40,8 +44,8 @@ public class PluginValidator {
 		try {
 			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
-			
+			LOGGER.log(Level.WARNING, e.getCause().toString(), e);
+
 			// Add artifactId diagnostic
 			String errorMessage = e.getMessage();
 			DOMNode pluginNode = DOMUtils.findClosestParentNode(diagnosticRequest, "plugin");
@@ -77,13 +81,13 @@ public class PluginValidator {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			// A diagnostic was already added in validatePluginResolution()
 		}
 		if (parameters.isEmpty()) {
 			return Optional.empty();
 		}
-		
+
 		List<Diagnostic> diagnostics = new ArrayList<>();
 		if (node.isElement() && node.hasChildNodes()) {
 			for (DOMNode childNode : node.getChildren()) {
@@ -91,7 +95,7 @@ public class PluginValidator {
 				validateConfigurationElement(childDiagnosticReq, parameters).ifPresent(diagnostics::add);;
 			}
 		}
-		
+
 		return Optional.of(diagnostics);
 	}
 
@@ -104,18 +108,18 @@ public class PluginValidator {
 		if (pluginResolutionError.isPresent()) {
 			return pluginResolutionError;
 		}
-		
+
 		List<Diagnostic> diagnostics = new ArrayList<>();
 		if (node.isElement() && node.hasChildNodes()) {
 			PluginDescriptor pluginDescriptor;
 			try {
 				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
 				if (pluginDescriptor != null) {
-					internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;					
+					internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;
 				}
 			} catch (PluginResolutionException | PluginDescriptorParsingException
 					| InvalidPluginDescriptorException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 				// A diagnostic was already added in validatePluginResolution()
 			}
 		}

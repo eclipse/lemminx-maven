@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
@@ -51,6 +53,8 @@ import org.eclipse.lemminx.dom.DOMDocument;
 
 public class MavenProjectCache {
 
+	private static final Logger LOGGER = Logger.getLogger(MavenProjectCache.class.getName());
+
 	private final Map<URI, Integer> lastCheckedVersion;
 	private final Map<URI, MavenProject> projectCache;
 	private final Map<URI, Collection<ModelProblem>> problemCache;
@@ -58,7 +62,7 @@ public class MavenProjectCache {
 	private final MavenLemminxExtension lemminxMavenPlugin;
 	private final PlexusContainer plexusContainer;
 	private final MavenExecutionRequest mavenRequest;
-	
+
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
 	private ProjectBuilder projectBuilder;
 
@@ -79,7 +83,7 @@ public class MavenProjectCache {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param document
 	 * @return the last MavenDocument that could be build for the more recent
 	 *         version of the provided document. If document fails to build a
@@ -92,7 +96,7 @@ public class MavenProjectCache {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param document
 	 * @return the problems for the latest version of the document (either in cache,
 	 *         or the one passed in arguments)
@@ -170,7 +174,7 @@ public class MavenProjectCache {
 						projectCache.put(uri, project);
 						projectParsedListeners.forEach(listener -> listener.accept(project));
 					} catch (IOException | XmlPullParserException e1) {
-						e1.printStackTrace();
+						LOGGER.log(Level.SEVERE, e1.getMessage(), e1);
 					}
 				} else {
 					problems.add(
@@ -189,7 +193,7 @@ public class MavenProjectCache {
 			}
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 
 		lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
@@ -216,7 +220,7 @@ public class MavenProjectCache {
 			projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
 			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
 		} catch (ComponentLookupException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 	}
 

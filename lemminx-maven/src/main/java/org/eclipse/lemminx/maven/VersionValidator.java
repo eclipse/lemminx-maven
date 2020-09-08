@@ -11,6 +11,8 @@ package org.eclipse.lemminx.maven;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
@@ -22,18 +24,20 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 
 public class VersionValidator {
 
+	private static final Logger LOGGER = Logger.getLogger(VersionValidator.class.getName());
+
 	public static Optional<List<Diagnostic>> validateVersion(DiagnosticRequest diagnosticRequest) {
 		DOMNode node = diagnosticRequest.getNode();
 		Dependency model = MavenParseUtils.parseArtifact(node);
 		Artifact artifact = null;
 		try {
-			 artifact = new DefaultArtifact(model.getGroupId(), model.getArtifactId(), model.getVersion(), model.getScope(), model.getType(), model.getClassifier(), new DefaultArtifactHandler(model.getType()));
+			artifact = new DefaultArtifact(model.getGroupId(), model.getArtifactId(), model.getVersion(), model.getScope(), model.getType(), model.getClassifier(), new DefaultArtifactHandler(model.getType()));
 			if (!artifact.isSelectedVersionKnown()) {
 				return Optional.of(Collections
 						.singletonList(diagnosticRequest.createDiagnostic("Version Error", DiagnosticSeverity.Error)));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 		return Optional.empty();
 	}

@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -72,6 +74,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
+	private static final Logger LOGGER = Logger.getLogger(MavenCompletionParticipant.class.getName());
+
 	static interface GAVInsertionStrategy {
 		/**
 		 * set current element value and add siblings as addition textEdits
@@ -82,10 +86,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		 * insert elements as children of the parent element
 		 */
 		public static final GAVInsertionStrategy CHILDREN_ELEMENTS = new GAVInsertionStrategy() {};
-		
+
 		public static final class NodeWithChildrenInsertionStrategy implements GAVInsertionStrategy {
 			public final String elementName;
-			
+
 			public NodeWithChildrenInsertionStrategy(String elementName) {
 				this.elementName = elementName;
 			}
@@ -98,21 +102,21 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	public MavenCompletionParticipant(MavenLemminxExtension plugin) {
 		this.plugin = plugin;
 	}
-	
+
 	@Override
 	public void onTagOpen(ICompletionRequest request, ICompletionResponse response)
 			throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
-			  return;
+			return;
 		}
-		
+
 		DOMNode tag = request.getNode();
 		if (DOMUtils.isADescendantOf(tag, "configuration")) {
 			collectPluginConfiguration(request).forEach(response::addCompletionItem);
 			return;
 		}
 	}
-	
+
 	// TODO: Factor this with MavenHoverParticipant's equivalent method
 	private List<CompletionItem> collectPluginConfiguration(ICompletionRequest request) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
@@ -120,7 +124,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			return null;
 		}
 
@@ -169,9 +173,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	@Override
 	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
-			  return;
+			return;
 		}
-		
+
 		if (request.getXMLDocument().getText().length() < 2) {
 			response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
 		}
@@ -203,128 +207,128 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		GAVInsertionStrategy gavInsertionStrategy = computeGAVInsertionStrategy(request);
 		List<ArtifactInfo> allArtifactInfos = Collections.synchronizedList(new ArrayList<>());
 		switch (parent.getLocalName()) {
-		case "scope":
-			collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
-					DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
-			break;
-		case "phase":
-			collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
-					phase -> phase.description, request).forEach(response::addCompletionAttribute);
-			break;
-		case "groupId":
-			if (isParentDeclaration) {
-				Optional<MavenProject> filesystem = computeFilesystemParent(request);
-				if (filesystem.isPresent()) {
-					filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
-				}
-				// TODO localRepo
-				// TODO remoteRepos
-			} else {
-				// TODO if artifactId is set and match existing content, suggest only matching groupId
-				collectSimpleCompletionItems(isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds() : plugin.getLocalRepositorySearcher().searchGroupIds(),
-						Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
-			}
-			break;
-		case "artifactId":
-			if (isParentDeclaration) {
-				Optional<MavenProject> filesystem = computeFilesystemParent(request);
-				if (filesystem.isPresent()) {
-					filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
-				}
-				// TODO localRepo
-				// TODO remoteRepos
-			} else {
-				allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts() : plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
-					.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
-					// TODO pass description as documentation
-					.map(this::toArtifactInfo)
-					.collect(Collectors.toList()));
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
-			}
-			break;
-		case "version":
-			if (!isParentDeclaration) {
-				if (artifactId.isPresent()) {
-					plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-						.filter(gav -> gav.getGroupId().equals(artifactId.get()))
-						.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
-						.findAny()
-						.map(Gav::getVersion)
-						.map(DefaultArtifactVersion::new)
-						.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
-						.ifPresent(response::addCompletionItem);
+			case "scope":
+				collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
+						DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
+				break;
+			case "phase":
+				collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
+						phase -> phase.description, request).forEach(response::addCompletionAttribute);
+				break;
+			case "groupId":
+				if (isParentDeclaration) {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				} else {
+					// TODO if artifactId is set and match existing content, suggest only matching groupId
+					collectSimpleCompletionItems(isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds() : plugin.getLocalRepositorySearcher().searchGroupIds(),
+							Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
 					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
 				}
-			} else {
+				break;
+			case "artifactId":
+				if (isParentDeclaration) {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				} else {
+					allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts() : plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
+							.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
+							// TODO pass description as documentation
+							.map(this::toArtifactInfo)
+							.collect(Collectors.toList()));
+					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
+				}
+				break;
+			case "version":
+				if (!isParentDeclaration) {
+					if (artifactId.isPresent()) {
+						plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+								.filter(gav -> gav.getGroupId().equals(artifactId.get()))
+								.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
+								.findAny()
+								.map(Gav::getVersion)
+								.map(DefaultArtifactVersion::new)
+								.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
+								.ifPresent(response::addCompletionItem);
+						internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
+					}
+				} else {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				}
+				if (allArtifactInfos.isEmpty()) {
+					response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
+				}
+				break;
+			case "module":
+				collectSubModuleCompletion(request).forEach(response::addCompletionItem);
+				break;
+			case "relativePath":
+				collectRelativePathCompletion(request).forEach(response::addCompletionItem);
+				break;
+			case "dependencies":
+			case "dependency":
+				// TODO completion/resolve to get description for local artifacts
+				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+						.map(this::toArtifactInfo)
+						.collect(Collectors.toList()));
+				internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, response);
+				break;
+			case "plugins":
+			case "plugin":
+				// TODO completion/resolve to get description for local artifacts
+				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
+						.map(this::toArtifactInfo)
+						.collect(Collectors.toList()));
+				internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, response);
+				break;
+			case "parent":
 				Optional<MavenProject> filesystem = computeFilesystemParent(request);
 				if (filesystem.isPresent()) {
 					filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
+				} else {
+					// TODO localRepo
+					// TODO remoteRepos
 				}
-				// TODO localRepo
-				// TODO remoteRepos
-			}
-			if (allArtifactInfos.isEmpty()) {
-				response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
-			}
-			break;
-		case "module":
-			collectSubModuleCompletion(request).forEach(response::addCompletionItem);
-			break;
-		case "relativePath":
-			collectRelativePathCompletion(request).forEach(response::addCompletionItem);
-			break;
-		case "dependencies":
-		case "dependency":
-			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-				.map(this::toArtifactInfo)
-				.collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, response);
-			break;
-		case "plugins":
-		case "plugin":
-			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
-				.map(this::toArtifactInfo)
-				.collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, response);
-			break;
-		case "parent":
-			Optional<MavenProject> filesystem = computeFilesystemParent(request);
-			if (filesystem.isPresent()) {
-				filesystem.map(this::toArtifactInfo).ifPresent(allArtifactInfos::add);
-			} else {
-				// TODO localRepo
-				// TODO remoteRepos
-			}
-			break;
-		case "goal":
-			collectGoals(request).forEach(response::addCompletionItem);
-			break;
-		default:
-			initSnippets();
-			TextDocument document = parent.getOwnerDocument().getTextDocument();
-			int completionOffset = request.getOffset();
-			boolean canSupportMarkdown = true; // request.canSupportMarkupKind(MarkupKind.MARKDOWN);
-			SnippetRegistry.getInstance()
-					.getCompletionItems(document, completionOffset, canSupportMarkdown, context -> {
-						if (!Maven.POMv4.equals(context.getType())) {
-							return false;
-						}
-						return parent.getLocalName().equals(context.getValue());
-					}).forEach(response::addCompletionItem);
+				break;
+			case "goal":
+				collectGoals(request).forEach(response::addCompletionItem);
+				break;
+			default:
+				initSnippets();
+				TextDocument document = parent.getOwnerDocument().getTextDocument();
+				int completionOffset = request.getOffset();
+				boolean canSupportMarkdown = true; // request.canSupportMarkupKind(MarkupKind.MARKDOWN);
+				SnippetRegistry.getInstance()
+						.getCompletionItems(document, completionOffset, canSupportMarkdown, context -> {
+							if (!Maven.POMv4.equals(context.getType())) {
+								return false;
+							}
+							return parent.getLocalName().equals(context.getValue());
+						}).forEach(response::addCompletionItem);
 		}
 		if (!allArtifactInfos.isEmpty()) {
 			Comparator<ArtifactInfo> artifactInfoComparator = Comparator.comparing(artifact -> new DefaultArtifactVersion(artifact.getVersion()))/*.thenComparing(ArtifactInfo::getDescription)*/;
 			final Comparator<ArtifactInfo> highestVersionWithDescriptionComparator = artifactInfoComparator.thenComparing(artifactInfo -> artifactInfo.getDescription() != null ? artifactInfo.getDescription() : "");
 			allArtifactInfos.stream()
-				.collect(Collectors.groupingBy(artifact -> artifact.getGroupId() + ":" + artifact.getArtifactId()))
-				.values()
-				.stream()
-				.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
-				.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
-				.forEach(response::addCompletionItem);
+					.collect(Collectors.groupingBy(artifact -> artifact.getGroupId() + ":" + artifact.getArtifactId()))
+					.values()
+					.stream()
+					.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
+					.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
+					.forEach(response::addCompletionItem);
 		}
 		if (request.getNode().isText() && (allArtifactInfos.isEmpty() || request.getNode().getTextContent().contains("$"))) {
 			completeProperties(request).forEach(response::addCompletionAttribute);
@@ -352,7 +356,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private ArtifactInfo toArtifactInfo(Gav gav) {
 		return new ArtifactInfo(null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null, null);
 	}
-	
+
 	private ArtifactInfo toArtifactInfo(MavenProject project) {
 		ArtifactInfo artifactInfo = new ArtifactInfo(null, project.getGroupId(), project.getArtifactId(), project.getVersion(), null, null);
 		artifactInfo.setDescription(project.getDescription());
@@ -364,12 +368,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return null;
 		}
 		switch (request.getParentElement().getLocalName()) {
-		case "dependencies": return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy("dependency");
-		case "dependency": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
-		case "plugins": return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy("plugin");
-		case "plugin": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
-		case "artifactId": return GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
-		case "parent": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			case "dependencies": return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy("dependency");
+			case "dependency": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			case "plugins": return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy("plugin");
+			case "plugin": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			case "artifactId": return GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
+			case "parent": return GAVInsertionStrategy.CHILDREN_ELEMENTS;
 		}
 		return GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
 	}
@@ -416,7 +420,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal, MojoDescriptor::getDescription, request);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 		return Collections.emptySet();
 	}
@@ -435,42 +439,42 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			item.setKind(CompletionItemKind.Value);
 			textEdit.setRange(request.getReplaceRange());
 			switch (request.getParentElement().getLocalName()) {
-			case "artifactId":
-				item.setLabel(artifactInfo.getArtifactId() + (insertGroupId || insertVersion ? " - " + artifactInfo.getGroupId() + ":" + artifactInfo.getArtifactId() + ":" + artifactInfo.getVersion() : ""));
-				textEdit.setNewText(artifactInfo.getArtifactId());
-				List<TextEdit> additionalEdits = new ArrayList<>(2);
-				if (insertGroupId) {
-					Position insertionPosition;
-					try {
-						insertionPosition = request.getXMLDocument().positionAt(request.getParentElement().getParentElement().getStartTagCloseOffset() + 1);
-						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + "<groupId>" + artifactInfo.getGroupId() + "</groupId>"));
-					} catch (BadLocationException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+				case "artifactId":
+					item.setLabel(artifactInfo.getArtifactId() + (insertGroupId || insertVersion ? " - " + artifactInfo.getGroupId() + ":" + artifactInfo.getArtifactId() + ":" + artifactInfo.getVersion() : ""));
+					textEdit.setNewText(artifactInfo.getArtifactId());
+					List<TextEdit> additionalEdits = new ArrayList<>(2);
+					if (insertGroupId) {
+						Position insertionPosition;
+						try {
+							insertionPosition = request.getXMLDocument().positionAt(request.getParentElement().getParentElement().getStartTagCloseOffset() + 1);
+							additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + "<groupId>" + artifactInfo.getGroupId() + "</groupId>"));
+						} catch (BadLocationException e) {
+							// TODO Auto-generated catch block
+							LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+						}
 					}
-				}
-				if (insertVersion) {
-					Position insertionPosition;
-					try {
-						insertionPosition = request.getXMLDocument().positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
-						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + DOMUtils.getOneLevelIndent(request) + "<version>" + artifactInfo.getVersion() + "</version>"));
-					} catch (BadLocationException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+					if (insertVersion) {
+						Position insertionPosition;
+						try {
+							insertionPosition = request.getXMLDocument().positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
+							additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + DOMUtils.getOneLevelIndent(request) + "<version>" + artifactInfo.getVersion() + "</version>"));
+						} catch (BadLocationException e) {
+							// TODO Auto-generated catch block
+							LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+						}
 					}
-				}
-				if (!additionalEdits.isEmpty()) {
-					item.setAdditionalTextEdits(additionalEdits);
-				}
-				return item;
-			case "groupId":
-				item.setLabel(artifactInfo.getGroupId());
-				textEdit.setNewText(artifactInfo.getGroupId());
-				return item;
-			case "version":
-				item.setLabel(artifactInfo.getVersion());
-				textEdit.setNewText(artifactInfo.getVersion());
-				return item;
+					if (!additionalEdits.isEmpty()) {
+						item.setAdditionalTextEdits(additionalEdits);
+					}
+					return item;
+				case "groupId":
+					item.setLabel(artifactInfo.getGroupId());
+					textEdit.setNewText(artifactInfo.getGroupId());
+					return item;
+				case "version":
+					item.setLabel(artifactInfo.getVersion());
+					textEdit.setNewText(artifactInfo.getVersion());
+					return item;
 			}
 		} else {
 			item.setLabel(artifactInfo.getArtifactId() + " - " + artifactInfo.getGroupId() + ":" + artifactInfo.getArtifactId() + ":" + artifactInfo.getVersion());
@@ -478,8 +482,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			try {
 				textEdit.setRange(request.getReplaceRange());
 				String newText = "";
-				String suffix = ""; 
-				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent(); 
+				String suffix = "";
+				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
 				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy) {
 					String elementName = ((GAVInsertionStrategy.NodeWithChildrenInsertionStrategy)strategy).elementName;
 					gavElementsIndent += DOMUtils.getOneLevelIndent(request);
@@ -497,7 +501,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				newText += suffix;
 				textEdit.setNewText(newText);
 			} catch (BadLocationException ex) {
-				ex.printStackTrace();
+				LOGGER.log(Level.SEVERE, ex.getCause().toString(), ex);
 				return null;
 			}
 		}
@@ -552,12 +556,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 				return item;
 			} catch (BadLocationException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 				return toErrorCompletionItem(e);
 			}
 		}).collect(Collectors.toList());
 	}
-	
+
 	private CompletionItem toErrorCompletionItem(Throwable e) {
 		CompletionItem res = new CompletionItem("Error: " + e.getMessage());
 		res.setDocumentation(ExceptionUtils.getStackTrace(e));
@@ -588,48 +592,48 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				updateItems.add(updatingItem);
 				return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
 					switch (node.getLocalName()) {
-					case "groupId":
-						// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean parameter
-						if (onlyPlugins) {
-							indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
-									.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
-						} else {
-							indexSearcher.getGroupIds(artifactToSearch, index).stream()
-									.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
-						}
-						return updatingItem;
-					case "artifactId":
-						if (onlyPlugins) {
-							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
-						} else {
+						case "groupId":
+							// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean parameter
+							if (onlyPlugins) {
+								indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
+										.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+							} else {
+								indexSearcher.getGroupIds(artifactToSearch, index).stream()
+										.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+							}
+							return updatingItem;
+						case "artifactId":
+							if (onlyPlugins) {
+								artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+							} else {
+								artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
+							}
+							return updatingItem;
+						case "version":
+							if (onlyPlugins) {
+								indexSearcher.getPluginArtifactVersions(artifactToSearch, index).stream()
+										.map(version -> toCompletionItem(version.toString(), null, range))
+										.forEach(nonArtifactCollector::addCompletionItem);
+							} else {
+								indexSearcher.getArtifactVersions(artifactToSearch, index).stream()
+										.map(version -> toCompletionItem(version.toString(), null, range))
+										.forEach(nonArtifactCollector::addCompletionItem);
+							}
+							return updatingItem;
+						case "dependencies":
+						case "dependency":
 							artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
-						}
-						return updatingItem;
-					case "version":
-						if (onlyPlugins) {
-							indexSearcher.getPluginArtifactVersions(artifactToSearch, index).stream()
-									.map(version -> toCompletionItem(version.toString(), null, range))
-									.forEach(nonArtifactCollector::addCompletionItem);
-						} else {
-							indexSearcher.getArtifactVersions(artifactToSearch, index).stream()
-									.map(version -> toCompletionItem(version.toString(), null, range))
-									.forEach(nonArtifactCollector::addCompletionItem);
-						}
-						return updatingItem;
-					case "dependencies":
-					case "dependency":
-						artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
-						return updatingItem;
-					case "plugins":
-					case "plugin":
-						artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
-						return updatingItem;
+							return updatingItem;
+						case "plugins":
+						case "plugin":
+							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+							return updatingItem;
 					}
 					return (CompletionItem)null;
 				}).whenComplete((ok, error) -> updateItems.remove(ok));
 			}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
 		} catch (InterruptedException | ExecutionException exception) {
-			exception.printStackTrace();
+			LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
 		} catch (TimeoutException e) {
 			// nothing to log, some work still pending
 			updateItems.forEach(nonArtifactCollector::addCompletionItem);
@@ -654,8 +658,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			files.add(docFolder.getParentFile());
 		}
 		return files.stream()
-			.map(file -> toFileCompletionItem(file, docFolder, request))
-			.collect(Collectors.toList());
+				.map(file -> toFileCompletionItem(file, docFolder, request))
+				.collect(Collectors.toList());
 	}
 
 	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
@@ -667,16 +671,16 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		List<File> files = new ArrayList<>();
 		if (prefix.isEmpty()) {
 			Arrays.stream(docFolder.getParentFile().listFiles())
-				.filter(file -> file.getName().contains("parent"))
-				.map(file -> new File(file, Maven.POMv4))
-				.filter(File::isFile)
-				.forEach(files::add);
+					.filter(file -> file.getName().contains("parent"))
+					.map(file -> new File(file, Maven.POMv4))
+					.filter(File::isFile)
+					.forEach(files::add);
 			files.add(docFolder.getParentFile());
 		} else {
 			try {
 				prefixFile = prefixFile.getCanonicalFile();
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			}
 			if (!prefix.endsWith("/")) {
 				final File thePrefixFile = prefixFile;
@@ -687,24 +691,24 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			files.addAll(Arrays.asList(prefixFile.listFiles()));
 		}
 		return files.stream()
-			.filter(file -> file.getName().equals(Maven.POMv4) || file.isDirectory())
-			.filter(file -> !(file.equals(docFolder) || file.equals(docFile)))
-			.flatMap(file -> {
-				if (docFile.toPath().startsWith(file.toPath()) || file.getName().contains("parent")) {
-					File pomFile = new File(file, Maven.POMv4);
-					if (pomFile.exists()) {
-						return Stream.of(pomFile, file);
+				.filter(file -> file.getName().equals(Maven.POMv4) || file.isDirectory())
+				.filter(file -> !(file.equals(docFolder) || file.equals(docFile)))
+				.flatMap(file -> {
+					if (docFile.toPath().startsWith(file.toPath()) || file.getName().contains("parent")) {
+						File pomFile = new File(file, Maven.POMv4);
+						if (pomFile.exists()) {
+							return Stream.of(pomFile, file);
+						}
 					}
-				}
-				return Stream.of(file);
-			}).sorted(Comparator
-				.comparing(File::isFile) // pom files before folders
-				.thenComparing(file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath())) || (file.isDirectory() && file.equals(docFolder.getParentFile()))) // `../pom.xml` before ...
-				.thenComparing(file -> file.getParentFile().getName().contains("parent")) // folders containing "parent" before...
-				.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings before...
-				.reversed().thenComparing(Function.identity())// other folders and files
-			).map(file -> toFileCompletionItem(file, docFolder, request))
-			.collect(Collectors.toList());
+					return Stream.of(file);
+				}).sorted(Comparator
+						.comparing(File::isFile) // pom files before folders
+						.thenComparing(file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath())) || (file.isDirectory() && file.equals(docFolder.getParentFile()))) // `../pom.xml` before ...
+						.thenComparing(file -> file.getParentFile().getName().contains("parent")) // folders containing "parent" before...
+						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings before...
+						.reversed().thenComparing(Function.identity())// other folders and files
+				).map(file -> toFileCompletionItem(file, docFolder, request))
+				.collect(Collectors.toList());
 	}
 
 	private CompletionItem toFileCompletionItem(File file, File referenceFolder, ICompletionRequest request) {
@@ -720,12 +724,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			builder.insert(0, current.getFileName());
 			current = current.getParent();
 		}
-		
+
 		Range replaceRange = request.getReplaceRange();
-		
+
 		/* Temporary workaround for https://github.com/eclipse/lemminx-maven/pull/127
-		 * Workaround involves overriding the replace range of the entire node text 
-		 * rather than some portion after the file separator. 
+		 * Workaround involves overriding the replace range of the entire node text
+		 * rather than some portion after the file separator.
 		 * TODO: Remove try catch block after upstream fix has been merged.
 		 * Upstream fix: https://github.com/eclipse/lemminx/issues/723
 		 * */
@@ -740,15 +744,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			}
 			replaceRange = new Range(start, end);
 		} catch (BadLocationException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
-		
+
 		String pathString = builder.toString();
 		res.setLabel(pathString);
 		res.setFilterText(pathString);
 		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
 		res.setTextEdit(new TextEdit(replaceRange, pathString));
-		
+
 		return res;
 	}
 
@@ -761,7 +765,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				SnippetRegistry.getInstance()
 						.load(MavenCompletionParticipant.class.getResourceAsStream("pom-snippets.json"));
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			}
 		} finally {
 			snippetsLoaded = true;
@@ -770,7 +774,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private <T> Collection<CompletionItem> collectSimpleCompletionItems(Collection<T> items, Function<T, String> insertionTextExtractor,
-			Function<T, String> documentationExtractor, ICompletionRequest request) {
+																		Function<T, String> documentationExtractor, ICompletionRequest request) {
 		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();
 		boolean needClosingTag = node.getEndTagOpenOffset() == DOMNode.NULL_VALUE;
@@ -794,7 +798,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	/**
 	 * Utility function, takes a label string, description and range and returns a
 	 * CompletionItem
-	 * 
+	 *
 	 * @param description Completion description
 	 * @param label       Completion label
 	 * @return CompletionItem resulting from the label, description and range given
@@ -814,7 +818,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		item.setTextEdit(new TextEdit(range, insertText));
 		return item;
 	}
-	
+
 	/*
 	 * Utility function which can be passed as an argument to filter() to filter out
 	 * duplicate elements by a property.

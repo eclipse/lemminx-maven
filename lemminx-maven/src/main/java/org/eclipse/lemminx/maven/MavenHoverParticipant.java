@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -58,6 +60,8 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Range;
 
 public class MavenHoverParticipant implements IHoverParticipant {
+
+	private static final Logger LOGGER = Logger.getLogger(MavenHoverParticipant.class.getName());
 	private static Properties environmentProperties;
 	private final MavenLemminxExtension lemminxMavenPlugin;
 
@@ -80,9 +84,9 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	@Override
 	public Hover onTag(IHoverRequest request) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
-			  return null;
+			return null;
 		}
-		
+
 		DOMNode tag = request.getNode();
 		DOMElement parent = tag.getParentElement();
 		DOMElement grandParent = parent.getParentElement();
@@ -90,17 +94,17 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		if (tag.getLocalName() == null) {
 			return null;
 		}
-		
+
 		if (DOMUtils.isADescendantOf(tag, "configuration")) {
 			return collectPluginConfiguration(request);
 		}
 
 		// TODO: Get rid of this?
 		switch (parent.getLocalName()) {
-		case "configuration":
-			return collectPluginConfiguration(request);
-		default:
-			break;
+			case "configuration":
+				return collectPluginConfiguration(request);
+			default:
+				break;
 		}
 
 		return null;
@@ -125,35 +129,35 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		try {
 			ModelBuilder builder = lemminxMavenPlugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
 			Optional<String> localDescription = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-				.filter(gav ->
-					(artifactToSearch.getGroupId() == null || artifactToSearch.getGroupId().equals(gav.getGroupId())) &&
-					(artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().equals(gav.getArtifactId())) &&
-					(artifactToSearch.getVersion() == null || artifactToSearch.getVersion().equals(gav.getVersion())))
-				.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
-				.findFirst()
-				.map(lemminxMavenPlugin.getLocalRepositorySearcher()::findLocalFile)
-				.map(file -> builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
-				.map(model -> {
-					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
-					String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-					String message = "";
-					
-					if (model.getName() != null) {
-						message += toBold.apply(model.getName());
-					}
-					
-					if (model.getDescription() != null) {
-						message += lineBreak + model.getDescription();
-					}
-					
-					return message;
-				})
-				.map(message -> (message.length() > 2 ? message : null));
+					.filter(gav ->
+							(artifactToSearch.getGroupId() == null || artifactToSearch.getGroupId().equals(gav.getGroupId())) &&
+									(artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().equals(gav.getArtifactId())) &&
+									(artifactToSearch.getVersion() == null || artifactToSearch.getVersion().equals(gav.getVersion())))
+					.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
+					.findFirst()
+					.map(lemminxMavenPlugin.getLocalRepositorySearcher()::findLocalFile)
+					.map(file -> builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
+					.map(model -> {
+						UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+						String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+						String message = "";
+
+						if (model.getName() != null) {
+							message += toBold.apply(model.getName());
+						}
+
+						if (model.getDescription() != null) {
+							message += lineBreak + model.getDescription();
+						}
+
+						return message;
+					})
+					.map(message -> (message.length() > 2 ? message : null));
 			if (localDescription.isPresent()) {
 				return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, localDescription.get()));
 			}
 		} catch (Exception e1) {
-			e1.printStackTrace();
+			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
 		}
 		var indexSearcher = lemminxMavenPlugin.getIndexSearcher();
 		try {
@@ -179,14 +183,14 @@ public class MavenHoverParticipant implements IHoverParticipant {
 
 			}).toArray(CompletableFuture<?>[]::new)).get(10, TimeUnit.SECONDS);
 		} catch (InterruptedException | ExecutionException exception) {
-			exception.printStackTrace();
+			LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
 		} catch (TimeoutException e) {
 			// nothing to log, some work still pending
 		}
 		if (possibleHovers.isEmpty()) {
 			return null;
 		}
-		
+
 		return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, possibleHovers.iterator().next()));
 	}
 
@@ -201,7 +205,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				}
 			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 		return null;
 	}
@@ -212,7 +216,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, lemminxMavenPlugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			return null;
 		}
 		DOMNode node = request.getNode();
@@ -225,9 +229,9 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				}
 			}
 		}
-		
+
 		// Nested case: node is a grand child of configuration
-		
+
 		// Get the node's ancestor which is a child of configuration
 		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, "configuration");
 		if (parentParameterNode != null) {
@@ -236,7 +240,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 					.collect(Collectors.toList());
 			if (!parentParameters.isEmpty()) {
 				MojoParameter parentParameter = parentParameters.get(0);
-				
+
 				if (parentParameter.getNestedParameters().size() == 1) {
 					// The parent parameter must be a collection of a type
 					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
@@ -245,7 +249,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 						return new Hover(MavenPluginUtils.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown));
 					}
 				}
-				
+
 				// Get all deeply nested parameters
 				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
 				nestedParameters.add(parentParameter);
@@ -262,37 +266,37 @@ public class MavenHoverParticipant implements IHoverParticipant {
 	@Override
 	public Hover onText(IHoverRequest request) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
-			  return null;
+			return null;
 		}
-		
+
 		DOMNode tag = request.getNode();
 		DOMElement parent = tag.getParentElement();
 		DOMElement grandParent = parent.getParentElement();
-		
+
 		boolean isPlugin = "plugin".equals(parent.getLocalName())
 				|| (grandParent != null && "plugin".equals(grandParent.getLocalName()));
 		boolean isParentDeclaration = "parent".equals(parent.getLocalName())
 				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
-		
-		
+
+
 		Pair<Range, String> mavenProperty = getMavenPropertyInRequest(request);
 		if (mavenProperty != null) {
 			return collectProperty(request, mavenProperty);
 		}
-		
+
 		switch (parent.getLocalName()) {
-		case "artifactId":
-			if (isParentDeclaration) {
-				return null;
-			} else {
-				return collectArtifactDescription(request, isPlugin);
-			}
-		case "goal":
-			return collectGoal(request);
-		default:
-			break;
+			case "artifactId":
+				if (isParentDeclaration) {
+					return null;
+				} else {
+					return collectArtifactDescription(request, isPlugin);
+				}
+			case "goal":
+				return collectGoal(request);
+			default:
+				break;
 		}
-		
+
 		return null;
 	}
 
@@ -337,11 +341,11 @@ public class MavenHoverParticipant implements IHoverParticipant {
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
 				if (property.getRight().equals(mavenProperty)) {
-					String message = toBold.apply("Property: ") + mavenProperty 
+					String message = toBold.apply("Property: ") + mavenProperty
 							+ lineBreak
-							+ toBold.apply("Value: ") + prop.getValue() 
+							+ toBold.apply("Value: ") + prop.getValue()
 							+ lineBreak;
-					
+
 					Hover hover = new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
 					hover.setRange(property.getLeft());
 					return hover;
@@ -371,8 +375,8 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		allProps.put("project.build.directory", project.getBuild() == null ? "unknown" : project.getBuild().getDirectory());
 		allProps.put("project.build.outputDirectory",
 				project.getBuild() == null ? "unknown" : project.getBuild().getOutputDirectory());
-		
+
 		return allProps;
 	}
-	
+
 }

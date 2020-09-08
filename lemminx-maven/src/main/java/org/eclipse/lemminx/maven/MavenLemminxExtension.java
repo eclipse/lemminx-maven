@@ -16,6 +16,8 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -63,6 +65,7 @@ import com.google.gson.JsonObject;
  */
 public class MavenLemminxExtension implements IXMLExtension {
 
+	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
 	private XMLExtensionsRegistry currentRegistry;
@@ -111,7 +114,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			definitionParticipant = new MavenDefinitionParticipant(this);
 			registry.registerDefinitionParticipant(definitionParticipant);
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			LOGGER.log(Level.SEVERE, ex.getCause().toString(), ex);
 		}
 	}
 
@@ -140,7 +143,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			stop(currentRegistry);
 		}
 	}
@@ -266,7 +269,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 					|| file.getName().endsWith(Maven.POMv4);
 		} catch (Exception ex) {
 			// usually because of not so tolerant Java URI API
-			ex.printStackTrace();
+			LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
 			return false;
 		}
 	}
