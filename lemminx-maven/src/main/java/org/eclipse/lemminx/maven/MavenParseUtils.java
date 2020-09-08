@@ -12,7 +12,12 @@ import org.apache.maven.model.Dependency;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class MavenParseUtils {
+
+	private static final Logger LOGGER = Logger.getLogger(MavenParseUtils.class.getName());
 
 	public static Dependency parseArtifact(DOMNode node) {
 		if (node == null) {
@@ -40,41 +45,40 @@ public class MavenParseUtils {
 					if (value == null) {
 						continue;
 					}
-					value = value.trim(); 
+					value = value.trim();
 					switch (tag.getLocalName()) {
-					case "groupId":
-						res.setGroupId(value);
-						break;
-					case "artifactId":
-						res.setArtifactId(value);
-						break;
-					case "version":
-						res.setVersion(value);
-						break;
-					case "scope":
-						res.setScope(value);
-						break;
-					case "type":
-						res.setType(value);
-						break;
-					case "classifier":
-						res.setClassifier(value);
-						break;
+						case "groupId":
+							res.setGroupId(value);
+							break;
+						case "artifactId":
+							res.setArtifactId(value);
+							break;
+						case "version":
+							res.setVersion(value);
+							break;
+						case "scope":
+							res.setScope(value);
+							break;
+						case "type":
+							res.setType(value);
+							break;
+						case "classifier":
+							res.setClassifier(value);
+							break;
 					}
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("Error parsing Artifact");
+			LOGGER.log(Level.SEVERE,"Error parsing Artifact", e);
 		}
 		return isEmpty(res) ? null : res;
 	}
 
 	private static boolean isEmpty(Dependency res) {
 		return res.getGroupId() == null &&
-			res.getArtifactId() == null &&
-			res.getVersion() == null &&
-			res.getScope() == null &&
-			res.getClassifier() == null;
+				res.getArtifactId() == null &&
+				res.getVersion() == null &&
+				res.getScope() == null &&
+				res.getClassifier() == null;
 	}
 }

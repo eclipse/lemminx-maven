@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.versioning.ArtifactVersion;
@@ -31,7 +33,9 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 
 public class LocalRepositorySearcher {
-	
+
+	private static final Logger LOGGER = Logger.getLogger(LocalRepositorySearcher.class.getName());
+
 	private final File localRepository;
 
 	public LocalRepositorySearcher(File localRepository) {
@@ -69,7 +73,7 @@ public class LocalRepositorySearcher {
 						key.reset();
 					}
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 				}
 			}).start();
 			cache.put(localRepository, res);
@@ -80,7 +84,7 @@ public class LocalRepositorySearcher {
 	public Collection<Gav> computeLocalArtifacts() throws IOException {
 		final Path repoPath = localRepository.toPath();
 		Map<String, Gav> groupIdArtifactIdToVersion = new HashMap<>();
-		Files.walkFileTree(repoPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() { 
+		Files.walkFileTree(repoPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
 				if (file.getFileName().toString().charAt(0) == '.') {
@@ -114,7 +118,7 @@ public class LocalRepositorySearcher {
 		return groupIdArtifactIdToVersion.values();
 	}
 
-	
+
 	// TODO consider using directly ArtifactRepository for those 2 methods
 	public File findLocalFile(Dependency dependency) {
 		return new File(localRepository, dependency.getGroupId().replace('.', File.separatorChar) + File.separatorChar + dependency.getArtifactId() + File.separatorChar + dependency.getVersion() + File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom");
@@ -129,7 +133,7 @@ public class LocalRepositorySearcher {
 			try {
 				watchService.close();
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 			}
 			watchKey = null;
 			watchService = null;

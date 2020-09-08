@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.search.BooleanClause.Occur;
@@ -57,16 +59,20 @@ import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.codehaus.plexus.PlexusContainer;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.lemminx.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.maven.MavenParseUtils;
 
 public class RemoteRepositoryIndexSearcher {
+
+	private static final Logger LOGGER = Logger.getLogger(RemoteRepositoryIndexSearcher.class.getName());
+
 	private static final String PACKAGING_TYPE_JAR = "jar";
 	private static final String PACKAGING_TYPE_MAVEN_PLUGIN = "maven-plugin";
 
 	public static final RemoteRepository CENTRAL_REPO = new RemoteRepository.Builder("central", "default", "https://repo.maven.apache.org/maven2").build();
 	private final Set<RemoteRepository> knownRepositories;
-	
+
 	public static boolean disableCentralIndex = Boolean.parseBoolean(System.getProperty(RemoteRepositoryIndexSearcher.class.getName() + ".disableCentralIndex")) ;
-	
+
 	private Indexer indexer;
 
 	private IndexUpdater indexUpdater;
@@ -95,7 +101,7 @@ public class RemoteRepositoryIndexSearcher {
 			resourceFetcher = new WagonHelper.WagonFetcher(plexusContainer.lookup(Wagon.class, "http"), new AbstractTransferListener() {
 				@Override
 				public void transferStarted(TransferEvent transferEvent) {
-					System.out.println("Downloading " + transferEvent.getResource().getName());
+					LOGGER.log(Level.INFO, "Downloading" + transferEvent.getResource().getName());
 				}
 
 				@Override
@@ -104,14 +110,14 @@ public class RemoteRepositoryIndexSearcher {
 
 				@Override
 				public void transferCompleted(TransferEvent transferEvent) {
-					System.out.println("Done downloading " + transferEvent.getResource().getName());
+					LOGGER.log(Level.INFO, "Done downloading "+ transferEvent.getResource().getName());
 				}
 			}, null, null);
 			indexers.add(plexusContainer.lookup(IndexCreator.class, "min"));
 			indexers.add(plexusContainer.lookup(IndexCreator.class, "jarContent"));
 			indexers.add(plexusContainer.lookup(IndexCreator.class, PACKAGING_TYPE_MAVEN_PLUGIN));
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 		this.knownRepositories = new HashSet<>();
 		if (!disableCentralIndex) {
@@ -138,7 +144,7 @@ public class RemoteRepositoryIndexSearcher {
 			return future;
 		}
 	}
-	
+
 	private Set<ArtifactVersion> internalGetArtifactVersions(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
 		if (artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().trim().isEmpty()) {
 			return Collections.emptySet();
@@ -166,11 +172,11 @@ public class RemoteRepositoryIndexSearcher {
 	public Set<ArtifactVersion> getArtifactVersions(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetArtifactVersions(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
 	}
-	
+
 	public Set<ArtifactVersion> getPluginArtifactVersions(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetArtifactVersions(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
-	
+
 	private Collection<ArtifactInfo> internalGetArtifacts(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
 		BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
 		if (artifactToSearch.getGroupId() != null) {
@@ -189,13 +195,13 @@ public class RemoteRepositoryIndexSearcher {
 	}
 
 	/**
-	 * @param artifactToSearch a CompletableFuture containing a {@code Map<String artifactId, String artifactDescription>} 
+	 * @param artifactToSearch a CompletableFuture containing a {@code Map<String artifactId, String artifactDescription>}
 	 * @return
 	 */
 	public Collection<ArtifactInfo> getArtifacts(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
 	}
-	
+
 	public Collection<ArtifactInfo> getPluginArtifacts(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
@@ -211,13 +217,13 @@ public class RemoteRepositoryIndexSearcher {
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 		// TODO: Find the Count sweet spot
 		request.setCount(7500);
-		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getGroupId).collect(Collectors.toSet());		
+		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getGroupId).collect(Collectors.toSet());
 	}
 	// TODO: Get groupid description for completion
 	public Set<String> getGroupIds(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
 	}
-	
+
 	public Set<String> getPluginGroupIds(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
@@ -228,9 +234,9 @@ public class RemoteRepositoryIndexSearcher {
 		}
 		if ((context.getId().equals("https://repo.maven.apache.org/maven2") || context.getId().equals(CENTRAL_REPO.getId()))
 				&& disableCentralIndex) {
-			return CompletableFuture.runAsync(() -> System.out.println("Central repository index disabled"));
+			return CompletableFuture.runAsync(() -> LOGGER.log(Level.INFO, "Central repository index disabled"));
 		}
-		System.out.println("Updating Index for " + context.getRepositoryUrl() + "...");
+		LOGGER.log(Level.INFO, "Updating Index for " + context.getRepositoryUrl() + "...");
 		Date contextCurrentTimestamp = context.getTimestamp();
 		IndexUpdateRequest updateRequest = new IndexUpdateRequest(context, resourceFetcher);
 		return CompletableFuture.runAsync(() -> {
@@ -238,28 +244,28 @@ public class RemoteRepositoryIndexSearcher {
 			try {
 				IndexUpdateResult updateResult = indexUpdater.fetchAndUpdateIndex(updateRequest);
 				if (updateResult.isSuccessful()) {
-					System.out.println("Update successful for " + context.getRepositoryUrl());
+					LOGGER.log(Level.INFO, "Update successful for " + context.getRepositoryUrl());
 					if (updateResult.isFullUpdate()) {
-						System.out.println("Full update happened!");
+						LOGGER.log(Level.INFO, "Full update happened!");
 					} else if (contextCurrentTimestamp.equals(updateResult.getTimestamp())) {
-						System.out.println("No update needed, index is up to date!");
+						LOGGER.log(Level.INFO, "No update needed, index is up to date!");
 					} else {
-						System.out.println("Incremental update happened, change covered " + contextCurrentTimestamp
+						LOGGER.log(Level.INFO, "Incremental update happened, change covered " + contextCurrentTimestamp
 								+ " - " + updateResult.getTimestamp() + " period.");
 					}
 				} else {
-					System.err.println("Index update failed for " + context.getRepositoryUrl());
+					LOGGER.log(Level.WARNING, "Index update failed for " + context.getRepositoryUrl());
 				}
 			} catch (IOException e) {
 				// TODO: Fix this - the maven central context gets reported as broken when
 				// another context is broken
 				indexDownloadJobs.remove(context);
 				CompletableFuture.runAsync(() -> {
-					e.printStackTrace();
+					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 					throw new IllegalArgumentException(
 							"Invalid Context: " + context.getRepositoryId() + " @ " + context.getRepositoryUrl());
 				});
-				
+
 				// TODO: Maybe scan for maven metadata to use as an alternative to retrieve GAV
 			}
 		});
@@ -273,7 +279,7 @@ public class RemoteRepositoryIndexSearcher {
 			return indexer.createIndexingContext(repoUrl.toString(), repoUrl.toString(),
 					repoFile, repoIndex, repoUrl.toString(), null, true, true, indexers);
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 		return null;
 	}
@@ -287,8 +293,7 @@ public class RemoteRepositoryIndexSearcher {
 					download.cancel(true);
 				}
 			} catch (IOException e) {
-				System.out.println("Warning - could not close context: " + context.getId());
-				e.printStackTrace();
+				LOGGER.log(Level.WARNING, "Warning - could not close context: " + context.getId(), e);
 			}
 		}
 		indexingContexts.clear();
@@ -330,9 +335,8 @@ public class RemoteRepositoryIndexSearcher {
 		try {
 			response = indexer.searchIterator(request);
 		} catch (IOException e) {
-			System.out.println("Index search failed for " + String.join(":", artifactToSearch.getGroupId(),
-					artifactToSearch.getArtifactId(), artifactToSearch.getVersion()));
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, "Index search failed for " + String.join(":", artifactToSearch.getGroupId(),
+					artifactToSearch.getArtifactId(), artifactToSearch.getVersion()), e);
 		}
 		List<ArtifactInfo> artifactInfos = new ArrayList<>();
 		if (response != null) {
