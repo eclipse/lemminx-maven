@@ -90,29 +90,32 @@ public class LocalRepositorySearcher {
 				if (file.getFileName().toString().charAt(0) == '.') {
 					return FileVisitResult.SKIP_SUBTREE;
 				}
-				if (Character.isDigit(file.getFileName().toString().charAt(0))) {
-					Path artifactFolderPath = repoPath.relativize(file);
-					if (artifactFolderPath.getNameCount() < 3) {
-						// eg "maven-dependency-plugin/3.1.2"
-						return FileVisitResult.SKIP_SUBTREE;
-					}
-					ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
-					String artifactId = artifactFolderPath.getParent().getFileName().toString();
-					String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
-					String groupIdArtifactId = groupId + ':' + artifactId;
-					Gav existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
-					boolean replace = existingGav == null;
-					if (existingGav != null) {
-						ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
-						replace |= existingVersion.compareTo(version) < 0;
-						replace |= (existingVersion.toString().endsWith("-SNAPSHOT") && !version.toString().endsWith("-SNAPSHOT"));
-					}
-					if (replace) {
-						groupIdArtifactIdToVersion.put(groupIdArtifactId, new Gav(groupId, artifactId, version.toString()));
-					}
+				if (!Character.isDigit(file.getFileName().toString().charAt(0))) {
+					return FileVisitResult.CONTINUE;
+				}
+				Path artifactFolderPath = repoPath.relativize(file);
+				if (artifactFolderPath.getNameCount() < 3) {
+					// eg "maven-dependency-plugin/3.1.2"
 					return FileVisitResult.SKIP_SUBTREE;
 				}
-				return FileVisitResult.CONTINUE;
+				ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
+				String artifactId = artifactFolderPath.getParent().getFileName().toString();
+				String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
+				if (!new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
+					return FileVisitResult.SKIP_SUBTREE;
+				}
+				String groupIdArtifactId = groupId + ':' + artifactId;
+				Gav existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
+				boolean replace = existingGav == null;
+				if (existingGav != null) {
+					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
+					replace |= existingVersion.compareTo(version) < 0;
+					replace |= (existingVersion.toString().endsWith("-SNAPSHOT") && !version.toString().endsWith("-SNAPSHOT"));
+				}
+				if (replace) {
+					groupIdArtifactIdToVersion.put(groupIdArtifactId, new Gav(groupId, artifactId, version.toString()));
+				}
+				return FileVisitResult.SKIP_SUBTREE;
 			}
 		});
 		return groupIdArtifactIdToVersion.values();
