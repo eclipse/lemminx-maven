@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -51,5 +52,12 @@ public class LocalRepoTests {
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-local-groupId-complete.xml", languageService), new Position(11, 12), new SharedSettings())
 				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("org.apache.maven")));
+	}
+	
+	@Test(timeout=90000)
+	public void testDoNotCompleteNonExistingArtifact()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		assertTrue(languageService.doComplete(createDOMDocument("/pom-non-existing-dep.xml", languageService), new Position(10, 27), new SharedSettings())
+				.getItems().stream().map(CompletionItem::getLabel).noneMatch(label -> label.contains("some.fake.group")));
 	}
 }
