@@ -118,6 +118,26 @@ public class RemoteRepositoryTest {
 	}
 	
 	@Test(timeout=15000)
+ 	public void testDownloadNonCentralArtifactOnHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		languageService.initializeIfNeeded();
+		File mavenRepo = languageService.getExtensions().stream() //
+			.filter(MavenLemminxExtension.class::isInstance) //
+			.map(MavenLemminxExtension.class::cast) //
+			.findAny() //
+			.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
+			.get();
+		
+		File artifactDirectory = new File(mavenRepo, "com/github/goxr3plus/java-stream-player/9.0.4");
+		final DOMDocument document = createDOMDocument("/pom-remote-artifact-non-central-download-hover.xml", languageService);
+		final Position position = new Position(14, 20);
+		assertFalse(artifactDirectory.exists());
+ 		languageService.doHover(document, position, new SharedSettings());
+ 		
+ 		assertTrue(artifactDirectory.exists());
+ 		assertTrue(artifactDirectory.listFiles().length > 0);
+	}
+	
+	@Test(timeout=15000)
 	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml", languageService), //
 				new Position(11, 14), "org.codehaus.mojo");
