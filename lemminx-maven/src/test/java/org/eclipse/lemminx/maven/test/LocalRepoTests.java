@@ -9,7 +9,6 @@
 package org.eclipse.lemminx.maven.test;
 
 import static org.eclipse.lemminx.maven.test.MavenLemminxTestsUtils.createDOMDocument;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -19,6 +18,7 @@ import java.util.concurrent.ExecutionException;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
 import org.junit.After;
 import org.junit.Before;
@@ -59,5 +59,11 @@ public class LocalRepoTests {
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-non-existing-dep.xml", languageService), new Position(10, 27), new SharedSettings())
 				.getItems().stream().map(CompletionItem::getLabel).noneMatch(label -> label.contains("some.fake.group")));
+	}
+
+	@Test
+	public void testDefinitionManagedDependency() throws IOException, URISyntaxException {
+		assertTrue(languageService.findDefinition(createDOMDocument("/pom-dependencyManagement-child.xml", languageService), new Position(17, 6), () -> {})
+				.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("maven-surefire-plugin-2.22.2.pom")));
 	}
 }

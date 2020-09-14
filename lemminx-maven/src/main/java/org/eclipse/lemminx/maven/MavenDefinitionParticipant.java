@@ -70,24 +70,23 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 					relativeFile = new File(relativeFile, Maven.POMv4);
 				}
 				if (relativeFile.isFile()) {
-					locations.add(toLocationNoRange(relativeFile, (DOMElement)parentNode));
+					locations.add(toLocationNoRange(relativeFile, parentNode));
 				}
 				return;
 			} else {
 				File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
 				if (match(relativeFile, dependency)) {
-					locations.add(toLocationNoRange(relativeFile, (DOMElement)parentNode));
+					locations.add(toLocationNoRange(relativeFile, parentNode));
 				}
 				return;
 			}
 		}
 		if (dependency != null && element != null) {
-			File artifactLocation = getArtifactLocation(dependency);
+			File artifactLocation = getArtifactLocation(dependency, element.getOwnerDocument());
 			LocationLink location = toLocationNoRange(artifactLocation, element);
 			if (location != null) {
 				locations.add(location);
 			}
-			return;
 		}
 	}
 
@@ -127,14 +126,26 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {
-		MavenProject p = plugin.getProjectCache().getSnapshotProject(relativeFile).get();
-		return p != null &&
-				p.getGroupId().equals(dependency.getGroupId()) &&
-				p.getArtifactId().equals(dependency.getArtifactId()) &&
-				p.getVersion().equals(dependency.getVersion());
+		return plugin.getProjectCache().getSnapshotProject(relativeFile)
+				.filter(p -> 
+					p.getGroupId().equals(dependency.getGroupId()) && //
+					p.getArtifactId().equals(dependency.getArtifactId()) && //
+					p.getVersion().equals(dependency.getVersion()))
+				.isPresent();
 	}
 
-	private File getArtifactLocation(Dependency dependency) {
+	private File getArtifactLocation(Dependency dependency, DOMDocument doc) {
+		if (dependency.getGroupId() == null || dependency.getVersion() == null) {
+			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
+			if (p != null) {
+				final Dependency originalDependency = dependency;
+				dependency = p.getDependencies().stream().filter(dep -> 
+						(originalDependency.getGroupId() == null || originalDependency.getGroupId().equals(dep.getGroupId()) &&
+						(originalDependency.getArtifactId() == null || originalDependency.getArtifactId().equals(dep.getArtifactId())) &&
+						(originalDependency.getVersion() == null || originalDependency.getVersion().equals(dep.getVersion())))).findFirst()
+					.orElse(dependency);
+			}
+		}
 		File localArtifact = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
 		if (localArtifact != null) {
 			return localArtifact;
@@ -143,21 +154,16 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private LocationLink toLocationNoRange(File target, DOMNode originNode) {
+		if (target == null) {
+			return null;
+		}
 		Range dumbRange = new Range(new Position(0, 0), new Position(0, 0));
-		LocationLink link = new LocationLink(target.toURI().toString(), dumbRange, dumbRange, XMLPositionUtility.createRange(originNode));
-		return link;
-	}
-	
-	private LocationLink toLocation(File target, DOMNode targetNode, DOMNode originNode) {
-		Range targetRange = XMLPositionUtility.createRange(targetNode);
-		LocationLink link = new LocationLink(target.toURI().toString(), targetRange, targetRange, XMLPositionUtility.createRange(originNode));
-		return link;
+		return new LocationLink(target.toURI().toString(), dumbRange, dumbRange, XMLPositionUtility.createRange(originNode));
 	}
 	
 	private LocationLink toLocation(File target, DOMNode targetNode, Range originRange) {
 		Range targetRange = XMLPositionUtility.createRange(targetNode);
-		LocationLink link = new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
-		return link;
+		return new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
 	}
 
 	private DOMElement findInterestingElement(DOMNode node) {
@@ -176,6 +182,8 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		case "version":
 		case "relativePath":
 			return node.getParentElement();
+		default:
+			// continue
 		}
 		if (DOMUtils.findChildElementText(element, "artifactId").isPresent()) {
 			return element;
