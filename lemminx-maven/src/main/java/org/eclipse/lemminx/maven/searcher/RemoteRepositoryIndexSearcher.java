@@ -11,15 +11,12 @@ package org.eclipse.lemminx.maven.searcher;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -51,15 +48,12 @@ import org.apache.maven.index.updater.IndexUpdater;
 import org.apache.maven.index.updater.ResourceFetcher;
 import org.apache.maven.index.updater.WagonHelper;
 import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.project.MavenProject;
 import org.apache.maven.wagon.Wagon;
 import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.codehaus.plexus.PlexusContainer;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.lemminx.maven.MavenLemminxExtension;
-import org.eclipse.lemminx.maven.MavenParseUtils;
 
 public class RemoteRepositoryIndexSearcher {
 
@@ -69,7 +63,6 @@ public class RemoteRepositoryIndexSearcher {
 	private static final String PACKAGING_TYPE_MAVEN_PLUGIN = "maven-plugin";
 
 	public static final RemoteRepository CENTRAL_REPO = new RemoteRepository.Builder("central", "default", "https://repo.maven.apache.org/maven2").build();
-	private final Set<RemoteRepository> knownRepositories;
 
 	public static boolean disableCentralIndex = Boolean.parseBoolean(System.getProperty(RemoteRepositoryIndexSearcher.class.getName() + ".disableCentralIndex")) ;
 
@@ -119,12 +112,6 @@ public class RemoteRepositoryIndexSearcher {
 		} catch (Exception e) {
 			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
-		this.knownRepositories = new HashSet<>();
-		if (!disableCentralIndex) {
-			knownRepositories.add(CENTRAL_REPO);
-		}
-		knownRepositories.stream().map(RemoteRepository::getUrl).map(URI::create).forEach(this::getIndexingContext);
-		// TODO knownRepositories.addAll(readRepositoriesFromSettings());
 	}
 
 	public CompletableFuture<IndexingContext> getIndexingContext(URI repositoryUrl) {
@@ -299,36 +286,6 @@ public class RemoteRepositoryIndexSearcher {
 		indexingContexts.clear();
 		indexDownloadJobs.clear();
 	}
-
-	public void updateKnownRepositories(MavenProject project) {
-		if (project == null || project.getModel() == null) {
-			return;
-
-		}
-		Model model = project.getModel();
-
-		knownRepositories.addAll(model.getRepositories().stream()
-				.map(repo -> new RemoteRepository.Builder(repo.getId(), repo.getLayout(), repo.getUrl()).build())
-				.distinct().collect(Collectors.toList()));
-		Deque<MavenProject> parentHierarchy = new ArrayDeque<>();
-		if (model.getParent() != null && project.getParent() != null) {
-			parentHierarchy.add(project.getParent());
-			while (!parentHierarchy.isEmpty()) {
-				MavenProject currentParentProj = parentHierarchy.pop();
-				if (currentParentProj.getParent() != null) {
-					Model parentModel = currentParentProj.getParent().getModel();
-					knownRepositories.addAll(parentModel.getRepositories().stream()
-							.map(repo -> new RemoteRepository.Builder(repo.getId(), repo.getLayout(), repo.getUrl())
-									.build())
-							.distinct().collect(Collectors.toList()));
-					parentHierarchy.add(currentParentProj.getParent());
-				}
-			}
-		}
-
-		// TODO: get repositories from maven user and global settings.xml
-	}
-
 
 	private List<ArtifactInfo> createIndexerQuery(Dependency artifactToSearch, final IteratorSearchRequest request) {
 		IteratorSearchResponse response = null;
