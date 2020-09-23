@@ -151,7 +151,7 @@ public class RemoteRepositoryTest {
 		// if got out of the loop without timeout, then test is PASSED
 	}
 	
-	@Test(timeout=15000)
+	@Test
 	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml", languageService), //
 				new Position(13, 12), "1.0-beta-1");

@@ -138,7 +138,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
 			indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(options.get("maven.indexLocation")).map(JsonElement::getAsString).map(File::new));
-			cache.addProjectParsedListener(indexSearcher::updateKnownRepositories);
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);

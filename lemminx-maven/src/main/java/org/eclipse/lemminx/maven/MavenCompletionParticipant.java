@@ -523,20 +523,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private Collection<CompletionItem> completeProperties(ICompletionRequest request) {
-		DOMDocument xmlDocument = request.getXMLDocument();
-		String documentText = xmlDocument.getText();
-		int initialPropertyOffset = request.getOffset();
-		for (int i = request.getOffset() - 1; i >= request.getNode().getStart(); i--) {
-			char currentChar = documentText.charAt(i);
-			if (currentChar == '}') {
-				// properties area ended, return all properties
-				break;
-			} else if (currentChar == '$') {
-				initialPropertyOffset = i;
-				break;
-			}
-		}
-
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
 			return Collections.emptySet();
@@ -575,12 +561,11 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 		Range range = XMLPositionUtility.createRange(node.getStartTagCloseOffset() + 1, node.getEndTagOpenOffset(),
 				doc);
-		List<String> remoteArtifactRepositories = Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
-		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
-		if (project != null) {
-			remoteArtifactRepositories = project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl).collect(Collectors.toList());
-		}
+		List<String> remoteArtifactRepositories = project != null ? //
+				project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl).collect(Collectors.toList()) : //
+				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
+		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(remoteArtifactRepositories.size()));
 		RemoteRepositoryIndexSearcher indexSearcher = plugin.getIndexSearcher();
 		try {

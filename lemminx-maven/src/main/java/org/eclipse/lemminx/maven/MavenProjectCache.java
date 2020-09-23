@@ -228,8 +228,4 @@ public class MavenProjectCache {
 		return plexusContainer;
 	}
 
-	public void addProjectParsedListener(Consumer<MavenProject> listener) {
-		this.projectParsedListeners.add(listener);
-	}
-
 }
