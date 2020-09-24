@@ -117,14 +117,11 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		DOMNode node = request.getNode();
 		DOMDocument doc = request.getXMLDocument();
 
-		List<String> remoteArtifactRepositories = Collections
-				.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(doc);
-		if (project != null) {
-			remoteArtifactRepositories = project.getRemoteArtifactRepositories().stream()
-					.map(ArtifactRepository::getUrl).collect(Collectors.toList());
-		}
+		List<String> remoteArtifactRepositories = project == null ? //
+				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl()) : //
+				project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl).collect(Collectors.toList());
 
 		try {
 			ModelBuilder builder = lemminxMavenPlugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
@@ -159,34 +156,35 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
 		}
-		var indexSearcher = lemminxMavenPlugin.getIndexSearcher();
-		try {
-			CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
-				final String updatingItem = "Updating index for " + repository;
-				possibleHovers.add(updatingItem);
-
-				return indexSearcher.getIndexingContext(URI.create(repository)).thenAccept(index -> {
-					if (isPlugin) {
-						// TODO: make a new function that gets only the exact artifact ID match, or just
-						// take the first thing given
-						indexSearcher.getPluginArtifacts(artifactToSearch, index).stream()
-								.map(ArtifactInfo::getDescription)
-								.filter(Objects::nonNull)
-								.forEach(possibleHovers::add);
-					} else {
-						indexSearcher.getArtifacts(artifactToSearch, index).stream()
-								.map(ArtifactInfo::getDescription)
-								.filter(Objects::nonNull)
-								.forEach(possibleHovers::add);
-					}
-				}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem));
-
-			}).toArray(CompletableFuture<?>[]::new)).get(10, TimeUnit.SECONDS);
-		} catch (InterruptedException | ExecutionException exception) {
-			LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
-		} catch (TimeoutException e) {
-			// nothing to log, some work still pending
-		}
+		lemminxMavenPlugin.getIndexSearcher().ifPresent(indexSearcher -> {
+			try {
+				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
+					final String updatingItem = "Updating index for " + repository;
+					possibleHovers.add(updatingItem);
+	
+					return indexSearcher.getIndexingContext(URI.create(repository)).thenAccept(index -> {
+						if (isPlugin) {
+							// TODO: make a new function that gets only the exact artifact ID match, or just
+							// take the first thing given
+							indexSearcher.getPluginArtifacts(artifactToSearch, index).stream()
+									.map(ArtifactInfo::getDescription)
+									.filter(Objects::nonNull)
+									.forEach(possibleHovers::add);
+						} else {
+							indexSearcher.getArtifacts(artifactToSearch, index).stream()
+									.map(ArtifactInfo::getDescription)
+									.filter(Objects::nonNull)
+									.forEach(possibleHovers::add);
+						}
+					}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem));
+	
+				}).toArray(CompletableFuture<?>[]::new)).get(10, TimeUnit.SECONDS);
+			} catch (InterruptedException | ExecutionException exception) {
+				LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
+			} catch (TimeoutException e) {
+				// nothing to log, some work still pending
+			}
+		});
 		if (possibleHovers.isEmpty()) {
 			return null;
 		}

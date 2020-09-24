@@ -137,7 +137,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(options.get("maven.indexLocation")).map(JsonElement::getAsString).map(File::new));
+			JsonElement skipIndex = options.get("maven.index.skip");
+			if (skipIndex == null || !skipIndex.getAsBoolean()) {
+				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(options.get("maven.indexLocation")).map(JsonElement::getAsString).map(File::new));
+			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);
@@ -303,8 +306,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenPluginManager;
 	}
 	
-	public RemoteRepositoryIndexSearcher getIndexSearcher() {
+	public Optional<RemoteRepositoryIndexSearcher> getIndexSearcher() {
 		initialize();
-		return indexSearcher;
+		return Optional.ofNullable(indexSearcher);
 	}
 }
