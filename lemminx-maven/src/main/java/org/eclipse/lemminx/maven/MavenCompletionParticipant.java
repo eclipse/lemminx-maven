@@ -567,62 +567,63 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(remoteArtifactRepositories.size()));
-		RemoteRepositoryIndexSearcher indexSearcher = plugin.getIndexSearcher();
-		try {
-			CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
-				final CompletionItem updatingItem = new CompletionItem("Updating index for " + repository);
-				updatingItem.setPreselect(true);
-				updatingItem.setInsertText("");
-				updatingItem.setKind(CompletionItemKind.Event);
-				updateItems.add(updatingItem);
-				return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
-					switch (node.getLocalName()) {
-						case "groupId":
-							// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean parameter
-							if (onlyPlugins) {
-								indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
-										.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
-							} else {
-								indexSearcher.getGroupIds(artifactToSearch, index).stream()
-										.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
-							}
-							return updatingItem;
-						case "artifactId":
-							if (onlyPlugins) {
-								artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
-							} else {
+		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
+			try {
+				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
+					final CompletionItem updatingItem = new CompletionItem("Updating index for " + repository);
+					updatingItem.setPreselect(true);
+					updatingItem.setInsertText("");
+					updatingItem.setKind(CompletionItemKind.Event);
+					updateItems.add(updatingItem);
+					return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
+						switch (node.getLocalName()) {
+							case "groupId":
+								// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean parameter
+								if (onlyPlugins) {
+									indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
+											.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+								} else {
+									indexSearcher.getGroupIds(artifactToSearch, index).stream()
+											.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+								}
+								return updatingItem;
+							case "artifactId":
+								if (onlyPlugins) {
+									artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+								} else {
+									artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
+								}
+								return updatingItem;
+							case "version":
+								if (onlyPlugins) {
+									indexSearcher.getPluginArtifactVersions(artifactToSearch, index).stream()
+											.map(version -> toCompletionItem(version.toString(), null, range))
+											.forEach(nonArtifactCollector::addCompletionItem);
+								} else {
+									indexSearcher.getArtifactVersions(artifactToSearch, index).stream()
+											.map(version -> toCompletionItem(version.toString(), null, range))
+											.forEach(nonArtifactCollector::addCompletionItem);
+								}
+								return updatingItem;
+							case "dependencies":
+							case "dependency":
 								artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
-							}
-							return updatingItem;
-						case "version":
-							if (onlyPlugins) {
-								indexSearcher.getPluginArtifactVersions(artifactToSearch, index).stream()
-										.map(version -> toCompletionItem(version.toString(), null, range))
-										.forEach(nonArtifactCollector::addCompletionItem);
-							} else {
-								indexSearcher.getArtifactVersions(artifactToSearch, index).stream()
-										.map(version -> toCompletionItem(version.toString(), null, range))
-										.forEach(nonArtifactCollector::addCompletionItem);
-							}
-							return updatingItem;
-						case "dependencies":
-						case "dependency":
-							artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
-							return updatingItem;
-						case "plugins":
-						case "plugin":
-							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
-							return updatingItem;
-					}
-					return (CompletionItem)null;
-				}).whenComplete((ok, error) -> updateItems.remove(ok));
-			}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
-		} catch (InterruptedException | ExecutionException exception) {
-			LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
-		} catch (TimeoutException e) {
-			// nothing to log, some work still pending
-			updateItems.forEach(nonArtifactCollector::addCompletionItem);
-		}
+								return updatingItem;
+							case "plugins":
+							case "plugin":
+								artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+								return updatingItem;
+						}
+						return (CompletionItem)null;
+					}).whenComplete((ok, error) -> updateItems.remove(ok));
+				}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
+			} catch (InterruptedException | ExecutionException exception) {
+				LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
+			} catch (TimeoutException e) {
+				// nothing to log, some work still pending
+				updateItems.forEach(nonArtifactCollector::addCompletionItem);
+			}
+	});
 	}
 
 	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
