@@ -108,7 +108,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>2.22.2</version> <!-- Need to be same as in tests so we're sure version in in local repo -->
 				<configuration>
-					<test>org.eclipse.lemminx.maven.test.AllTests</test>
+					<test>org.eclipse.lemminx.extensions.maven.test.AllTests</test>
 					<systemPropertyVariables>
 						<lemminx.maven.indexDirectory>${lemminx.maven.indexDirectory}</lemminx.maven.indexDirectory>
 						<maven.repo.local>${maven.repo.local}</maven.repo.local>
