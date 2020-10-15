@@ -98,7 +98,7 @@
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
-			<version>4.5.11</version>
+			<version>4.5.13</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -166,7 +166,7 @@
 			<dependency>
 				<groupId>com.google.inject</groupId>
 				<artifactId>guice</artifactId>
-				<version>4.2.1</version>
+				<version>4.2.3</version>
 				<classifier>no_aop</classifier>
 			</dependency>
 			<dependency>
