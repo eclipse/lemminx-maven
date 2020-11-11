@@ -213,24 +213,23 @@ public class LocalPluginTest {
 	@Test(timeout=30000)
 	public void testPluginConfigurationDiagnostics() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-configuration-diagnostic.xml", languageService);
-		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().map(Diagnostic::getMessage)
 				.anyMatch(message -> message.contains("Invalid plugin configuration")));
-		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).size() == 2);
 	}
 	
 	@Test
 	public void testPluginGoalDiagnostics() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-goal-diagnostic.xml", languageService);
-		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().map(Diagnostic::getMessage)
 				.anyMatch(message -> message.contains("Invalid goal for this plugin")));
-		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).size() == 2);
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).size() == 2);
 	}
 	
 	@Test
 	public void testDiagnosticMissingGroupId() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-diagnostic-missing-groupid.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings());
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {});
 		assertTrue(diagnostics.size() == 0); 
 	}
 	
@@ -238,13 +237,12 @@ public class LocalPluginTest {
 	public void testGoalDiagnosticsNoFalsePositives()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-plugin-valid-goal-diagnostic.xml", languageService);
-		assertTrue(languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings()).size() == 0);
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).size() == 0);
 	}
 
 	@Test
 	public void testParentPluginManagementResolved() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-pluginManagement-child.xml", languageService);
-		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
 	}
 }

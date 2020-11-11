@@ -24,7 +24,7 @@ public class MatchTest {
 	public void testDoesntFailNonHierarchicalURIs() {
 		XMLLanguageService languageService = new XMLLanguageService();
 		DOMDocument doc = DOMParser.getInstance().parse("blah", "untitled:Untitled-1", new URIResolverExtensionManager());
-		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, () -> {}, new XMLValidationSettings());
+		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {});
 	}
 
 }

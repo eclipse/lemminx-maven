@@ -24,6 +24,7 @@ import org.apache.maven.model.building.ModelProblem.Severity;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -40,7 +41,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 	}
 
 	@Override
-	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics, CancelChecker monitor) {
+	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics, XMLValidationSettings validationSettings, CancelChecker monitor) {
 		if (!MavenLemminxExtension.match(xmlDocument)) {
 			  return;
 		}

@@ -110,22 +110,21 @@ public class SimpleModelTest {
 	public void testMissingArtifactIdError()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-without-artifactId.xml", languageService);
-		assertTrue(languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().map(Diagnostic::getMessage)
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().map(Diagnostic::getMessage)
 				.anyMatch(message -> message.contains("artifactId")));
 		// simulate an edit
 		TextDocument textDocument = document.getTextDocument();
 		textDocument.setText(textDocument.getText().replace("</project>", "<artifactId>a</artifactId></project>"));
 		textDocument.setVersion(textDocument.getVersion() + 1);
 		document = DOMParser.getInstance().parse(textDocument, languageService.getResolverExtensionManager());
-		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
 	}
 	
 	@Test
 	public void testSystemPathDiagnosticBug()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, () -> {
-		}, new XMLValidationSettings());
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {});
 		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("${env")));
 	}
 	
@@ -304,7 +303,7 @@ public class SimpleModelTest {
 	@Test
 	public void testBOMDependency() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-bom.xml", languageService);
-		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()));
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
 	}
 
 	@Test
@@ -319,6 +318,6 @@ public class SimpleModelTest {
 	@Test
 	public void testResolveParentFromCentralWhenAnotherRepoIsDeclared() throws Exception {
 		DOMDocument document = createDOMDocument("/it1/pom.xml", languageService);
-		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, () -> {}, new XMLValidationSettings()).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
 	}
 }
