@@ -219,7 +219,7 @@ public class RemoteRepositoryIndexSearcher {
 		if (context == null) {
 			return CompletableFuture.runAsync(() -> { throw new IllegalArgumentException("context mustn't be null"); });
 		}
-		if ((context.getId().equals("https://repo.maven.apache.org/maven2") || context.getId().equals(CENTRAL_REPO.getId()))
+		if ((context.getId().equals("https://repo.maven.apache.org/maven2") || context.getId().equals(CENTRAL_REPO.getId()) || context.getId().contains("maven_central"))
 				&& disableCentralIndex) {
 			return CompletableFuture.runAsync(() -> LOGGER.log(Level.INFO, "Central repository index disabled"));
 		}

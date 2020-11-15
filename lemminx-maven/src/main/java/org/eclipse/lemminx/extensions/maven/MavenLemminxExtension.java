@@ -192,6 +192,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
 		mavenRequest.setRemoteRepositories(defaultRemoteRepositories);
 		mavenRequest.setPluginArtifactRepositories(defaultRemoteRepositories);
+		mavenRequest.setSystemProperties(System.getProperties());
+		mavenRequest.setCacheNotFound(true);
+		mavenRequest.setCacheTransferError(true);
 		return mavenRequest;
 	}
 
