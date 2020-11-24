@@ -16,12 +16,16 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
+import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenDiagnosticParticipant;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
+import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
@@ -90,5 +94,18 @@ public class PluginResolutionTest {
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 	}
+	
+	@Test
+    public void testPluginGoalValidationWithPluginWithJDKProfiles()
+            throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+        MavenLemminxExtension plugin = new MavenLemminxExtension();
+        MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
+        languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
+        List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-plugin-goal-resolution.xml", languageService),
+                new XMLValidationSettings(), 
+                () -> {});
+        
+        assertTrue("No validation error or warning found", diagnostics.isEmpty());
+    }
 
 }
