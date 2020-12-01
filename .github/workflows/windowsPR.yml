@@ -10,10 +10,10 @@ jobs:
     runs-on: windows-2019
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Set up JDK 11
       uses: actions/setup-java@v1
       with:
         java-version: 11
     - name: Build with Maven
-      run: mvn -B verify --file lemminx-maven/pom.xml
+      run: mvn -B verify --file lemminx-maven/pom.xml "-Dmaven.test.error.ignore=true" "-Dmaven.test.failure.ignore=true"
