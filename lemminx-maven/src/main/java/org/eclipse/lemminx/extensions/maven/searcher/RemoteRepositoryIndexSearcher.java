@@ -52,6 +52,7 @@ import org.apache.maven.wagon.Wagon;
 import org.apache.maven.wagon.events.TransferEvent;
 import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.codehaus.plexus.PlexusContainer;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 
@@ -70,8 +71,6 @@ public class RemoteRepositoryIndexSearcher {
 
 	private IndexUpdater indexUpdater;
 
-	private ResourceFetcher resourceFetcher;
-
 	private List<IndexCreator> indexers = new ArrayList<>();
 
 	private final File indexPath;
@@ -79,7 +78,10 @@ public class RemoteRepositoryIndexSearcher {
 	private Map<URI, IndexingContext> indexingContexts = new HashMap<>();
 	private Map<IndexingContext, CompletableFuture<IndexingContext>> indexDownloadJobs = new HashMap<>();
 
+	private final PlexusContainer plexusContainer;
+
 	public RemoteRepositoryIndexSearcher(MavenLemminxExtension lemminxMavenPlugin, PlexusContainer plexusContainer, Optional<File> configuredIndexLocation) {
+		this.plexusContainer = plexusContainer;
 		indexPath = Optional.ofNullable(System.getProperty("lemminx.maven.indexDirectory"))
 				.filter(Objects::nonNull)
 				.map(String::trim)
@@ -91,21 +93,6 @@ public class RemoteRepositoryIndexSearcher {
 		try {
 			indexer = plexusContainer.lookup(Indexer.class);
 			indexUpdater = plexusContainer.lookup(IndexUpdater.class);
-			resourceFetcher = new WagonHelper.WagonFetcher(plexusContainer.lookup(Wagon.class, "http"), new AbstractTransferListener() {
-				@Override
-				public void transferStarted(TransferEvent transferEvent) {
-					LOGGER.log(Level.INFO, "Downloading" + transferEvent.getResource().getName());
-				}
-
-				@Override
-				public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
-				}
-
-				@Override
-				public void transferCompleted(TransferEvent transferEvent) {
-					LOGGER.log(Level.INFO, "Done downloading "+ transferEvent.getResource().getName());
-				}
-			}, null, null);
 			indexers.add(plexusContainer.lookup(IndexCreator.class, "min"));
 			indexers.add(plexusContainer.lookup(IndexCreator.class, "jarContent"));
 			indexers.add(plexusContainer.lookup(IndexCreator.class, PACKAGING_TYPE_MAVEN_PLUGIN));
@@ -126,9 +113,14 @@ public class RemoteRepositoryIndexSearcher {
 			}
 			final IndexingContext context = initializeContext(repositoryUrl);
 			indexingContexts.put(repositoryUrl, context);
-			CompletableFuture<IndexingContext> future = updateIndex(context).thenApply(theVoid -> context);
-			indexDownloadJobs.put(context, future);
-			return future;
+			CompletableFuture<IndexingContext> future;
+			try {
+				future = updateIndex(context).thenApply(theVoid -> context);
+				indexDownloadJobs.put(context, future);
+				return future;
+			} catch (ComponentLookupException e) {
+				return CompletableFuture.failedFuture(e);
+			}
 		}
 	}
 
@@ -215,7 +207,7 @@ public class RemoteRepositoryIndexSearcher {
 		return internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
 
-	private CompletableFuture<Void> updateIndex(IndexingContext context) {
+	private CompletableFuture<Void> updateIndex(IndexingContext context) throws ComponentLookupException {
 		if (context == null) {
 			return CompletableFuture.runAsync(() -> { throw new IllegalArgumentException("context mustn't be null"); });
 		}
@@ -225,6 +217,22 @@ public class RemoteRepositoryIndexSearcher {
 		}
 		LOGGER.log(Level.INFO, "Updating Index for " + context.getRepositoryUrl() + "...");
 		Date contextCurrentTimestamp = context.getTimestamp();
+		ResourceFetcher resourceFetcher = new WagonHelper.WagonFetcher(plexusContainer.lookup(Wagon.class, URI.create(context.getIndexUpdateUrl()).getScheme()), new AbstractTransferListener() {
+			@Override
+			public void transferStarted(TransferEvent transferEvent) {
+				LOGGER.log(Level.INFO, "Downloading" + transferEvent.getResource().getName());
+			}
+
+			@Override
+			public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
+			}
+
+			@Override
+			public void transferCompleted(TransferEvent transferEvent) {
+				LOGGER.log(Level.INFO, "Done downloading "+ transferEvent.getResource().getName());
+			}
+		}, null, null);
+
 		IndexUpdateRequest updateRequest = new IndexUpdateRequest(context, resourceFetcher);
 		return CompletableFuture.runAsync(() -> {
 

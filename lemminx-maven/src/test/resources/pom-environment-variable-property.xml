@@ -14,7 +14,7 @@
 			<version>1.0.1</version>
 			<scope>system</scope>
 			<!--<systemPath>${java.home}/../src.zip</systemPath> -->
-			<systemPath>${env.JAVA_HOME}/myLogger/MyLogger.jar </systemPath>
+			<systemPath>${env.PATH}/myLogger/MyLogger.jar </systemPath>
 		</dependency>
 	</dependencies>
 </project>

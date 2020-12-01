@@ -8,7 +8,6 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.test;
 
-import static org.eclipse.lemminx.extensions.maven.test.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -17,6 +16,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -32,7 +32,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class RemoteRepositoryTest {
+public class IndexBasedAssistanceTest {
 
 	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
@@ -49,6 +49,15 @@ public class RemoteRepositoryTest {
 		languageService = null;
 	}
 
+	private DOMDocument createDOMDocument(String path) throws IOException, URISyntaxException {
+		Properties props = new Properties();
+		String remoteRepoURL = System.getProperty("remoteRepoURL");
+		if (remoteRepoURL != null) {
+			props.put("remoteRepoURL", remoteRepoURL);
+		}
+		return MavenLemminxTestsUtils.createDOMDocument(path,props, languageService);
+	}
+
 	private void loopUntilCompletionItemFound(DOMDocument document, Position position, String expectedLabel) throws InterruptedException {
 		final SharedSettings settings = new SharedSettings();
 		List<CompletionItem> items = Collections.emptyList();
@@ -58,31 +67,31 @@ public class RemoteRepositoryTest {
 		} while (items.stream().map(CompletionItem::getLabel).noneMatch(expectedLabel::equals));
 	}
 
-	@Test(timeout=15000)
+	@Test
 	public void testRemoteGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-groupId-complete.xml", languageService), //
-				new Position(11, 20), "signaturacaib");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-groupId-complete.xml"), //
+				new Position(11, 20), "remote.repo.test");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 	
-	@Test(timeout=150000)
+	@Test
 	public void testRemoteArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-artifactId-complete.xml", languageService), //
-				new Position(12, 15), "signaturacaib.core - signaturacaib:signaturacaib.core:3.3.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-artifactId-complete.xml"), //
+				new Position(12, 15), "test1-jar - remote.repo.test:test1-jar:2.0.0");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 	
-	@Test(timeout=15000)
+	@Test
 	public void testRemoteVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-version-complete.xml", languageService), //
-				new Position(13, 13), "3.3.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-version-complete.xml"), //
+				new Position(13, 13), "1.0.0");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
 	@Test(timeout=15000)
  	public void testRemoteArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		String description = "A custom implementation of XPath 1.0 based upon apache commons jxpath 1.3";
-		final DOMDocument document = createDOMDocument("/pom-remote-artifact-hover.xml", languageService);
+		String description = "This is a test description for test1";
+		final DOMDocument document = createDOMDocument("/pom-remote-artifact-hover.xml");
 		final Position position = new Position(14, 18);
  		Hover hover;
  		do {
@@ -92,69 +101,24 @@ public class RemoteRepositoryTest {
  		// if got out of the loop without timeout, then test is PASSED
 	}
 	
-	@Test(timeout=15000)
- 	public void testDownloadArtifactOnHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		languageService.initializeIfNeeded();
-		File mavenRepo = languageService.getExtensions().stream() //
-			.filter(MavenLemminxExtension.class::isInstance) //
-			.map(MavenLemminxExtension.class::cast) //
-			.findAny() //
-			.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
-			.get();
-		File artifactDirectory = new File(mavenRepo, "org/glassfish/jersey/project/2.19");
-		String description = "Jersey is the open source (under dual CDDL+GPL license) JAX-RS 2.0 (JSR 339)";
-		final DOMDocument document = createDOMDocument("/pom-remote-artifact-download-hover.xml", languageService);
-		final Position position = new Position(14, 18);
-		assertFalse(artifactDirectory.exists());
- 		Hover hover;
- 		do {
- 	 		hover = languageService.doHover(document, position, new SharedSettings());
- 	 		Thread.sleep(500);
- 		} while (hover == null);
- 		
- 		assertTrue(artifactDirectory.exists());
- 		assertTrue(artifactDirectory.listFiles().length > 0);
- 		assertTrue(hover.getContents().getRight().getValue().contains(description));
-	}
-	
-	@Test(timeout=15000)
- 	public void testDownloadNonCentralArtifactOnHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		languageService.initializeIfNeeded();
-		File mavenRepo = languageService.getExtensions().stream() //
-			.filter(MavenLemminxExtension.class::isInstance) //
-			.map(MavenLemminxExtension.class::cast) //
-			.findAny() //
-			.map(mavenLemminxPlugin -> mavenLemminxPlugin.getMavenSession().getRepositorySession().getLocalRepository().getBasedir())
-			.get();
-		
-		File artifactDirectory = new File(mavenRepo, "com/github/goxr3plus/java-stream-player/9.0.4");
-		final DOMDocument document = createDOMDocument("/pom-remote-artifact-non-central-download-hover.xml", languageService);
-		final Position position = new Position(14, 20);
-		assertFalse(artifactDirectory.exists());
- 		languageService.doHover(document, position, new SharedSettings());
- 		
- 		assertTrue(artifactDirectory.exists());
- 		assertTrue(artifactDirectory.listFiles().length > 0);
-	}
-	
-	@Test(timeout=15000)
+	@Test
 	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml", languageService), //
-				new Position(11, 14), "org.codehaus.mojo");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml"), //
+				new Position(11, 14), "remote.repo.test");
 		// if got out of the loop without timeout, then test is PASSED
 	}
 	
-	@Test(timeout=15000)
+	@Test
 	public void testRemotePluginArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-artifactId-complete.xml", languageService), //
-				new Position(12, 15), "deb-maven-plugin - org.codehaus.mojo:deb-maven-plugin:1.0-beta-1");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-artifactId-complete.xml"), //
+				new Position(12, 15), "test-maven-plugin - remote.repo.test:test-maven-plugin:1.0.0");
 		// if got out of the loop without timeout, then test is PASSED
 	}
 	
 	@Test
 	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml", languageService), //
-				new Position(13, 12), "1.0-beta-1");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml"), //
+				new Position(13, 12), "1.0.0");
 		// if got out of the loop without timeout, then test is PASSED
 	}
 

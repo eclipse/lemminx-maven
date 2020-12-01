@@ -14,7 +14,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.List;
-import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -27,17 +28,23 @@ public interface MavenLemminxTestsUtils {
 	public static TextDocumentItem createTextDocumentItem(String resourcePath) throws IOException, URISyntaxException {
 		return createTextDocumentItem(resourcePath, null);
 	}
-	
+
+	public static DOMDocument createDOMDocument(String resourcePath, Properties replacements, XMLLanguageService languageService) throws IOException, URISyntaxException {
+		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(resourcePath, replacements)), languageService.getResolverExtensionManager());
+	}
+
 	public static DOMDocument createDOMDocument(String resourcePath, XMLLanguageService languageService) throws IOException, URISyntaxException {
 		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(resourcePath)), languageService.getResolverExtensionManager());
 	}
 
-	public static TextDocumentItem createTextDocumentItem(String resourcePath, Map<String, String> replacements) throws IOException, URISyntaxException {
+	public static TextDocumentItem createTextDocumentItem(String resourcePath, Properties replacements) throws IOException, URISyntaxException {
 		URI uri = MavenLemminxTestsUtils.class.getResource(resourcePath).toURI();
 		File file = new File(uri);
-		String contents = new String(Files.readAllBytes(file.toPath()));
+		String contents = Files.readString(file.toPath());
 		if (replacements != null) {
-			replacements.forEach((key, value) -> contents.replaceAll(key, value));
+			for (Entry<Object, Object> entry : replacements.entrySet()) {
+				contents = contents.replaceAll((String)entry.getKey(), (String)entry.getValue());
+			}
 		}
 		return new TextDocumentItem(uri.toString(), "xml", 1, contents);
 	}

@@ -5,7 +5,7 @@
 
 	<groupId>org.eclipse.lemminx</groupId>
 	<artifactId>lemminx-maven</artifactId>
-	<version>0.2.0</version>
+	<version>0.2.0-SNAPSHOT</version>
 
 	<licenses>
 		<license>
@@ -94,8 +94,19 @@
 			</exclusions>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.maven.indexer</groupId>
+			<artifactId>indexer-cli</artifactId>
+			<version>6.0.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
 			<artifactId>wagon-http</artifactId>
+			<version>3.4.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.wagon</groupId>
+			<artifactId>wagon-file</artifactId>
 			<version>3.4.1</version>
 		</dependency>
 		<dependency>
@@ -112,13 +123,13 @@
 				<version>3.2.1</version>
 				<executions>
 					<execution>
-						<id>provision-test-repo</id>
+						<id>provision-test-localrepo</id>
 						<goals><goal>run</goal></goals>
 						<phase>generate-test-resources</phase>
 						<configuration>
 							<goals><goal>dependency:go-offline</goal></goals>
-							<localRepositoryPath>${project.build.directory}/testrepo</localRepositoryPath>
-							<pom>src/test/resources/pom-test-dependencies.xml</pom>
+							<localRepositoryPath>${project.build.directory}/testlocalrepo</localRepositoryPath>
+							<pom>src/test/resources/pom-localrepo-test-dependencies.xml</pom>
 						</configuration>
 					</execution>
 				</executions>
@@ -130,7 +141,8 @@
 				<configuration>
 					<systemPropertyVariables>
 						<lemminx.maven.indexDirectory>${lemminx.maven.indexDirectory}</lemminx.maven.indexDirectory>
-						<maven.repo.local>${project.build.directory}/testrepo</maven.repo.local>
+						<maven.repo.local>${project.build.directory}/testlocalrepo</maven.repo.local>
+						<remoteRepoURL>file:${basedir}/src/test/resources/remoteRepo</remoteRepoURL>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

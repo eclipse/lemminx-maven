@@ -9,7 +9,7 @@
 <build>
 	<plugins>
 		<plugin>
-			<groupId>org.</groupId>
+			<groupId>remote.repo.t</groupId>
 			<artifactId></artifactId>
 			<version></version>
 		</plugin>
@@ -17,9 +17,9 @@
 </build>
 	<repositories>
 		<repository>
-			<id>soffid</id>
+			<id>testRemoteRepo</id>
 			<layout>m2</layout>
-			<url>http://www.soffid.com/maven/</url>
+			<url>remoteRepoURL</url>
 		</repository>
 	</repositories>
 	

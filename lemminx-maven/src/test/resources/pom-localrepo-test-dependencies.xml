@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.eclipse.lemminx.maven.tests</groupId>
-	<artifactId>get-test-dependencies</artifactId>
+	<artifactId>get-localrep-test-dependencies</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	

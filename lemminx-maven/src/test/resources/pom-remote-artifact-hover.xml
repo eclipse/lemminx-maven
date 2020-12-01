@@ -11,16 +11,16 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>com.soffid.zkib</groupId>
-			<artifactId>jxpath</artifactId>
+			<groupId>remote.repo.test</groupId>
+			<artifactId>test1-jar</artifactId>
 		</dependency>
 	</dependencies>
 	
 	<repositories>
 		<repository>
-			<id>soffid</id>
+			<id>testRemoteRepo</id>
 			<layout>m2</layout>
-			<url>http://www.soffid.com/maven/</url>
+			<url>remoteRepoURL</url>
 		</repository>
 	</repositories>
 </project>

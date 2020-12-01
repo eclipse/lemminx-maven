@@ -9,17 +9,17 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>signaturacaib</groupId>
-			<artifactId>signaturacaib.core</artifactId>
-			<version>a</version>
+			<groupId>remote.repo.test</groupId>
+			<artifactId>test2-jar</artifactId>
+			<version>1</version>
 		</dependency>
 	</dependencies>
 
 	<repositories>
 		<repository>
-			<id>soffid</id>
+			<id>testRemoteRepo</id>
 			<layout>m2</layout>
-			<url>http://www.soffid.com/maven/</url>
+			<url>remoteRepoURL</url>
 		</repository>
 	</repositories>	
 </project>

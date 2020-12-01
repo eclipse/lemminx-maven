@@ -141,9 +141,9 @@ public class SimpleModelTest {
 	public void testCompletionEnvironmentVariableProperty()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
-		List<CompletionItem> completions = languageService.doComplete(document, new Position(16, 54), new SharedSettings()).getItems();
+		List<CompletionItem> completions = languageService.doComplete(document, new Position(16, 49), new SharedSettings()).getItems();
 		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
-				.anyMatch("${env.JAVA_HOME}"::equals));
+				.anyMatch("${env.PATH}"::equals));
 	}
 
 	@Test(timeout=15000)

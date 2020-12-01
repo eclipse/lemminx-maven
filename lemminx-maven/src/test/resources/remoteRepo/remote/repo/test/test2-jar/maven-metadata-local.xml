@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>remote.repo.test</groupId>
+  <artifactId>test2-jar</artifactId>
+  <versioning>
+    <release>1.0.0</release>
+    <versions>
+      <version>1.0.0</version>
+    </versions>
+    <lastUpdated>20201201172743</lastUpdated>
+  </versioning>
+</metadata>

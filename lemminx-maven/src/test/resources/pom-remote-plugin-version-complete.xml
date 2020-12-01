@@ -9,17 +9,17 @@
 <build>
 	<plugins>
 		<plugin>
-			<groupId>org.codehaus.mojo</groupId>
-			<artifactId>deb-maven-plugin</artifactId>
+			<groupId>remote.repo.test</groupId>
+			<artifactId>test1-maven-plugin</artifactId>
 			<version></version>
 		</plugin>
 	</plugins>
 </build>
 	<repositories>
 		<repository>
-			<id>soffid</id>
+			<id>testRemoteRepo</id>
 			<layout>m2</layout>
-			<url>http://www.soffid.com/maven/</url>
+			<url>remoteRepoURL</url>
 		</repository>
 	</repositories>
 	

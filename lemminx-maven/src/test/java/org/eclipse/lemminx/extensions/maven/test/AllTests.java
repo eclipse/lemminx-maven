@@ -21,7 +21,8 @@ import org.junit.runners.Suite.SuiteClasses;
 	MavenProjectCacheTest.class, //
 	LocalPluginTest.class, //
 	PluginResolutionTest.class, //
-	RemoteRepositoryTest.class, //
+	IndexBasedAssistanceTest.class, //
+	DownloadArtifactsTest.class, //
 	SimpleModelTest.class, //
 	PathsTest.class, //
 	MatchTest.class})
