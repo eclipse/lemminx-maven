@@ -2,12 +2,32 @@
 
 ## Upcoming Release
 
-### 0.1.2
 
-* 📅 Release Date (tentative): Early December 2020
-* All changes: https://github.com/eclipse/lemminx-maven/compare/0.1.1...0.1.2
 
 ## Latest Release
+
+### 0.2.0
+
+* 📅 Release Date (tentative): December 1st, 2020
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.1.1...0.2.0
+
+#### Important fixes
+
+Some important fixes took place, mainly in project initialization and resolution. It should notably almost annihilate the occurrences of "false-positive" diagnostics about unresolved Maven plugins.
+
+#### Better index management
+
+Index of Maven repositories are now only downloaded on request, not on initialization. This allows to keep good performance of LemMinX in general, without extra CPU cycles when editing unrelated XML files, or unrelated pom.xml parts.
+
+A new initialization/workspace setting option is available to skip download of index files. It's `maven.index.skip`.
+
+#### Support LemMinX 0.14.x
+
+LemMinX-Maven is an extension for LemMinX 0.14.x; it's currently built and tested against LemMinX 0.14.1.
+
+#### Available as "zip-with-dependencies"
+
+This extension is published via Maven and now includes a `-zip-with-dependencies.zip` artifact, which is convenient to use for some integrations.
 
 ### 0.1.1
 
