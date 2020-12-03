@@ -142,7 +142,7 @@
 					<systemPropertyVariables>
 						<lemminx.maven.indexDirectory>${lemminx.maven.indexDirectory}</lemminx.maven.indexDirectory>
 						<maven.repo.local>${project.build.directory}/testlocalrepo</maven.repo.local>
-						<remoteRepoURL>file:${basedir}/src/test/resources/remoteRepo</remoteRepoURL>
+						<remoteRepoURL>file://${basedir}/src/test/resources/remoteRepo</remoteRepoURL>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

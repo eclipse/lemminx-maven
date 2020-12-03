@@ -53,7 +53,7 @@ public class IndexBasedAssistanceTest {
 		Properties props = new Properties();
 		String remoteRepoURL = System.getProperty("remoteRepoURL");
 		if (remoteRepoURL != null) {
-			props.put("remoteRepoURL", remoteRepoURL);
+			props.put("remoteRepoURL", remoteRepoURL.replace('\\', '/'));
 		}
 		return MavenLemminxTestsUtils.createDOMDocument(path,props, languageService);
 	}
