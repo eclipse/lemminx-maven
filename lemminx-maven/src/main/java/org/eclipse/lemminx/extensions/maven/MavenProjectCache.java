@@ -152,6 +152,8 @@ public class MavenProjectCache {
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
 				if (e.getCause() instanceof ModelBuildingException) {
+					// Try to manually build a minimal project from the document to collect lower-level
+					// errors and to have something usable in cache for most basic operations
 					ModelBuildingException modelBuildingException = (ModelBuildingException) e.getCause();
 					problems.addAll(modelBuildingException.getProblems());
 					File file = new File(uri);
@@ -173,8 +175,11 @@ public class MavenProjectCache {
 						project.setBuild(new Build());
 						projectCache.put(uri, project);
 						projectParsedListeners.forEach(listener -> listener.accept(project));
-					} catch (IOException | XmlPullParserException e1) {
-						LOGGER.log(Level.SEVERE, e1.getMessage(), e1);
+					} catch (XmlPullParserException parserException) {
+						// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
+						// exceptions
+					} catch (IOException ex) {
+						LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 					}
 				} else {
 					problems.add(
@@ -192,7 +197,6 @@ public class MavenProjectCache {
 				}
 			}
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
 		}
 
