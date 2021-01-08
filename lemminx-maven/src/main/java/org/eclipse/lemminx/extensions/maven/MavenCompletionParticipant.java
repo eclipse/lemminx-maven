@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,6 +76,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenCompletionParticipant.class.getName());
+	private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("[-.a-zA-Z0-9]+");
 
 	static interface GAVInsertionStrategy {
 		/**
@@ -320,8 +322,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						}).forEach(response::addCompletionItem);
 		}
 		if (!allArtifactInfos.isEmpty()) {
-			Comparator<ArtifactInfo> artifactInfoComparator = Comparator.comparing(artifact -> new DefaultArtifactVersion(artifact.getVersion()))/*.thenComparing(ArtifactInfo::getDescription)*/;
-			final Comparator<ArtifactInfo> highestVersionWithDescriptionComparator = artifactInfoComparator.thenComparing(artifactInfo -> artifactInfo.getDescription() != null ? artifactInfo.getDescription() : "");
+			Comparator<ArtifactInfo> artifactInfoComparator = Comparator.comparing(artifact -> new DefaultArtifactVersion(artifact.getVersion()));
+			final Comparator<ArtifactInfo> highestVersionWithDescriptionComparator = artifactInfoComparator
+					.thenComparing(
+							artifactInfo -> artifactInfo.getDescription() != null ? artifactInfo.getDescription() : "");
 			allArtifactInfos.stream()
 					.collect(Collectors.groupingBy(artifact -> artifact.getGroupId() + ":" + artifact.getArtifactId()))
 					.values()
@@ -432,16 +436,20 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		if (artifactInfo.getDescription() != null) {
 			item.setDocumentation(artifactInfo.getDescription());
 		}
+		DOMDocument doc = request.getXMLDocument();
+		Range replaceRange = doc.getTextDocument().getWordRangeAt(request.getOffset(), ARTIFACT_ID_PATTERN);
+
 		TextEdit textEdit = new TextEdit();
 		item.setTextEdit(textEdit);
-		textEdit.setRange(request.getReplaceRange());
+		textEdit.setRange(replaceRange);
 		if (strategy == GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING) {
 			item.setKind(CompletionItemKind.Value);
-			textEdit.setRange(request.getReplaceRange());
+			textEdit.setRange(replaceRange);
 			switch (request.getParentElement().getLocalName()) {
 				case "artifactId":
 					item.setLabel(artifactInfo.getArtifactId() + (insertGroupId || insertVersion ? " - " + artifactInfo.getGroupId() + ":" + artifactInfo.getArtifactId() + ":" + artifactInfo.getVersion() : ""));
 					textEdit.setNewText(artifactInfo.getArtifactId());
+					item.setFilterText(artifactInfo.getArtifactId());
 					List<TextEdit> additionalEdits = new ArrayList<>(2);
 					if (insertGroupId) {
 						Position insertionPosition;
@@ -479,8 +487,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		} else {
 			item.setLabel(artifactInfo.getArtifactId() + " - " + artifactInfo.getGroupId() + ":" + artifactInfo.getArtifactId() + ":" + artifactInfo.getVersion());
 			item.setKind(CompletionItemKind.Struct);
+			item.setFilterText(artifactInfo.getArtifactId());
 			try {
-				textEdit.setRange(request.getReplaceRange());
+				textEdit.setRange(replaceRange);
 				String newText = "";
 				String suffix = "";
 				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
@@ -578,18 +587,22 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
 						switch (node.getLocalName()) {
 							case "groupId":
-								// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean parameter
+								// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
+								// parameter
 								if (onlyPlugins) {
 									indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
-											.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+											.map(groupId -> toCompletionItem(groupId, null, range))
+											.forEach(nonArtifactCollector::addCompletionItem);
 								} else {
 									indexSearcher.getGroupIds(artifactToSearch, index).stream()
-											.map(groupId -> toCompletionItem(groupId, null, range)).forEach(nonArtifactCollector::addCompletionItem);
+											.map(groupId -> toCompletionItem(groupId, null, range))
+											.forEach(nonArtifactCollector::addCompletionItem);
 								}
 								return updatingItem;
 							case "artifactId":
 								if (onlyPlugins) {
-									artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+									artifactInfosCollector
+											.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
 								} else {
 									artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
 								}
@@ -611,10 +624,11 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 								return updatingItem;
 							case "plugins":
 							case "plugin":
-								artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+								artifactInfosCollector
+										.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
 								return updatingItem;
 						}
-						return (CompletionItem)null;
+						return (CompletionItem) null;
 					}).whenComplete((ok, error) -> updateItems.remove(ok));
 				}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
 			} catch (InterruptedException | ExecutionException exception) {
@@ -623,7 +637,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// nothing to log, some work still pending
 				updateItems.forEach(nonArtifactCollector::addCompletionItem);
 			}
-	});
+		});
 	}
 
 	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
