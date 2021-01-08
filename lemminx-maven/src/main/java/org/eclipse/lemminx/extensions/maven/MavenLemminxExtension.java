@@ -5,7 +5,7 @@
  * which is available at https://www.eclipse.org/legal/epl-2.0/
  *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  * Angelo Zerr <angelo.zerr@gmail.com> - initial API and implementation
  *******************************************************************************/
@@ -69,7 +69,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
 	private XMLExtensionsRegistry currentRegistry;
-	
+
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
@@ -92,14 +92,18 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (context.getType() == SaveContextType.SETTINGS) {
 			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes null on stop
 			stop(registry);
-			params.setInitializationOptions(context.getSettings());
+			if (params != null) {
+				params.setInitializationOptions(context.getSettings());
+			}
 			start(params, registry);
 		}
 	}
 
 	@Override
 	public void start(InitializeParams params, XMLExtensionsRegistry registry) {
-		this.params = params;
+		if (params != null) {
+			this.params = params;
+		}
 		this.currentRegistry = registry;
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
@@ -303,12 +307,12 @@ public class MavenLemminxExtension implements IXMLExtension {
 		initialize();
 		return localRepositorySearcher;
 	}
-	
+
 	public MavenPluginManager getMavenPluginManager() {
 		initialize();
 		return mavenPluginManager;
 	}
-	
+
 	public Optional<RemoteRepositoryIndexSearcher> getIndexSearcher() {
 		initialize();
 		return Optional.ofNullable(indexSearcher);
