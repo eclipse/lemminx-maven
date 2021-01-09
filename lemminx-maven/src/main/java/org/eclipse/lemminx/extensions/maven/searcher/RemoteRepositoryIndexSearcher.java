@@ -266,15 +266,18 @@ public class RemoteRepositoryIndexSearcher {
 		});
 	}
 
-	private IndexingContext initializeContext(URI repoUrl) {
-		String fileSystemFriendlyName = repoUrl.getHost() + repoUrl.hashCode();
-		File repoFile = new File(indexPath, fileSystemFriendlyName + "-cache");
-		File repoIndex = new File(indexPath, fileSystemFriendlyName + "-index");
+	private IndexingContext initializeContext(URI repositoryURI) {
+		String repositoryId = repositoryURI.toString();
+		String fileSystemFriendlyName = repositoryURI.getHost() + repositoryURI.hashCode();
+		File repositoryFile = new File(indexPath, fileSystemFriendlyName + "-cache");
+		File indexDirectory = new File(indexPath, fileSystemFriendlyName + "-index");
 		try {
-			return indexer.createIndexingContext(repoUrl.toString(), repoUrl.toString(),
-					repoFile, repoIndex, repoUrl.toString(), null, true, true, indexers);
+			return indexer.createIndexingContext(repositoryId, repositoryId, repositoryFile, indexDirectory,
+					repositoryId, null, true, true, indexers);
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE,
+					"Error while creating indexing context with repository ID={0}, directory={1} in index directory={2}.",
+					new Object[] { e, repositoryId, repositoryFile.getPath(), indexDirectory.getPath() });
 		}
 		return null;
 	}
