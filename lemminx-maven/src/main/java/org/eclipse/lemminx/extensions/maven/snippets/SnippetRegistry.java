@@ -71,7 +71,7 @@ public class SnippetRegistry {
 				whitespacesIndent = StringUtils.getStartWhitespaces(lineText);
 			} catch (BadLocationException e) {
 				// TODO Auto-generated catch block
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 		}
 
@@ -140,7 +140,7 @@ public class SnippetRegistry {
 				item.setInsertTextFormat(InsertTextFormat.Snippet);
 				return item;
 			} catch (BadLocationException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 				return null;
 			}
 

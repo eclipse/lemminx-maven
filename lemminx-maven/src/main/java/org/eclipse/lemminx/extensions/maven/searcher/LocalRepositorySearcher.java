@@ -73,7 +73,7 @@ public class LocalRepositorySearcher {
 						key.reset();
 					}
 				} catch (InterruptedException e) {
-					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
 				}
 			}).start();
 			cache.put(localRepository, res);
@@ -136,7 +136,7 @@ public class LocalRepositorySearcher {
 			try {
 				watchService.close();
 			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 			watchKey = null;
 			watchService = null;

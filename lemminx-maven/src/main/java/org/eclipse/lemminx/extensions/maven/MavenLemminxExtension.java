@@ -145,7 +145,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			stop(currentRegistry);
 		}
 	}

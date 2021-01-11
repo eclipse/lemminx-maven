@@ -37,7 +37,7 @@ public class VersionValidator {
 						.singletonList(diagnosticRequest.createDiagnostic("Version Error", DiagnosticSeverity.Error)));
 			}
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return Optional.empty();
 	}

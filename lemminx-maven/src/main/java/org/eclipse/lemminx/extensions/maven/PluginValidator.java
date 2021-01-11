@@ -40,7 +40,7 @@ public class PluginValidator {
 		try {
 			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.WARNING, e.getCause().toString(), e);
+			LOGGER.log(Level.WARNING, "Could not resolve plugin description", e);
 
 			// Add artifactId diagnostic
 			String errorMessage = e.getMessage();
@@ -77,7 +77,7 @@ public class PluginValidator {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			// A diagnostic was already added in validatePluginResolution()
 		}
 		if (parameters.isEmpty()) {
@@ -115,7 +115,7 @@ public class PluginValidator {
 				}
 			} catch (PluginResolutionException | PluginDescriptorParsingException
 					| InvalidPluginDescriptorException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 				// A diagnostic was already added in validatePluginResolution()
 			}
 		}
