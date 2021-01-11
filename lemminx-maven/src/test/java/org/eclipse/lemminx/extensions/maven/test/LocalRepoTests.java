@@ -9,7 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.test;
 
 import static org.eclipse.lemminx.extensions.maven.test.MavenLemminxTestsUtils.createDOMDocument;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -20,41 +20,47 @@ import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class LocalRepoTests {
 
 
 	private XMLLanguageService languageService;
 
-	@Before
+	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() throws InterruptedException, ExecutionException {
 		languageService.dispose();
 		languageService = null;
 	}
 
-	@Test(timeout=90000)
+	@Test
+	@Timeout(90000)
 	public void testCompleteDependency()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-with-dependency.xml", languageService), new Position(11, 7), new SharedSettings())
 				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("org.apache.maven:maven-core")));
 	}
 
-	@Test(timeout=90000)
+	@Test
+	@Timeout(90000)
 	public void testCompleteLocalGroupdId()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-local-groupId-complete.xml", languageService), new Position(11, 12), new SharedSettings())
 				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("org.apache.maven")));
 	}
-	
-	@Test(timeout=90000)
+
+	@Test
+	@Timeout(90000)
 	public void testDoNotCompleteNonExistingArtifact()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-non-existing-dep.xml", languageService), new Position(10, 27), new SharedSettings())

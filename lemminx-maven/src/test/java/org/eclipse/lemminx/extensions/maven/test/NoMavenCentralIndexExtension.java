@@ -9,27 +9,14 @@
 package org.eclipse.lemminx.extensions.maven.test;
 
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteRepositoryIndexSearcher;
-import org.junit.BeforeClass;
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-import org.junit.runners.Suite.SuiteClasses;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
-@RunWith(Suite.class)
-@SuiteClasses({ // 
-	LocalRepoTests.class, //
-	MavenParseUtilsTest.class, //
-	MavenProjectCacheTest.class, //
-	LocalPluginTest.class, //
-	PluginResolutionTest.class, //
-	IndexBasedAssistanceTest.class, //
-	DownloadArtifactsTest.class, //
-	SimpleModelTest.class, //
-	PathsTest.class, //
-	MatchTest.class})
-public class AllTests {
+public class NoMavenCentralIndexExtension implements BeforeAllCallback {
 
-	@BeforeClass
-	public static void skipCentral() {
+	@Override
+	public void beforeAll(ExtensionContext arg0) throws Exception {
 		RemoteRepositoryIndexSearcher.disableCentralIndex = true;
-	};
+	}
+
 }

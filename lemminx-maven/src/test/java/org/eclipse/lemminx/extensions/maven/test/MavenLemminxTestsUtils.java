@@ -24,7 +24,7 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.TextDocumentItem;
 
 public interface MavenLemminxTestsUtils {
-	
+
 	public static TextDocumentItem createTextDocumentItem(String resourcePath) throws IOException, URISyntaxException {
 		return createTextDocumentItem(resourcePath, null);
 	}
