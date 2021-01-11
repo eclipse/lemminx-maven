@@ -9,12 +9,12 @@
 package org.eclipse.lemminx.extensions.maven.test;
 
 import static org.eclipse.lemminx.extensions.maven.test.MavenLemminxTestsUtils.createDOMDocument;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -44,30 +44,32 @@ import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class SimpleModelTest {
 
-	public @Rule TestRule noCentralIndexRule = new NoMavenCentralIndexTestRule();
-	
 	private XMLLanguageService languageService;
 
-	@Before
+	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() throws InterruptedException, ExecutionException {
 		languageService.dispose();
 		languageService = null;
 	}
 
-	@Test(timeout=10000)
+	@Test
+	@Timeout(10000)
 	public void testScopeCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		CompletionList completion = languageService.doComplete(createDOMDocument("/pom-with-module-error.xml", languageService),
 				new Position(12, 10), new SharedSettings());
@@ -75,7 +77,8 @@ public class SimpleModelTest {
 	}
 
 
-	@Test(timeout=10000)
+	@Test
+	@Timeout(10000)
 	public void testPropertyCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		CompletionList completion = languageService.doComplete(createDOMDocument("/pom-with-properties.xml", languageService),
@@ -85,14 +88,16 @@ public class SimpleModelTest {
 	}
 
 
-	@Test(timeout=10000)
+	@Test
+	@Timeout(10000)
 	public void testParentPropertyCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-with-properties-in-parent.xml", languageService), new Position(15, 20), new SharedSettings())
 				.getItems().stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains("myProperty")));
 	}
 
-	@Test(timeout=15000)
+	@Test
+	@Timeout(15000)
 	public void testLocalParentGAVCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, TimeoutException {
 		// * if relativePath is set and resolve to a pom or a folder containing a pom, GAV must be available for completion
@@ -119,7 +124,7 @@ public class SimpleModelTest {
 		document = DOMParser.getInstance().parse(textDocument, languageService.getResolverExtensionManager());
 		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
 	}
-	
+
 	@Test
 	public void testSystemPathDiagnosticBug()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -127,7 +132,7 @@ public class SimpleModelTest {
 		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {});
 		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("${env")));
 	}
-	
+
 	@Test
 	public void testEnvironmentVariablePropertyHover()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -136,7 +141,7 @@ public class SimpleModelTest {
 		// We can't test the value of an environment variable as it is platform-dependent
 		assertNotNull(hoverContents);
 	}
-	
+
 	@Test
 	public void testCompletionEnvironmentVariableProperty()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -146,7 +151,8 @@ public class SimpleModelTest {
 				.anyMatch("${env.PATH}"::equals));
 	}
 
-	@Test(timeout=15000)
+	@Test
+	@Timeout(15000)
 	public void testCompleteScope() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-scope.xml", languageService);
 		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
@@ -155,7 +161,8 @@ public class SimpleModelTest {
 				.anyMatch("compile</scope>"::equals));
 	}
 
-	@Test(timeout=15000)
+	@Test
+	@Timeout(15000)
 	public void testCompletePhase() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-phase.xml", languageService);
 		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
@@ -163,7 +170,7 @@ public class SimpleModelTest {
 		assertTrue(languageService.doComplete(document, new Position(1, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
 				.anyMatch("generate-resources</phase>"::equals));
 	}
-	
+
 	@Test
  	public void testPropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
@@ -176,14 +183,14 @@ public class SimpleModelTest {
  		hover = languageService.doHover(document, new Position(15, 13), new SharedSettings());
  		assertNull(hover);
 	}
-	
+
 	@Test
  	public void testPropertyDefinitionSameDocument() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
 		Position pos = new Position(14, 22);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		DOMDocument targetDocument = document;
 		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "myProperty").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);;
 		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
@@ -191,7 +198,7 @@ public class SimpleModelTest {
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
 	}
-	
+
 	@Test
  	public void testMultiplePropertyHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-multiple-properties.xml", languageService);
@@ -199,14 +206,14 @@ public class SimpleModelTest {
 		Hover hover = languageService.doHover(document,pos, new SharedSettings());
 		Range firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("$")));
- 		
+
  		pos = new Position(16, 21);
  		hover = languageService.doHover(document,pos, new SharedSettings());
  		Range secondHoverRange = hover.getRange();
   		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("test")));
   		assertFalse(firstHoverRange.equals(secondHoverRange));
 	}
-	
+
 	@Test
 	public void testMultiplePropertyDefinitionRangeSameTag()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -233,16 +240,16 @@ public class SimpleModelTest {
 		assertFalse(firstDefinitionRange.equals(parentNodeRange));
 		assertFalse(secondDefinitionRange.equals(parentNodeRange));
 	}
-	
+
 	@Test
  	public void testPropertyDefinitionSameDocumentBug() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-definition-wrong-tag-bug.xml", languageService);
 		Position pos = new Position(22, 40);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		DOMDocument targetDocument = document;
-		
+
 		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "lemminx.maven.indexDirectory").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);
 		assertTrue(propertyNode.getParentNode().getLocalName().equals("properties"));
 		Range expectedTargetRange = XMLPositionUtility.createRange(propertyNode);
@@ -250,14 +257,14 @@ public class SimpleModelTest {
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
 	}
-	
+
 	@Test
  	public void testPropertyDefinitionParentDocument() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		Position pos = new Position(23, 16);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		//Verify the LocationLink points to the right file and node
 		DOMDocument targetDocument = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
 		DOMNode propertyNode = DOMUtils.findNodesByLocalName(targetDocument, "myProperty").stream().filter(node -> node.getParentElement().getLocalName().equals("properties")).collect(Collectors.toList()).get(0);;
@@ -266,36 +273,36 @@ public class SimpleModelTest {
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetRange().equals(expectedTargetRange)));
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetSelectionRange().equals(expectedTargetRange)));
 	}
-	
+
 	@Test
 	public void testModuleDefinition() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-module-definition.xml", languageService);
 		Position pos = new Position(11, 5);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		DOMDocument targetDocument = createDOMDocument("/multi-module/pom.xml", languageService);
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
 	}
-	
+
 	@Test
 	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		Position pos = new Position(6, 9);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		DOMDocument targetDocument = createDOMDocument("/pom-with-properties-for-definition.xml", languageService);
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
 	}
-	
+
 	@Test
 	public void testParentDefinitionWithoutRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/multi-module/folder1/pom.xml", languageService);
 		Position pos = new Position(6, 9);
 		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
 		});
-		
+
 		DOMDocument targetDocument = createDOMDocument("/multi-module/pom.xml", languageService);
 		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
 	}

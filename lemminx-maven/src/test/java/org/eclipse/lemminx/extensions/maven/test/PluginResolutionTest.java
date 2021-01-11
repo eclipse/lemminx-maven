@@ -9,8 +9,8 @@
 package org.eclipse.lemminx.extensions.maven.test;
 
 import static org.eclipse.lemminx.extensions.maven.test.MavenLemminxTestsUtils.createDOMDocument;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,22 +29,20 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class PluginResolutionTest {
-
-	@Rule
-	public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
 	private XMLLanguageService languageService;
 
 	private File initialMavenPluginApiDirectory;
 	private File movedMavenPluginApiDirectory;
 
-	@Before
+	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 		languageService.initializeIfNeeded();
@@ -64,7 +62,7 @@ public class PluginResolutionTest {
 		FileUtils.deleteDirectory(initialMavenPluginApiDirectory);
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() throws InterruptedException, ExecutionException, IOException {
 		languageService.dispose();
 		languageService = null;
@@ -79,14 +77,14 @@ public class PluginResolutionTest {
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertFalse(initialMavenPluginApiDirectory.exists());
 		// <compilerArguments> hover
-		
+
 		SharedSettings settings = new SharedSettings();
 		HoverCapabilities hover = new HoverCapabilities();
 		String capabilities[] = { MarkupKind.MARKDOWN };
 		hover.setContentFormat(Arrays.asList(capabilities));
-		
+
 		settings.getHoverSettings().setCapabilities(hover);
-		
+
 		String hoverContents = languageService
 				.doHover(createDOMDocument("/pom-plugin-nested-configuration-hover.xml", languageService),
 						new Position(15, 8), settings)
@@ -94,7 +92,7 @@ public class PluginResolutionTest {
 		assertTrue(hoverContents.contains("**Type:** List&lt;String&gt;"));
 		assertTrue(hoverContents.contains("Sets the arguments to be passed to the compiler"));
 	}
-	
+
 	@Test
     public void testPluginGoalValidationWithPluginWithJDKProfiles()
             throws IOException, InterruptedException, ExecutionException, URISyntaxException {
@@ -102,10 +100,10 @@ public class PluginResolutionTest {
         MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
         languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
         List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-plugin-goal-resolution.xml", languageService),
-                new XMLValidationSettings(), 
+                new XMLValidationSettings(),
                 () -> {});
-        
-        assertTrue("No validation error or warning found", diagnostics.isEmpty());
+
+        assertTrue(diagnostics.isEmpty(), "No validation error or warning found");
     }
 
 }

@@ -9,7 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.test;
 
 import static org.eclipse.lemminx.extensions.maven.test.MavenLemminxTestsUtils.createDOMDocument;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,24 +20,22 @@ import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Position;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class PathsTest {
 
-	public @Rule TestRule noCentralIndexRule = new NoMavenCentralIndexTestRule();
-	
 	private XMLLanguageService languageService;
 
-	@Before
+	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() throws InterruptedException, ExecutionException {
 		languageService.dispose();
 		languageService = null;

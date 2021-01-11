@@ -8,10 +8,6 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.test;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -20,31 +16,30 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
-import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class IndexBasedAssistanceTest {
-
-	@Rule public NoMavenCentralIndexTestRule rule = new NoMavenCentralIndexTestRule();
 
 	private XMLLanguageService languageService;
 
-	@Before
-	public  void setUp() throws IOException {
+	@BeforeEach
+	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
 	}
 
-	@After
-	public  void tearDown() throws InterruptedException, ExecutionException {
+	@AfterEach
+	public void tearDown() throws InterruptedException, ExecutionException {
 		languageService.dispose();
 		languageService = null;
 	}
@@ -55,10 +50,11 @@ public class IndexBasedAssistanceTest {
 		if (remoteRepoURL != null) {
 			props.put("remoteRepoURL", remoteRepoURL.replace('\\', '/'));
 		}
-		return MavenLemminxTestsUtils.createDOMDocument(path,props, languageService);
+		return MavenLemminxTestsUtils.createDOMDocument(path, props, languageService);
 	}
 
-	private void loopUntilCompletionItemFound(DOMDocument document, Position position, String expectedLabel) throws InterruptedException {
+	private void loopUntilCompletionItemFound(DOMDocument document, Position position, String expectedLabel)
+			throws InterruptedException {
 		final SharedSettings settings = new SharedSettings();
 		List<CompletionItem> items = Collections.emptyList();
 		do {
@@ -68,55 +64,63 @@ public class IndexBasedAssistanceTest {
 	}
 
 	@Test
-	public void testRemoteGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemoteGroupIdCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-groupId-complete.xml"), //
 				new Position(11, 20), "remote.repo.test");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
-	
+
 	@Test
-	public void testRemoteArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemoteArtifactIdCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-artifactId-complete.xml"), //
 				new Position(12, 15), "test1-jar - remote.repo.test:test1-jar:2.0.0");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
-	
+
 	@Test
-	public void testRemoteVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemoteVersionCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-version-complete.xml"), //
 				new Position(13, 13), "1.0.0");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
-	@Test(timeout=15000)
- 	public void testRemoteArtifactHover() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	@Test
+	@Timeout(15000)
+	public void testRemoteArtifactHover()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		String description = "This is a test description for test1";
 		final DOMDocument document = createDOMDocument("/pom-remote-artifact-hover.xml");
 		final Position position = new Position(14, 18);
- 		Hover hover;
- 		do {
- 	 		hover = languageService.doHover(document, position, new SharedSettings());
- 	 		Thread.sleep(500);
- 		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
- 		// if got out of the loop without timeout, then test is PASSED
+		Hover hover;
+		do {
+			hover = languageService.doHover(document, position, new SharedSettings());
+			Thread.sleep(500);
+		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
+		// if got out of the loop without timeout, then test is PASSED
 	}
-	
+
 	@Test
-	public void testRemotePluginGroupIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemotePluginGroupIdCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml"), //
 				new Position(11, 14), "remote.repo.test");
 		// if got out of the loop without timeout, then test is PASSED
 	}
-	
+
 	@Test
-	public void testRemotePluginArtifactIdCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemotePluginArtifactIdCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-artifactId-complete.xml"), //
 				new Position(12, 15), "test-maven-plugin - remote.repo.test:test-maven-plugin:1.0.0");
 		// if got out of the loop without timeout, then test is PASSED
 	}
-	
+
 	@Test
-	public void testRemotePluginVersionCompletion() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+	public void testRemotePluginVersionCompletion()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml"), //
 				new Position(13, 12), "1.0.0");
 		// if got out of the loop without timeout, then test is PASSED

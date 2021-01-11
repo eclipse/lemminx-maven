@@ -8,8 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.test;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,10 +24,12 @@ import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MavenProjectCache;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.google.common.io.Files;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class MavenProjectCacheTest {
 
 	@Test
@@ -40,7 +42,7 @@ public class MavenProjectCacheTest {
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
 	}
-	
+
 	@Test
 	public void testOnBuildError_ResolveProjectFromDocumentBytes() throws Exception {
 		URI uri = getClass().getResource("/pom-with-module-error.xml").toURI();
@@ -60,7 +62,7 @@ public class MavenProjectCacheTest {
 		MavenProjectCache cache = plugin.getProjectCache();
 		DOMDocument doc = getDocument("/pom-with-properties-in-parent.xml");
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
-		assertTrue(project.getProperties().toString(), project.getProperties().containsKey("myProperty"));
+		assertTrue(project.getProperties().containsKey("myProperty"), project.getProperties().toString());
 		URI parentUri = getClass().getResource("/pom-with-properties.xml").toURI();
 		File parentPomFile = new File(parentUri);
 		String initialContent = FileUtils.readFileToString(parentPomFile, "UTF-8");
@@ -69,7 +71,7 @@ public class MavenProjectCacheTest {
 			Files.write(content.getBytes(Charset.defaultCharset()), parentPomFile);
 			doc.getTextDocument().setVersion(2); // Simulate some change
 			MavenProject modifiedProject = cache.getLastSuccessfulMavenProject(doc);
-			assertTrue(modifiedProject.getProperties().toString(), modifiedProject.getProperties().containsKey("modifiedProperty"));
+			assertTrue(modifiedProject.getProperties().containsKey("modifiedProperty"), modifiedProject.getProperties().toString());
 		} finally {
 			Files.write(initialContent.getBytes(Charset.defaultCharset()), parentPomFile);
 		}

@@ -21,20 +21,35 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<lemminx.maven.indexDirectory>${project.build.directory}/test-index</lemminx.maven.indexDirectory>
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
-		<test>org.eclipse.lemminx.extensions.maven.test.AllTests</test>
+		<junit-jupiter.version>5.7.0</junit-jupiter.version>
+		<lemminx.version>0.14.1</lemminx.version>
 	</properties>
 
 	<dependencies>
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.13.1</version>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${junit-jupiter.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>${junit-jupiter.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.lemminx</groupId>
 			<artifactId>org.eclipse.lemminx</artifactId>
-			<version>0.14.1</version>
+			<version>${lemminx.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.lemminx</groupId>
+			<artifactId>org.eclipse.lemminx</artifactId>
+			<version>${lemminx.version}</version>
+			<scope>test</scope>
+			<classifier>tests</classifier>
+			<type>test-jar</type>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven</groupId>

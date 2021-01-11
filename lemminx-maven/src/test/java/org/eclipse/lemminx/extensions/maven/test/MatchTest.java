@@ -16,15 +16,19 @@ import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSetting
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lsp4j.Diagnostic;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(NoMavenCentralIndexExtension.class)
 public class MatchTest {
-	
+
 	@Test
 	public void testDoesntFailNonHierarchicalURIs() {
 		XMLLanguageService languageService = new XMLLanguageService();
-		DOMDocument doc = DOMParser.getInstance().parse("blah", "untitled:Untitled-1", new URIResolverExtensionManager());
-		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {});
+		DOMDocument doc = DOMParser.getInstance().parse("blah", "untitled:Untitled-1",
+				new URIResolverExtensionManager());
+		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {
+		});
 	}
 
 }
