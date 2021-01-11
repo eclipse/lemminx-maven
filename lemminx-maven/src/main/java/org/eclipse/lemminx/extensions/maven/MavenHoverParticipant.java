@@ -203,7 +203,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 				}
 			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return null;
 	}
@@ -214,7 +214,7 @@ public class MavenHoverParticipant implements IHoverParticipant {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, lemminxMavenPlugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return null;
 		}
 		DOMNode node = request.getNode();

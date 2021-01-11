@@ -97,7 +97,7 @@ public class RemoteRepositoryIndexSearcher {
 			indexers.add(plexusContainer.lookup(IndexCreator.class, "jarContent"));
 			indexers.add(plexusContainer.lookup(IndexCreator.class, PACKAGING_TYPE_MAVEN_PLUGIN));
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 	}
 
@@ -256,7 +256,7 @@ public class RemoteRepositoryIndexSearcher {
 				// another context is broken
 				indexDownloadJobs.remove(context);
 				CompletableFuture.runAsync(() -> {
-					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					throw new IllegalArgumentException(
 							"Invalid Context: " + context.getRepositoryId() + " @ " + context.getRepositoryUrl());
 				});

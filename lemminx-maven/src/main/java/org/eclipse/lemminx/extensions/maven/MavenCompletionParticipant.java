@@ -124,7 +124,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return null;
 		}
 
@@ -420,7 +420,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal, MojoDescriptor::getDescription, request);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return Collections.emptySet();
 	}
@@ -450,7 +450,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 							additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + "<groupId>" + artifactInfo.getGroupId() + "</groupId>"));
 						} catch (BadLocationException e) {
 							// TODO Auto-generated catch block
-							LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+							LOGGER.log(Level.SEVERE, e.getMessage(), e);
 						}
 					}
 					if (insertVersion) {
@@ -460,7 +460,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 							additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition), request.getLineIndentInfo().getLineDelimiter() + request.getLineIndentInfo().getWhitespacesIndent() + DOMUtils.getOneLevelIndent(request) + "<version>" + artifactInfo.getVersion() + "</version>"));
 						} catch (BadLocationException e) {
 							// TODO Auto-generated catch block
-							LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+							LOGGER.log(Level.SEVERE, e.getMessage(), e);
 						}
 					}
 					if (!additionalEdits.isEmpty()) {
@@ -542,7 +542,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 				return item;
 			} catch (BadLocationException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 				return toErrorCompletionItem(e);
 			}
 		}).collect(Collectors.toList());
@@ -666,7 +666,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			try {
 				prefixFile = prefixFile.getCanonicalFile();
 			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 			if (!prefix.endsWith("/")) {
 				final File thePrefixFile = prefixFile;
@@ -730,7 +730,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			}
 			replaceRange = new Range(start, end);
 		} catch (BadLocationException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 
 		String pathString = builder.toString();
@@ -751,7 +751,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				SnippetRegistry.getInstance()
 						.load(MavenCompletionParticipant.class.getResourceAsStream("pom-snippets.json"));
 			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 		} finally {
 			snippetsLoaded = true;

@@ -215,7 +215,7 @@ public class PlexusConfigHelper {
 			try {
 				cp = ClassPath.from(realm);
 			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 				return Collections.singletonList(enclosingClass);
 			}
 
@@ -224,7 +224,7 @@ public class PlexusConfigHelper {
 				try {
 					clazz = realm.loadClass(ci.getName());
 				} catch (ClassNotFoundException e) {
-					LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					continue;
 				}
 

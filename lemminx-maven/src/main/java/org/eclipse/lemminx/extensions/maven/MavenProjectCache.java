@@ -179,7 +179,7 @@ public class MavenProjectCache {
 						// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
 						// exceptions
 					} catch (IOException ex) {
-						LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+						LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					}
 				} else {
 					problems.add(
@@ -197,7 +197,7 @@ public class MavenProjectCache {
 				}
 			}
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 
 		lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
@@ -224,7 +224,7 @@ public class MavenProjectCache {
 			projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
 			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
 		} catch (ComponentLookupException e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 	}
 
