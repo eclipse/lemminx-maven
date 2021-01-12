@@ -44,6 +44,7 @@ import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinitionParticipant;
@@ -78,6 +79,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
 	private MavenDefinitionParticipant definitionParticipant;
+	private MavenWorkspaceService workspaceServiceParticipant;
 
 	private MavenProjectCache cache;
 	private RemoteRepositoryIndexSearcher indexSearcher;
@@ -113,6 +115,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
 			// Initialization will happen when calling getters.
+			workspaceServiceParticipant = new MavenWorkspaceService(this);
+			registry.registerWorkspaceServiceParticipant(workspaceServiceParticipant);
 			completionParticipant = new MavenCompletionParticipant(this);
 			registry.registerCompletionParticipant(completionParticipant);
 			diagnosticParticipant = new MavenDiagnosticParticipant(this);
@@ -203,6 +207,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		mavenRequest.setSystemProperties(System.getProperties());
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
+		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader());
 		return mavenRequest;
 	}
 
@@ -316,9 +321,16 @@ public class MavenLemminxExtension implements IXMLExtension {
 		initialize();
 		return mavenPluginManager;
 	}
-
+	
 	public Optional<RemoteRepositoryIndexSearcher> getIndexSearcher() {
 		initialize();
 		return Optional.ofNullable(indexSearcher);
+	}
+
+	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
+		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
+		if (workspaceReader instanceof MavenLemminxWorkspaceReader) {
+			// TODO
+		}
 	}
 }
