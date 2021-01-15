@@ -21,6 +21,8 @@ import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
+
 import com.google.common.base.Objects;
 
 // TODO: Make Maven bug about moving this upstream

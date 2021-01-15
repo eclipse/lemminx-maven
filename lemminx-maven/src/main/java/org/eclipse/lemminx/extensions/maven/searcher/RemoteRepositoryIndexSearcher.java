@@ -11,6 +11,7 @@ package org.eclipse.lemminx.extensions.maven.searcher;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -63,9 +64,11 @@ public class RemoteRepositoryIndexSearcher {
 	private static final String PACKAGING_TYPE_JAR = "jar";
 	private static final String PACKAGING_TYPE_MAVEN_PLUGIN = "maven-plugin";
 
-	public static final RemoteRepository CENTRAL_REPO = new RemoteRepository.Builder("central", "default", "https://repo.maven.apache.org/maven2").build();
+	public static final RemoteRepository CENTRAL_REPO = new RemoteRepository.Builder("central", "default",
+			"https://repo.maven.apache.org/maven2").build();
 
-	public static boolean disableCentralIndex = Boolean.parseBoolean(System.getProperty(RemoteRepositoryIndexSearcher.class.getName() + ".disableCentralIndex")) ;
+	public static boolean disableCentralIndex = Boolean
+			.parseBoolean(System.getProperty(RemoteRepositoryIndexSearcher.class.getName() + ".disableCentralIndex"));
 
 	private Indexer indexer;
 
@@ -80,13 +83,11 @@ public class RemoteRepositoryIndexSearcher {
 
 	private final PlexusContainer plexusContainer;
 
-	public RemoteRepositoryIndexSearcher(MavenLemminxExtension lemminxMavenPlugin, PlexusContainer plexusContainer, Optional<File> configuredIndexLocation) {
+	public RemoteRepositoryIndexSearcher(MavenLemminxExtension lemminxMavenPlugin, PlexusContainer plexusContainer,
+			Optional<File> configuredIndexLocation) {
 		this.plexusContainer = plexusContainer;
-		indexPath = Optional.ofNullable(System.getProperty("lemminx.maven.indexDirectory"))
-				.filter(Objects::nonNull)
-				.map(String::trim)
-				.filter(Predicate.not(String::isEmpty))
-				.map(File::new)
+		indexPath = Optional.ofNullable(System.getProperty("lemminx.maven.indexDirectory")).filter(Objects::nonNull)
+				.map(String::trim).filter(Predicate.not(String::isEmpty)).map(File::new)
 				.or(() -> configuredIndexLocation)
 				.orElse(new File(lemminxMavenPlugin.getMavenSession().getLocalRepository().getBasedir() + "/index"));
 		indexPath.mkdirs();
@@ -124,80 +125,95 @@ public class RemoteRepositoryIndexSearcher {
 		}
 	}
 
-	private Set<ArtifactVersion> internalGetArtifactVersions(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
+	private Set<ArtifactVersion> internalGetArtifactVersions(Dependency artifactToSearch, String packaging,
+			IndexingContext... requestSpecificContexts) {
 		if (artifactToSearch.getArtifactId() == null || artifactToSearch.getArtifactId().trim().isEmpty()) {
 			return Collections.emptySet();
 		}
 		BooleanQuery.Builder builder = new BooleanQuery.Builder();
 		if (artifactToSearch.getGroupId() != null) {
-			builder.add(indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.EXACT), Occur.MUST);
+			builder.add(indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.EXACT),
+					Occur.MUST);
 		}
-		builder.add(indexer.constructQuery(MAVEN.ARTIFACT_ID, artifactToSearch.getArtifactId(), SearchType.EXACT), Occur.SHOULD);
+		builder.add(indexer.constructQuery(MAVEN.ARTIFACT_ID, artifactToSearch.getArtifactId(), SearchType.EXACT),
+				Occur.SHOULD);
 		builder.add(indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT), Occur.MUST);
 		final BooleanQuery query = builder.build();
 
-		List<IndexingContext> contexts = Collections.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0 ?
-				Arrays.asList(requestSpecificContexts) :
-				new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = Collections
+				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
+						? Arrays.asList(requestSpecificContexts)
+						: new LinkedList<>(indexingContexts.values()));
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 
-		return createIndexerQuery(artifactToSearch, request).stream()
-				.map(ArtifactInfo::getVersion)
-				.map(DefaultArtifactVersion::new)
-				.sorted()
-				.collect(Collectors.toSet());
+		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getVersion)
+				.map(DefaultArtifactVersion::new).sorted().collect(Collectors.toSet());
 	}
 
-	public Set<ArtifactVersion> getArtifactVersions(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
+	public Set<ArtifactVersion> getArtifactVersions(Dependency artifactToSearch,
+			IndexingContext... requestSpecificContexts) {
 		return internalGetArtifactVersions(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
 	}
 
-	public Set<ArtifactVersion> getPluginArtifactVersions(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
+	public Set<ArtifactVersion> getPluginArtifactVersions(Dependency artifactToSearch,
+			IndexingContext... requestSpecificContexts) {
 		return internalGetArtifactVersions(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
 
-	private Collection<ArtifactInfo> internalGetArtifacts(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
+	private Collection<ArtifactInfo> internalGetArtifacts(Dependency artifactToSearch, String packaging,
+			IndexingContext... requestSpecificContexts) {
 		BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
 		if (artifactToSearch.getGroupId() != null) {
-			queryBuilder.add(indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.EXACT), Occur.MUST);
+			queryBuilder.add(indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.EXACT),
+					Occur.MUST);
 		}
 		if (artifactToSearch.getArtifactId() != null) {
-			queryBuilder.add(indexer.constructQuery(MAVEN.ARTIFACT_ID, artifactToSearch.getArtifactId(), SearchType.EXACT), Occur.MUST);
+			queryBuilder.add(
+					indexer.constructQuery(MAVEN.ARTIFACT_ID, artifactToSearch.getArtifactId(), SearchType.EXACT),
+					Occur.MUST);
 		}
 		queryBuilder.add(indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT), Occur.MUST);
 		final BooleanQuery query = queryBuilder.build();
-		List<IndexingContext> contexts = Collections.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0 ?
-				Arrays.asList(requestSpecificContexts) :
-				new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = Collections
+				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
+						? Arrays.asList(requestSpecificContexts)
+						: new LinkedList<>(indexingContexts.values()));
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 		return createIndexerQuery(artifactToSearch, request);
 	}
 
 	/**
-	 * @param artifactToSearch a CompletableFuture containing a {@code Map<String artifactId, String artifactDescription>}
+	 * @param artifactToSearch a CompletableFuture containing a
+	 *                         {@code Map<String artifactId, String artifactDescription>}
 	 * @return
 	 */
-	public Collection<ArtifactInfo> getArtifacts(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
+	public Collection<ArtifactInfo> getArtifacts(Dependency artifactToSearch,
+			IndexingContext... requestSpecificContexts) {
 		return internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
 	}
 
-	public Collection<ArtifactInfo> getPluginArtifacts(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
+	public Collection<ArtifactInfo> getPluginArtifacts(Dependency artifactToSearch,
+			IndexingContext... requestSpecificContexts) {
 		return internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN, requestSpecificContexts);
 	}
 
-	private Set<String> internalGetGroupIds(Dependency artifactToSearch, String packaging, IndexingContext... requestSpecificContexts) {
+	private Set<String> internalGetGroupIds(Dependency artifactToSearch, String packaging,
+			IndexingContext... requestSpecificContexts) {
 		final Query groupIdQ = indexer.constructQuery(MAVEN.GROUP_ID, artifactToSearch.getGroupId(), SearchType.SCORED);
 		final Query jarPackagingQ = indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT);
 		final BooleanQuery query = new BooleanQuery.Builder().add(groupIdQ, Occur.MUST).add(jarPackagingQ, Occur.MUST)
 				.build();
-		List<IndexingContext> contexts = Collections.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0 ?
-				Arrays.asList(requestSpecificContexts) :
-				new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = Collections
+				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
+						? Arrays.asList(requestSpecificContexts)
+						: new LinkedList<>(indexingContexts.values()));
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 		// TODO: Find the Count sweet spot
 		request.setCount(7500);
-		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getGroupId).collect(Collectors.toSet());
+		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getGroupId)
+				.collect(Collectors.toSet());
 	}
+
 	// TODO: Get groupid description for completion
 	public Set<String> getGroupIds(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
@@ -209,29 +225,34 @@ public class RemoteRepositoryIndexSearcher {
 
 	private CompletableFuture<Void> updateIndex(IndexingContext context) throws ComponentLookupException {
 		if (context == null) {
-			return CompletableFuture.runAsync(() -> { throw new IllegalArgumentException("context mustn't be null"); });
+			return CompletableFuture.runAsync(() -> {
+				throw new IllegalArgumentException("context mustn't be null");
+			});
 		}
-		if ((context.getId().equals("https://repo.maven.apache.org/maven2") || context.getId().equals(CENTRAL_REPO.getId()) || context.getId().contains("maven_central"))
+		if ((context.getId().equals("https://repo.maven.apache.org/maven2")
+				|| context.getId().equals(CENTRAL_REPO.getId()) || context.getId().contains("maven_central"))
 				&& disableCentralIndex) {
 			return CompletableFuture.runAsync(() -> LOGGER.log(Level.INFO, "Central repository index disabled"));
 		}
 		LOGGER.log(Level.INFO, "Updating Index for " + context.getRepositoryUrl() + "...");
 		Date contextCurrentTimestamp = context.getTimestamp();
-		ResourceFetcher resourceFetcher = new WagonHelper.WagonFetcher(plexusContainer.lookup(Wagon.class, URI.create(context.getIndexUpdateUrl()).getScheme()), new AbstractTransferListener() {
-			@Override
-			public void transferStarted(TransferEvent transferEvent) {
-				LOGGER.log(Level.INFO, "Downloading" + transferEvent.getResource().getName());
-			}
+		ResourceFetcher resourceFetcher = new WagonHelper.WagonFetcher(
+				plexusContainer.lookup(Wagon.class, URI.create(context.getIndexUpdateUrl()).getScheme()),
+				new AbstractTransferListener() {
+					@Override
+					public void transferStarted(TransferEvent transferEvent) {
+						LOGGER.log(Level.INFO, "Downloading" + transferEvent.getResource().getName());
+					}
 
-			@Override
-			public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
-			}
+					@Override
+					public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
+					}
 
-			@Override
-			public void transferCompleted(TransferEvent transferEvent) {
-				LOGGER.log(Level.INFO, "Done downloading "+ transferEvent.getResource().getName());
-			}
-		}, null, null);
+					@Override
+					public void transferCompleted(TransferEvent transferEvent) {
+						LOGGER.log(Level.INFO, "Done downloading " + transferEvent.getResource().getName());
+					}
+				}, null, null);
 
 		IndexUpdateRequest updateRequest = new IndexUpdateRequest(context, resourceFetcher);
 		return CompletableFuture.runAsync(() -> {
@@ -275,9 +296,9 @@ public class RemoteRepositoryIndexSearcher {
 			return indexer.createIndexingContext(repositoryId, repositoryId, repositoryFile, indexDirectory,
 					repositoryId, null, true, true, indexers);
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE,
+			LOGGER.log(Level.SEVERE, MessageFormat.format(
 					"Error while creating indexing context with repository ID={0}, directory={1} in index directory={2}.",
-					new Object[] { e, repositoryId, repositoryFile.getPath(), indexDirectory.getPath() });
+					repositoryId, repositoryFile.getPath(), indexDirectory.getPath()), e);
 		}
 		return null;
 	}
