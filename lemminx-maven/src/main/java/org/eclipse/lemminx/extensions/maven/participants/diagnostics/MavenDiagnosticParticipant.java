@@ -8,10 +8,14 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Function;
@@ -35,21 +39,22 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
-	private final MavenLemminxExtension lemminxMavenPlugin;
+	private final MavenLemminxExtension plugin;
 
-	public MavenDiagnosticParticipant(MavenLemminxExtension lemminxMavenPlugin) {
-		this.lemminxMavenPlugin = lemminxMavenPlugin;
+	public MavenDiagnosticParticipant(MavenLemminxExtension plugin) {
+		this.plugin = plugin;
 	}
 
 	@Override
-	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics, XMLValidationSettings validationSettings, CancelChecker monitor) {
+	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics,
+			XMLValidationSettings validationSettings, CancelChecker monitor) {
 		if (!MavenLemminxExtension.match(xmlDocument)) {
-			  return;
+			return;
 		}
-		
-		lemminxMavenPlugin.getProjectCache().getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
+
+		plugin.getProjectCache().getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
 		DOMElement documentElement = xmlDocument.getDocumentElement();
-		HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
+		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
 		Deque<DOMNode> nodes = new ArrayDeque<>();
 		for (DOMNode node : documentElement.getChildren()) {
@@ -60,13 +65,11 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			for (Entry<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> entry : tagDiagnostics
 					.entrySet()) {
 				if (node.getLocalName() != null && node.getLocalName().equals(entry.getKey())) {
-					entry.getValue().apply(new DiagnosticRequest(node, xmlDocument))
-							.ifPresent(diagnosticList -> {
-								// Don't add a diagnostic if it already exists
-								diagnostics.addAll(
-										diagnosticList.stream().filter(diagnostic -> !diagnostics.contains(diagnostic))
-												.collect(Collectors.toList()));
-							});
+					entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)).ifPresent(diagnosticList -> {
+						// Don't add a diagnostic if it already exists
+						diagnostics.addAll(diagnosticList.stream()
+								.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
+					});
 				}
 			}
 			if (node.hasChildNodes()) {
@@ -77,15 +80,15 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 	}
 
-	private HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions() {
-		PluginValidator pluginValidator = new PluginValidator(lemminxMavenPlugin);
+	private Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions() {
+		PluginValidator pluginValidator = new PluginValidator(plugin);
 
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginConfiguration = pluginValidator::validateConfiguration;
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginGoal = pluginValidator::validateGoal;
 
-		HashMap<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = new HashMap<>();
-		tagDiagnostics.put("configuration", validatePluginConfiguration);
-		tagDiagnostics.put("goal", validatePluginGoal);
+		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = new HashMap<>();
+		tagDiagnostics.put(CONFIGURATION_ELT, validatePluginConfiguration);
+		tagDiagnostics.put(GOAL_ELT, validatePluginGoal);
 		return tagDiagnostics;
 	}
 

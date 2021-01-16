@@ -8,6 +8,14 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.definition;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
+
 import java.io.File;
 import java.net.URI;
 import java.util.List;
@@ -41,33 +49,34 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	public MavenDefinitionParticipant(MavenLemminxExtension plugin) {
 		this.plugin = plugin;
 	}
-	
+
 	@Override
 	public void findDefinition(IDefinitionRequest request, List<LocationLink> locations, CancelChecker cancelChecker) {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
-			  return;
+			return;
 		}
-		
+
 		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
-		
+
 		LocationLink propertyLocation = findMavenPropertyLocation(request);
 		if (propertyLocation != null) {
 			locations.add(propertyLocation);
 			return;
 		}
-		
+
 		DOMElement element = findInterestingElement(request.getNode());
-		if (element != null && element.getLocalName().equals("module")) {
-			File subModuleFile = new File(currentFolder, element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
+		if (element != null && MODULE_ELT.equals(element.getLocalName())) {
+			File subModuleFile = new File(currentFolder,
+					element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
 			if (subModuleFile.isFile()) {
 				locations.add(toLocationNoRange(subModuleFile, element));
 			}
 			return;
 		}
 		Dependency dependency = MavenParseUtils.parseArtifact(request.getParentElement());
-		DOMNode parentNode = DOMUtils.findClosestParentNode(request, "parent");
+		DOMNode parentNode = DOMUtils.findClosestParentNode(request, PARENT_ELT);
 		if (parentNode != null && parentNode.isElement()) {
-			Optional<String> relativePath = DOMUtils.findChildElementText(element, "relativePath");
+			Optional<String> relativePath = DOMUtils.findChildElementText(element, RELATIVE_PATH_ELT);
 			if (relativePath.isPresent()) {
 				File relativeFile = new File(currentFolder, relativePath.get());
 				if (relativeFile.isDirectory()) {
@@ -97,7 +106,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
 		Pair<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {
-			return null; 
+			return null;
 		}
 		DOMDocument xmlDocument = request.getXMLDocument();
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(xmlDocument);
@@ -109,32 +118,34 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			childProj = project;
 			project = project.getParent();
 		}
-		
+
 		DOMNode propertyDeclaration = null;
-		Predicate<DOMNode> isMavenProperty = (node) -> node.getParentNode().getLocalName().equals("properties");
-		
+		Predicate<DOMNode> isMavenProperty = (node) -> PROPERTIES_ELT.equals(node.getParentNode().getLocalName());
+
 		if (childProj.getFile().toURI().toString().equals(xmlDocument.getDocumentURI())) {
 			// Property is defined in the same file as the request
-			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getRight()).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
+			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getRight()).stream()
+					.filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		} else {
-			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(childProj.getFile().toURI().toString(),
+			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
+					childProj.getFile().toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
-			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getRight()).stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
+			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getRight())
+					.stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		}
-		
+
 		if (propertyDeclaration == null) {
 			return null;
 		}
-		
-		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getLeft());	
+
+		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getLeft());
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {
 		return plugin.getProjectCache().getSnapshotProject(relativeFile)
-				.filter(p -> 
-					p.getGroupId().equals(dependency.getGroupId()) && //
-					p.getArtifactId().equals(dependency.getArtifactId()) && //
-					p.getVersion().equals(dependency.getVersion()))
+				.filter(p -> p.getGroupId().equals(dependency.getGroupId()) && //
+						p.getArtifactId().equals(dependency.getArtifactId()) && //
+						p.getVersion().equals(dependency.getVersion()))
 				.isPresent();
 	}
 
@@ -143,11 +154,14 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 			if (p != null) {
 				final Dependency originalDependency = dependency;
-				dependency = p.getDependencies().stream().filter(dep -> 
-						(originalDependency.getGroupId() == null || originalDependency.getGroupId().equals(dep.getGroupId()) &&
-						(originalDependency.getArtifactId() == null || originalDependency.getArtifactId().equals(dep.getArtifactId())) &&
-						(originalDependency.getVersion() == null || originalDependency.getVersion().equals(dep.getVersion())))).findFirst()
-					.orElse(dependency);
+				dependency = p.getDependencies().stream()
+						.filter(dep -> (originalDependency.getGroupId() == null
+								|| originalDependency.getGroupId().equals(dep.getGroupId())
+										&& (originalDependency.getArtifactId() == null
+												|| originalDependency.getArtifactId().equals(dep.getArtifactId()))
+										&& (originalDependency.getVersion() == null
+												|| originalDependency.getVersion().equals(dep.getVersion()))))
+						.findFirst().orElse(dependency);
 			}
 		}
 		File localArtifact = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
@@ -157,39 +171,40 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		return null;
 	}
 
-	private LocationLink toLocationNoRange(File target, DOMNode originNode) {
+	private static LocationLink toLocationNoRange(File target, DOMNode originNode) {
 		if (target == null) {
 			return null;
 		}
 		Range dumbRange = new Range(new Position(0, 0), new Position(0, 0));
-		return new LocationLink(target.toURI().toString(), dumbRange, dumbRange, XMLPositionUtility.createRange(originNode));
+		return new LocationLink(target.toURI().toString(), dumbRange, dumbRange,
+				XMLPositionUtility.createRange(originNode));
 	}
-	
-	private LocationLink toLocation(File target, DOMNode targetNode, Range originRange) {
+
+	private static LocationLink toLocation(File target, DOMNode targetNode, Range originRange) {
 		Range targetRange = XMLPositionUtility.createRange(targetNode);
 		return new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
 	}
 
-	private DOMElement findInterestingElement(DOMNode node) {
+	private static DOMElement findInterestingElement(DOMNode node) {
 		if (node == null) {
 			return null;
 		}
 		if (!node.isElement()) {
 			return findInterestingElement(node.getParentElement());
 		}
-		DOMElement element = (DOMElement)node;
+		DOMElement element = (DOMElement) node;
 		switch (node.getLocalName()) {
-		case "module":
+		case MODULE_ELT:
 			return element;
-		case "artifactId":
-		case "groupId":
-		case "version":
-		case "relativePath":
+		case ARTIFACT_ID_ELT:
+		case GROUP_ID_ELT:
+		case VERSION_ELT:
+		case RELATIVE_PATH_ELT:
 			return node.getParentElement();
 		default:
 			// continue
 		}
-		if (DOMUtils.findChildElementText(element, "artifactId").isPresent()) {
+		if (DOMUtils.findChildElementText(element, ARTIFACT_ID_ELT).isPresent()) {
 			return element;
 		}
 		return null;

@@ -8,6 +8,13 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.EXECUTION_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOALS_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
@@ -36,83 +43,41 @@ import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 
 public class MavenPluginUtils {
-	
+
 	private MavenPluginUtils() {
 		// Utility class, not meant to be instantiated
 	}
 
-	public static MarkupContent getMarkupDescription(Parameter parameter, boolean supportsMarkdown) {
+	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter,
+			boolean supportsMarkdown) {
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-		
-		String description = parameter.getDescription();
-		description = MarkdownUtils.htmlXMLToMarkdown(description);
-		
-		String expression = parameter.getExpression() != null ? parameter.getExpression() : "(none)";
-		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "(unset)";
-	
-		String markdownDescription = 
-				toBold.apply("Required: ") + parameter.isRequired() + lineBreak + 
-				toBold.apply("Type: ") + parameter.getType() + lineBreak + 
-				toBold.apply("Expression: ") + expression + lineBreak + 
-				toBold.apply("Default Value: ") + defaultValue + lineBreak + 
-				description;
-	
-		return new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, markdownDescription);
-	}
-	
-	public static MarkupContent getMarkupDescription(MojoParameter parameter, MojoParameter parentParameter, boolean supportsMarkdown) {
-		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
-		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-		
+
 		final String fromParent = toBold.apply("From parent configuration element:") + lineBreak;
 		String type = parameter.getType() != null ? parameter.getType() : "";
 		String expression = parameter.getExpression() != null ? parameter.getExpression() : "(none)";
 		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "(unset)";
 		String description = parameter.getDescription() != null ? parameter.getDescription() : "";
-		
+
 		if (defaultValue.isEmpty() && parentParameter != null && parentParameter.getDefaultValue() != null) {
 			defaultValue = fromParent + parentParameter.getDefaultValue();
 		}
 		if (description.isEmpty() && parentParameter != null) {
 			description = fromParent + parentParameter.getDescription();
 		}
-		
+
 		description = MarkdownUtils.htmlXMLToMarkdown(description);
-		
-		String markdownDescription = 
-				toBold.apply("Required: ") + parameter.isRequired() + lineBreak + 
-				toBold.apply("Type: ") + type + lineBreak + 
-				toBold.apply("Expression: ") + expression + lineBreak + 
-				toBold.apply("Default Value: ") + defaultValue + lineBreak +
-				description;
-		
+
+		String markdownDescription = toBold.apply("Required: ") + parameter.isRequired() + lineBreak
+				+ toBold.apply("Type: ") + type + lineBreak + toBold.apply("Expression: ") + expression + lineBreak
+				+ toBold.apply("Default Value: ") + defaultValue + lineBreak + description;
+
 		return new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, markdownDescription);
 	}
 
 	public static Set<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
-			MavenLemminxExtension lemminxMavenPlugin) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, lemminxMavenPlugin);
-		if (pluginDescriptor == null) {
-			return Collections.emptySet();
-		}
-		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
-		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, "execution");
-		if (executionElementDomNode != null) {
-			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
-					.filter(node -> "goals".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
-					.filter(node -> "goal".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
-					.filter(DOMNode::isText).map(DOMNode::getTextContent).collect(Collectors.toSet());
-			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
-					.collect(Collectors.toList());
-		}
-		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
-				.collect(Collectors.toSet());
-		return parameters;
-	}
-	
-	
-	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request, MavenLemminxExtension plugin) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+			MavenLemminxExtension plugin)
+			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 		if (pluginDescriptor == null) {
 			return Collections.emptySet();
@@ -121,42 +86,68 @@ public class MavenPluginUtils {
 		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, "execution");
 		if (executionElementDomNode != null) {
 			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
-					.filter(node -> "goals".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
-					.filter(node -> "goal".equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(node -> GOALS_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(node -> GOAL_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
 					.filter(DOMNode::isText).map(DOMNode::getTextContent).collect(Collectors.toSet());
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		MavenProject project =  plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
+				.collect(Collectors.toSet());
+		return parameters;
+	}
+
+	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
+			MavenLemminxExtension plugin)
+			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+		if (pluginDescriptor == null) {
+			return Collections.emptySet();
+		}
+		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
+		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, EXECUTION_ELT);
+		if (executionElementDomNode != null) {
+			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
+					.filter(node -> GOALS_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(node -> GOAL_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
+					.filter(DOMNode::isText).map(DOMNode::getTextContent).collect(Collectors.toSet());
+			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
+					.collect(Collectors.toList());
+		}
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
 			return Collections.emptySet();
 		}
-		//System.out.println("plugin: " + pluginDescriptor.getPluginLookupKey());
-		//pluginDescriptor.getDependencies().forEach(dep -> System.out.println("    plugin dependency: " + dep.getArtifactId() + ":" + dep.getVersion()));
+		// System.out.println("plugin: " + pluginDescriptor.getPluginLookupKey());
+		// pluginDescriptor.getDependencies().forEach(dep -> System.out.println(" plugin
+		// dependency: " + dep.getArtifactId() + ":" + dep.getVersion()));
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
-		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager()).stream()
-		).collect(Collectors.toSet());
-		
+		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
+				.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
+				.stream()).collect(Collectors.toSet());
+
 		return mojoParams;
 	}
-
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
 		Builder builder = new RemoteRepository.Builder(modelRepo.getId(), modelRepo.getLayout(), modelRepo.getUrl());
 		return builder.build();
 	}
 
-	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request, MavenLemminxExtension lemminxMavenPlugin) throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
-		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request,
+			MavenLemminxExtension lemminxMavenPlugin)
+			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+		MavenProject project = lemminxMavenPlugin.getProjectCache()
+				.getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
 			return null;
 		}
-		DOMNode pluginNode = DOMUtils.findClosestParentNode(request, "plugin");
+		DOMNode pluginNode = DOMUtils.findClosestParentNode(request, PLUGIN_ELT);
 		if (pluginNode == null) {
 			return null;
 		}
-		Optional<String> groupId = DOMUtils.findChildElementText(pluginNode, "groupId");
-		Optional<String> artifactId = DOMUtils.findChildElementText(pluginNode, "artifactId");
+		Optional<String> groupId = DOMUtils.findChildElementText(pluginNode, GROUP_ID_ELT);
+		Optional<String> artifactId = DOMUtils.findChildElementText(pluginNode, ARTIFACT_ID_ELT);
 		String pluginKey = "";
 		if (groupId.isPresent()) {
 			pluginKey += groupId.get();
@@ -168,23 +159,25 @@ public class MavenPluginUtils {
 		Plugin plugin = project.getPlugin(pluginKey);
 		if (plugin == null && project.getPluginManagement() != null) {
 			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
-			
+
 			if (plugin == null && artifactId.isPresent()) {
-				//pluginArtifactMap will be empty if PluginManagement is null
-				for (Entry <String, Artifact> entry : project.getPluginArtifactMap().entrySet() ) {
+				// pluginArtifactMap will be empty if PluginManagement is null
+				for (Entry<String, Artifact> entry : project.getPluginArtifactMap().entrySet()) {
 					if (entry.getValue().getArtifactId().equals(artifactId.get())) {
 						plugin = project.getPlugin(entry.getKey());
 					}
 				}
 			}
 		}
-		
+
 		if (plugin == null) {
-			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey,  Collections.emptyList());
+			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
 		}
 
-		return lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin, project.getPluginRepositories().stream()
-				.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()), lemminxMavenPlugin.getMavenSession().getRepositorySession());
+		return lemminxMavenPlugin.getMavenPluginManager()
+				.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
+						.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()),
+						lemminxMavenPlugin.getMavenSession().getRepositorySession());
 	}
 
 }
