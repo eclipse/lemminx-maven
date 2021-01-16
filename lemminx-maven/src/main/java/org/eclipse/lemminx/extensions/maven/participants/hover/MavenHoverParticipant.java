@@ -8,6 +8,12 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.hover;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
@@ -70,10 +76,10 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenHoverParticipant.class.getName());
 	private static Properties environmentProperties;
-	private final MavenLemminxExtension lemminxMavenPlugin;
+	private final MavenLemminxExtension plugin;
 
-	public MavenHoverParticipant(MavenLemminxExtension lemminxMavenPlugin) {
-		this.lemminxMavenPlugin = lemminxMavenPlugin;
+	public MavenHoverParticipant(MavenLemminxExtension plugin) {
+		this.plugin = plugin;
 		environmentProperties = new Properties();
 		EnvironmentUtils.addEnvVars(environmentProperties);
 	}
@@ -91,13 +97,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			return null;
 		}
 
-		if (DOMUtils.isADescendantOf(tag, "configuration")) {
+		if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
 			return collectPluginConfiguration(request);
 		}
 
 		// TODO: Get rid of this?
 		switch (parent.getLocalName()) {
-		case "configuration":
+		case CONFIGURATION_ELT:
 			return collectPluginConfiguration(request);
 		default:
 			break;
@@ -113,15 +119,15 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMDocument doc = request.getXMLDocument();
 
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
-		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(doc);
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		List<String> remoteArtifactRepositories = project == null ? //
 				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl()) : //
 				project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl)
 						.collect(Collectors.toList());
 
 		try {
-			ModelBuilder builder = lemminxMavenPlugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
-			Optional<String> localDescription = lemminxMavenPlugin.getLocalRepositorySearcher()
+			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
+			Optional<String> localDescription = plugin.getLocalRepositorySearcher()
 					.getLocalArtifactsLastVersion().stream()
 					.filter(gav -> (artifactToSearch.getGroupId() == null
 							|| artifactToSearch.getGroupId().equals(gav.getGroupId()))
@@ -130,7 +136,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 							&& (artifactToSearch.getVersion() == null
 									|| artifactToSearch.getVersion().equals(gav.getVersion())))
 					.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
-					.findFirst().map(lemminxMavenPlugin.getLocalRepositorySearcher()::findLocalFile).map(file -> builder
+					.findFirst().map(plugin.getLocalRepositorySearcher()::findLocalFile).map(file -> builder
 							.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
 					.map(model -> {
 						UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
@@ -155,7 +161,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
 		}
-		lemminxMavenPlugin.getIndexSearcher().ifPresent(indexSearcher -> {
+		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
 			try {
 				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
 					final String updatingItem = "Updating index for " + repository;
@@ -193,7 +199,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMNode node = request.getNode();
 		PluginDescriptor pluginDescriptor;
 		try {
-			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, lemminxMavenPlugin);
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
 					return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
@@ -209,14 +215,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Set<MojoParameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, lemminxMavenPlugin);
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return null;
 		}
 		DOMNode node = request.getNode();
 		String parentName = node.getParentNode().getLocalName();
-		if (parentName != null && parentName.equals("configuration")) {
+		if (parentName != null && parentName.equals(CONFIGURATION_ELT)) {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
 				if (node.getLocalName().equals(parameter.getName())) {
@@ -228,7 +234,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		// Nested case: node is a grand child of configuration
 
 		// Get the node's ancestor which is a child of configuration
-		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, "configuration");
+		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
 		if (parentParameterNode != null) {
 			List<MojoParameter> parentParameters = parameters.stream()
 					.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
@@ -270,10 +276,10 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMElement parent = tag.getParentElement();
 		DOMElement grandParent = parent.getParentElement();
 
-		boolean isPlugin = "plugin".equals(parent.getLocalName())
-				|| (grandParent != null && "plugin".equals(grandParent.getLocalName()));
-		boolean isParentDeclaration = "parent".equals(parent.getLocalName())
-				|| (grandParent != null && "parent".equals(grandParent.getLocalName()));
+		boolean isPlugin = PLUGIN_ELT.equals(parent.getLocalName())
+				|| (grandParent != null && PLUGIN_ELT.equals(grandParent.getLocalName()));
+		boolean isParentDeclaration = PARENT_ELT.equals(parent.getLocalName())
+				|| (grandParent != null && PARENT_ELT.equals(grandParent.getLocalName()));
 
 		Pair<Range, String> mavenProperty = getMavenPropertyInRequest(request);
 		if (mavenProperty != null) {
@@ -281,13 +287,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 
 		switch (parent.getLocalName()) {
-		case "artifactId":
+		case ARTIFACT_ID_ELT:
 			if (isParentDeclaration) {
 				return null;
 			} else {
 				return collectArtifactDescription(request, isPlugin);
 			}
-		case "goal":
+		case GOAL_ELT:
 			return collectGoal(request);
 		default:
 			break;
@@ -328,7 +334,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 		DOMDocument doc = request.getXMLDocument();
-		MavenProject project = lemminxMavenPlugin.getProjectCache().getLastSuccessfulMavenProject(doc);
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			Map<String, String> allProps = getMavenProjectProperties(project);
 			UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();

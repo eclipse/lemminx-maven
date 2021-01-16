@@ -8,6 +8,13 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.CLASSIFIER_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.SCOPE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.TYPE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +31,7 @@ public class MavenParseUtils {
 			return null;
 		}
 		if (node.isElement()) {
-			Dependency res = parseArtifactInternal((DOMElement)node);
+			Dependency res = parseArtifactInternal((DOMElement) node);
 			if (res != null) {
 				return res;
 			}
@@ -47,38 +54,35 @@ public class MavenParseUtils {
 					}
 					value = value.trim();
 					switch (tag.getLocalName()) {
-						case "groupId":
-							res.setGroupId(value);
-							break;
-						case "artifactId":
-							res.setArtifactId(value);
-							break;
-						case "version":
-							res.setVersion(value);
-							break;
-						case "scope":
-							res.setScope(value);
-							break;
-						case "type":
-							res.setType(value);
-							break;
-						case "classifier":
-							res.setClassifier(value);
-							break;
+					case GROUP_ID_ELT:
+						res.setGroupId(value);
+						break;
+					case ARTIFACT_ID_ELT:
+						res.setArtifactId(value);
+						break;
+					case VERSION_ELT:
+						res.setVersion(value);
+						break;
+					case SCOPE_ELT:
+						res.setScope(value);
+						break;
+					case TYPE_ELT:
+						res.setType(value);
+						break;
+					case CLASSIFIER_ELT:
+						res.setClassifier(value);
+						break;
 					}
 				}
 			}
 		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE,"Error parsing Artifact", e);
+			LOGGER.log(Level.SEVERE, "Error parsing Artifact", e);
 		}
 		return isEmpty(res) ? null : res;
 	}
 
 	private static boolean isEmpty(Dependency res) {
-		return res.getGroupId() == null &&
-				res.getArtifactId() == null &&
-				res.getVersion() == null &&
-				res.getScope() == null &&
-				res.getClassifier() == null;
+		return res.getGroupId() == null && res.getArtifactId() == null && res.getVersion() == null
+				&& res.getScope() == null && res.getClassifier() == null;
 	}
 }

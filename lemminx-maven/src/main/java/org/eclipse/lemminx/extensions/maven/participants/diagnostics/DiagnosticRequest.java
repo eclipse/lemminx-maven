@@ -21,9 +21,9 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 public class DiagnosticRequest implements IPositionRequest {
-	private DOMNode node;
-	private DOMDocument xmlDocument;
-	
+	private final DOMNode node;
+	private final DOMDocument xmlDocument;
+
 	/**
 	 * A diagnosticRequest allows creation of diagnostics for a supplied node.
 	 * 
@@ -34,16 +34,16 @@ public class DiagnosticRequest implements IPositionRequest {
 		this.node = node;
 		this.xmlDocument = xmlDocument;
 	}
-	
+
 	public Diagnostic createDiagnostic(String errorMessage, DiagnosticSeverity severity) {
 		return new Diagnostic(this.getRange(), errorMessage, severity, this.getXMLDocument().getDocumentURI(), "XML");
 	}
-	
+
 	private Range getRange() {
 		return XMLPositionUtility.createRange(((DOMElement) node).getStartTagCloseOffset() + 1,
 				((DOMElement) node).getEndTagOpenOffset(), xmlDocument);
 	}
-	
+
 	@Override
 	public DOMDocument getXMLDocument() {
 		return xmlDocument;
