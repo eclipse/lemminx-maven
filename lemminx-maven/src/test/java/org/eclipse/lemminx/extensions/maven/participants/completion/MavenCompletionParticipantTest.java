@@ -108,4 +108,35 @@ public class MavenCompletionParticipantTest {
 						"maven-core"));
 	}
 
+	@Test
+	public void testNotPrefixedPropertyCompletion() throws Exception {
+		String pom = //
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + //
+				"<project\n" + //
+				"  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0\n" + //
+				"                      https://maven.apache.org/xsd/maven-4.0.0.xsd\"\n" + //
+				"  xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" + //
+				"  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" + //
+				"  <modelVersion>4.0.0</modelVersion>\n" + //
+				"  <artifactId>just-a-pom</artifactId>\n" + //
+				"  <groupId>com.datho7561</groupId>\n" + //
+				"  <version>0.1.0</version>\n" + //
+				"  <properties>\n" + //
+				"    <spring.version>5.0.2</spring.version>\n" + //
+				"  </properties>\n" + //
+				"  <dependencies>\n" + //
+				"    <dependency>\n" + //
+				"      <groupId>org.springframework</groupId>\n" + //
+				"      <artifactId>spring-context</artifactId>\n" + //
+				"      <version>spring.ver|</version>\n" + //
+				"      <scope>runtime</scope>\n" + //
+				"    </dependency>\n" + //
+				"  </dependencies>\n" + //
+				"</project>\n";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("${spring.version}", //
+				te(17, 25, 17, 25, //
+						"${spring.version}"),
+						"${spring.version}"));
+	}
 }
