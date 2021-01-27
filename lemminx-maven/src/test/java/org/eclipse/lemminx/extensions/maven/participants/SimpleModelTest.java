@@ -285,6 +285,19 @@ public class SimpleModelTest {
 	}
 
 	@Test
+	public void testModules() throws IOException, URISyntaxException {
+		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
+				createDOMDocument("/modules/module-a-pom.xml", languageService), 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+
+		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
+				createDOMDocument("/modules/module-b-pom.xml", languageService), 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+	}
+
+	@Test
 	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		Position pos = new Position(6, 9);
