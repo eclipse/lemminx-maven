@@ -232,4 +232,7 @@ public class MavenProjectCache {
 		return plexusContainer;
 	}
 
+	public Collection<MavenProject> getProjects() {
+		return projectCache.values();
+	}
 }

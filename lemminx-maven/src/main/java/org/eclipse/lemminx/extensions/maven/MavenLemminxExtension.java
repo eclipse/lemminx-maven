@@ -61,12 +61,9 @@ import org.eclipse.lemminx.services.extensions.save.ISaveContext;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
 import org.eclipse.lemminx.settings.AllXMLSettings;
 import org.eclipse.lemminx.settings.InitializationOptionsSettings;
-import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.eclipse.lsp4j.InitializeParams;
 
 import com.google.common.base.Objects;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 /**
  * Extension for pom.xml.
@@ -168,7 +165,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
+	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		SettingsReader reader = container.lookup(SettingsReader.class);
 		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
@@ -214,7 +211,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		mavenRequest.setSystemProperties(System.getProperties());
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
-		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader());
+		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader(this));
 		return mavenRequest;
 	}
 
