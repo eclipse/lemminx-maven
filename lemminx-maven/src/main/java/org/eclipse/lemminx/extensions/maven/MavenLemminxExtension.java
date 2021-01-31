@@ -58,6 +58,9 @@ import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
+import org.eclipse.lemminx.settings.AllXMLSettings;
+import org.eclipse.lemminx.settings.InitializationOptionsSettings;
+import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.eclipse.lsp4j.InitializeParams;
 
 import com.google.gson.JsonElement;
@@ -96,9 +99,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (context.getType() == SaveContextType.SETTINGS) {
 			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes null on stop
 			stop(registry);
-			if (params != null) {
-				params.setInitializationOptions(context.getSettings());
-			}
 			start(params, registry);
 		}
 	}
@@ -132,12 +132,16 @@ public class MavenLemminxExtension implements IXMLExtension {
 			return;
 		}
 		try {
-			JsonObject options = params != null && params.getInitializationOptions() != null ? (JsonObject)params.getInitializationOptions() : new JsonObject();
-			if (options.has("xml")) {
-				options = options.getAsJsonObject("xml");
+
+			XMLMavenGeneralSettings settings = new XMLMavenGeneralSettings();
+			if (params != null) {
+				Object initOptions = InitializationOptionsSettings.getSettings(params);
+				Object xmlSettings = AllXMLSettings.getAllXMLSettings(initOptions);
+				settings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings);
 			}
+
 			this.container = newPlexusContainer();
-			mavenRequest = initMavenRequest(container, options);
+			mavenRequest = initMavenRequest(container, settings);
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
 			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
@@ -145,9 +149,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			JsonElement skipIndex = options.get("maven.index.skip");
-			if (skipIndex == null || !skipIndex.getAsBoolean()) {
-				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(options.get("maven.indexLocation")).map(JsonElement::getAsString).map(File::new));
+			if (!settings.getMaven().getIndex().isSkip()) {
+				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(settings.getMaven().getIndexLocation()).map(File::new));
 			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
@@ -158,12 +161,12 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, JsonObject options) throws Exception {
+	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenGeneralSettings options) throws Exception {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		SettingsReader reader = container.lookup(SettingsReader.class);
 		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
 		{
-			final File globalSettingsFile = getFileFromOptions(options.get("maven.globalSettings"), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			final File globalSettingsFile = getFileFromOptions(options.getMaven().getGlobalSettings(), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
 			if (globalSettingsFile.canRead()) {
 				mavenRequest.setGlobalSettingsFile(globalSettingsFile);
 				Settings globalSettings = reader.read(globalSettingsFile, null);
@@ -171,7 +174,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			}
 		}
 		{
-			final File localSettingsFile = getFileFromOptions(options.get("maven.userSettings"), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
+			final File localSettingsFile = getFileFromOptions(options.getMaven().getUserSettings(), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
 			if (localSettingsFile.canRead()) {
 				mavenRequest.setUserSettingsFile(localSettingsFile);
 				Settings userSettings = reader.read(localSettingsFile, null);
@@ -183,14 +186,11 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (localRepoProperty != null) {
 			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
 		}
-		JsonElement localRepoElement = options.get("maven.repo.local");
-		if (localRepoElement != null && localRepoElement.isJsonPrimitive()) {
-			String localRepoOption = localRepoElement.getAsString();
-			if (localRepoOption != null && !localRepoOption.trim().isEmpty()) {
-				File candidate = new File(localRepoOption);
-				if (candidate.isFile() && candidate.canRead()) {
-					mavenRequest.setLocalRepositoryPath(candidate);
-				}
+		String localRepoOption = options.getMaven().getRepo().getLocal();
+		if (localRepoOption != null && !localRepoOption.trim().isEmpty()) {
+			File candidate = new File(localRepoOption);
+			if (candidate.isFile() && candidate.canRead()) {
+				mavenRequest.setLocalRepositoryPath(candidate);
 			}
 		}
 
@@ -206,13 +206,12 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenRequest;
 	}
 
-	private static File getFileFromOptions(JsonElement element, File defaults) {
-		if (element == null || !element.isJsonPrimitive()) {
+	private static File getFileFromOptions(String element, File defaults) {
+		if (element == null) {
 			return defaults;
 		}
-		String stringValue = element.getAsString();
-		if (stringValue != null && !stringValue.trim().isEmpty()) {
-			File globalSettingsCandidate = new File(stringValue);
+		if (element != null && !element.trim().isEmpty()) {
+			File globalSettingsCandidate = new File(element);
 			if (globalSettingsCandidate.canRead()) {
 				return globalSettingsCandidate;
 			}
