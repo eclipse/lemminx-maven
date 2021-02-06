@@ -181,7 +181,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 				requestPopulator.populateFromSettings(mavenRequest, userSettings);
 			}
 		}
-		mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
+
 		String localRepoProperty = System.getProperty("maven.repo.local");
 		if (localRepoProperty != null) {
 			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
@@ -192,6 +192,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 			if (candidate.isFile() && candidate.canRead()) {
 				mavenRequest.setLocalRepositoryPath(candidate);
 			}
+		}
+
+		if (mavenRequest.getLocalRepositoryPath() == null) {
+			mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
 		}
 
 		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
@@ -206,11 +210,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenRequest;
 	}
 
+
+
 	private static File getFileFromOptions(String element, File defaults) {
 		if (element == null) {
 			return defaults;
 		}
-		if (element != null && !element.trim().isEmpty()) {
+		if (!element.trim().isEmpty()) {
 			File globalSettingsCandidate = new File(element);
 			if (globalSettingsCandidate.canRead()) {
 				return globalSettingsCandidate;
