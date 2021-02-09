@@ -63,6 +63,7 @@ import org.eclipse.lemminx.settings.InitializationOptionsSettings;
 import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.eclipse.lsp4j.InitializeParams;
 
+import com.google.common.base.Objects;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -91,22 +92,31 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private MavenSession mavenSession;
 	private BuildPluginManager buildPluginManager;
 
-	private InitializeParams params;
-
+	XMLMavenSettings settings = new XMLMavenSettings();
 
 	@Override
 	public void doSave(ISaveContext context) {
 		if (context.getType() == SaveContextType.SETTINGS) {
 			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes null on stop
-			stop(registry);
-			start(params, registry);
+			XMLMavenGeneralSettings generalXMLSettings = XMLMavenGeneralSettings.getGeneralXMLSettings(context.getSettings());
+			if (generalXMLSettings == null) {
+				return;
+			}
+			XMLMavenSettings newSettings = generalXMLSettings.getMaven();
+			if (newSettings != null && !Objects.equal(this.settings, newSettings)) {
+				stop(registry);
+				this.settings = newSettings;
+				start(null, registry);
+			}
 		}
 	}
 
 	@Override
 	public void start(InitializeParams params, XMLExtensionsRegistry registry) {
 		if (params != null) {
-			this.params = params;
+			Object initOptions = InitializationOptionsSettings.getSettings(params);
+			Object xmlSettings = AllXMLSettings.getAllXMLSettings(initOptions);
+			settings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings).getMaven();
 		}
 		this.currentRegistry = registry;
 		try {
@@ -133,13 +143,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		try {
 
-			XMLMavenGeneralSettings settings = new XMLMavenGeneralSettings();
-			if (params != null) {
-				Object initOptions = InitializationOptionsSettings.getSettings(params);
-				Object xmlSettings = AllXMLSettings.getAllXMLSettings(initOptions);
-				settings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings);
-			}
-
 			this.container = newPlexusContainer();
 			mavenRequest = initMavenRequest(container, settings);
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
@@ -149,8 +152,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			if (!settings.getMaven().getIndex().isSkip()) {
-				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(settings.getMaven().getIndexLocation()).map(File::new));
+			if (!settings.getIndex().isSkip()) {
+				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(settings.getIndexLocation()).map(File::new));
 			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
@@ -161,12 +164,12 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenGeneralSettings options) throws Exception {
+	private static MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		SettingsReader reader = container.lookup(SettingsReader.class);
 		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
 		{
-			final File globalSettingsFile = getFileFromOptions(options.getMaven().getGlobalSettings(), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			final File globalSettingsFile = getFileFromOptions(options.getGlobalSettings(), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
 			if (globalSettingsFile.canRead()) {
 				mavenRequest.setGlobalSettingsFile(globalSettingsFile);
 				Settings globalSettings = reader.read(globalSettingsFile, null);
@@ -174,7 +177,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			}
 		}
 		{
-			final File localSettingsFile = getFileFromOptions(options.getMaven().getUserSettings(), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
+			final File localSettingsFile = getFileFromOptions(options.getUserSettings(), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
 			if (localSettingsFile.canRead()) {
 				mavenRequest.setUserSettingsFile(localSettingsFile);
 				Settings userSettings = reader.read(localSettingsFile, null);
@@ -186,7 +189,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (localRepoProperty != null) {
 			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
 		}
-		String localRepoOption = options.getMaven().getRepo().getLocal();
+		String localRepoOption = options.getRepo().getLocal();
 		if (localRepoOption != null && !localRepoOption.trim().isEmpty()) {
 			File candidate = new File(localRepoOption);
 			if (candidate.isFile() && candidate.canRead()) {
@@ -260,9 +263,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 	@Override
 	public void stop(XMLExtensionsRegistry registry) {
 		registry.unregisterCompletionParticipant(completionParticipant);
+		this.completionParticipant = null;
 		registry.unregisterDiagnosticsParticipant(diagnosticParticipant);
+		this.diagnosticParticipant = null;
 		registry.unregisterHoverParticipant(hoverParticipant);
+		this.hoverParticipant = null;
 		registry.unregisterDefinitionParticipant(definitionParticipant);
+		this.definitionParticipant = null;
 		if (localRepositorySearcher != null) {
 			localRepositorySearcher.stop();
 			localRepositorySearcher = null;

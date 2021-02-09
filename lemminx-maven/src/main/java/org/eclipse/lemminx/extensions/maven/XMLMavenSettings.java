@@ -11,6 +11,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import java.util.Objects;
+
 public class XMLMavenSettings {
 
 	private XMLMavenIndexSettings index;
@@ -66,6 +68,25 @@ public class XMLMavenSettings {
 
 	public void setIndexLocation(String indexLocation) {
 		this.indexLocation = indexLocation;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(globalSettings, index, indexLocation, repo, userSettings);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		XMLMavenSettings other = (XMLMavenSettings) obj;
+		return Objects.equals(globalSettings, other.globalSettings) && Objects.equals(index, other.index)
+				&& Objects.equals(indexLocation, other.indexLocation) && Objects.equals(repo, other.repo)
+				&& Objects.equals(userSettings, other.userSettings);
 	}
 
 }

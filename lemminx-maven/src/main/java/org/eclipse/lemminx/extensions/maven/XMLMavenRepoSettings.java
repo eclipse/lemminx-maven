@@ -11,6 +11,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import java.util.Objects;
+
 public class XMLMavenRepoSettings {
 
 	private String local;
@@ -21,6 +23,23 @@ public class XMLMavenRepoSettings {
 
 	public void setLocal(String local) {
 		this.local = local;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(local);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		XMLMavenRepoSettings other = (XMLMavenRepoSettings) obj;
+		return Objects.equals(local, other.local);
 	}
 
 }

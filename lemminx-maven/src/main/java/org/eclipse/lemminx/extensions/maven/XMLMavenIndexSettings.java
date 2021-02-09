@@ -11,6 +11,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import java.util.Objects;
+
 public class XMLMavenIndexSettings {
 
 	private boolean skip;
@@ -22,4 +24,22 @@ public class XMLMavenIndexSettings {
 	public void setSkip(boolean skip) {
 		this.skip = skip;
 	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(skip);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		XMLMavenIndexSettings other = (XMLMavenIndexSettings) obj;
+		return skip == other.skip;
+	}
+
 }
