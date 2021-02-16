@@ -113,14 +113,18 @@ public class RemoteRepositoryIndexSearcher {
 				return indexDownloadJobs.get(res).thenApply(theVoid -> context);
 			}
 			final IndexingContext context = initializeContext(repositoryUrl);
-			indexingContexts.put(repositoryUrl, context);
-			CompletableFuture<IndexingContext> future;
-			try {
-				future = updateIndex(context).thenApply(theVoid -> context);
-				indexDownloadJobs.put(context, future);
-				return future;
-			} catch (ComponentLookupException e) {
-				return CompletableFuture.failedFuture(e);
+			if (context != null) {
+				indexingContexts.put(repositoryUrl, context);
+				CompletableFuture<IndexingContext> future;
+				try {
+					future = updateIndex(context).thenApply(theVoid -> context);
+					indexDownloadJobs.put(context, future);
+					return future;
+				} catch (ComponentLookupException e) {
+					return CompletableFuture.failedFuture(e);
+				}
+			} else {
+				return CompletableFuture.completedFuture(null);
 			}
 		}
 	}
@@ -140,10 +144,7 @@ public class RemoteRepositoryIndexSearcher {
 		builder.add(indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT), Occur.MUST);
 		final BooleanQuery query = builder.build();
 
-		List<IndexingContext> contexts = Collections
-				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
-						? Arrays.asList(requestSpecificContexts)
-						: new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = internalGetIndexingContexts(requestSpecificContexts);;
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 
 		return createIndexerQuery(artifactToSearch, request).stream().map(ArtifactInfo::getVersion)
@@ -174,10 +175,7 @@ public class RemoteRepositoryIndexSearcher {
 		}
 		queryBuilder.add(indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT), Occur.MUST);
 		final BooleanQuery query = queryBuilder.build();
-		List<IndexingContext> contexts = Collections
-				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
-						? Arrays.asList(requestSpecificContexts)
-						: new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = internalGetIndexingContexts(requestSpecificContexts);;
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 		return createIndexerQuery(artifactToSearch, request);
 	}
@@ -203,10 +201,7 @@ public class RemoteRepositoryIndexSearcher {
 		final Query jarPackagingQ = indexer.constructQuery(MAVEN.PACKAGING, packaging, SearchType.EXACT);
 		final BooleanQuery query = new BooleanQuery.Builder().add(groupIdQ, Occur.MUST).add(jarPackagingQ, Occur.MUST)
 				.build();
-		List<IndexingContext> contexts = Collections
-				.unmodifiableList(requestSpecificContexts != null && requestSpecificContexts.length > 0
-						? Arrays.asList(requestSpecificContexts)
-						: new LinkedList<>(indexingContexts.values()));
+		List<IndexingContext> contexts = internalGetIndexingContexts(requestSpecificContexts);;
 		final IteratorSearchRequest request = new IteratorSearchRequest(query, contexts, null);
 		// TODO: Find the Count sweet spot
 		request.setCount(7500);
@@ -214,6 +209,13 @@ public class RemoteRepositoryIndexSearcher {
 				.collect(Collectors.toSet());
 	}
 
+	private List<IndexingContext> internalGetIndexingContexts(IndexingContext... requestSpecificContexts) {
+		return (requestSpecificContexts != null && requestSpecificContexts.length > 0
+				? Arrays.asList(requestSpecificContexts)
+				: new LinkedList<>(indexingContexts.values())).stream().filter(Objects::nonNull)
+						.collect(Collectors.toUnmodifiableList());
+	}
+	
 	// TODO: Get groupid description for completion
 	public Set<String> getGroupIds(Dependency artifactToSearch, IndexingContext... requestSpecificContexts) {
 		return internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_JAR, requestSpecificContexts);
@@ -229,9 +231,7 @@ public class RemoteRepositoryIndexSearcher {
 				throw new IllegalArgumentException("context mustn't be null");
 			});
 		}
-		if ((context.getId().equals("https://repo.maven.apache.org/maven2")
-				|| context.getId().equals(CENTRAL_REPO.getId()) || context.getId().contains("maven_central"))
-				&& disableCentralIndex) {
+		if (isDisabledRepository(context.getId())) {
 			return CompletableFuture.runAsync(() -> LOGGER.log(Level.INFO, "Central repository index disabled"));
 		}
 		LOGGER.log(Level.INFO, "Updating Index for " + context.getRepositoryUrl() + "...");
@@ -256,7 +256,6 @@ public class RemoteRepositoryIndexSearcher {
 
 		IndexUpdateRequest updateRequest = new IndexUpdateRequest(context, resourceFetcher);
 		return CompletableFuture.runAsync(() -> {
-
 			try {
 				IndexUpdateResult updateResult = indexUpdater.fetchAndUpdateIndex(updateRequest);
 				if (updateResult.isSuccessful()) {
@@ -289,27 +288,39 @@ public class RemoteRepositoryIndexSearcher {
 
 	private IndexingContext initializeContext(URI repositoryURI) {
 		String repositoryId = repositoryURI.toString();
-		String fileSystemFriendlyName = repositoryURI.getHost() + repositoryURI.hashCode();
-		File repositoryFile = new File(indexPath, fileSystemFriendlyName + "-cache");
-		File indexDirectory = new File(indexPath, fileSystemFriendlyName + "-index");
-		try {
-			return indexer.createIndexingContext(repositoryId, repositoryId, repositoryFile, indexDirectory,
-					repositoryId, null, true, true, indexers);
-		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, MessageFormat.format(
-					"Error while creating indexing context with repository ID={0}, directory={1} in index directory={2}.",
-					repositoryId, repositoryFile.getPath(), indexDirectory.getPath()), e);
+		if (!isDisabledRepository(repositoryId)) {
+			String fileSystemFriendlyName = repositoryURI.getHost() + repositoryURI.hashCode();
+			File repositoryFile = new File(indexPath, fileSystemFriendlyName + "-cache");
+			File indexDirectory = new File(indexPath, fileSystemFriendlyName + "-index");
+			try {
+				return indexer.createIndexingContext(repositoryId, repositoryId, repositoryFile, indexDirectory,
+						repositoryId, null, true, true, indexers);
+			} catch (Exception e) {
+				LOGGER.log(Level.SEVERE, MessageFormat.format(
+						"Error while creating indexing context with repository ID={0}, directory={1} in index directory={2}.",
+						repositoryId, repositoryFile.getPath(), indexDirectory.getPath()), e);
+			}
+		} else {
+			LOGGER.log(Level.INFO, "Central repository index disabled");
 		}
 		return null;
 	}
 
+	private boolean isDisabledRepository(String repositoryUri) {
+		return (repositoryUri.equals("https://repo.maven.apache.org/maven2")
+				|| repositoryUri.equals(CENTRAL_REPO.getId()) || repositoryUri.contains("maven_central"))
+				&& disableCentralIndex;
+	}
+	
 	public void closeContext() {
 		for (IndexingContext context : indexingContexts.values()) {
 			try {
-				indexer.closeIndexingContext(context, false);
-				CompletableFuture<?> download = indexDownloadJobs.get(context);
-				if (!download.isDone()) {
-					download.cancel(true);
+				if (context != null) {
+					indexer.closeIndexingContext(context, false);
+					CompletableFuture<?> download = indexDownloadJobs.get(context);
+					if (!download.isDone()) {
+						download.cancel(true);
+					}
 				}
 			} catch (IOException e) {
 				LOGGER.log(Level.WARNING, "Warning - could not close context: " + context.getId(), e);

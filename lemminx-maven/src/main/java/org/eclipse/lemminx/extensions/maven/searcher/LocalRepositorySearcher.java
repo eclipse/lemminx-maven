@@ -10,6 +10,7 @@ package org.eclipse.lemminx.extensions.maven.searcher;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,9 +70,13 @@ public class LocalRepositorySearcher {
 				WatchKey key;
 				try {
 					while ((key = watchService.take()) != null) {
-						cache.remove(localRepository);
-						key.reset();
+						if (watchKey.equals(key)) {
+							cache.remove(localRepository);
+							key.reset();
+						}
 					}
+				} catch (ClosedWatchServiceException e) {
+					LOGGER.log(Level.WARNING, "Local repo thread watcher is closed");
 				} catch (InterruptedException e) {
 					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
 				}
