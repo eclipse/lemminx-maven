@@ -93,6 +93,7 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
@@ -129,7 +130,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	@Override
-	public void onTagOpen(ICompletionRequest request, ICompletionResponse response) throws Exception {
+	public void onTagOpen(ICompletionRequest request, ICompletionResponse response, CancelChecker cancelChecker) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return;
 		}
@@ -194,7 +195,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	@Override
-	public void onXMLContent(ICompletionRequest request, ICompletionResponse response) throws Exception {
+	public void onXMLContent(ICompletionRequest request, ICompletionResponse response, CancelChecker cancelChecker) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return;
 		}
@@ -247,7 +248,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds()
 								: plugin.getLocalRepositorySearcher().searchGroupIds(),
 						Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
+				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response, cancelChecker);
 			}
 			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
 			break;
@@ -265,7 +266,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 								.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
 								// TODO pass description as documentation
 								.map(this::toArtifactInfo).collect(Collectors.toList()));
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
+				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response, cancelChecker);
 			}
 			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
 			break;
@@ -278,7 +279,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 							.map(Gav::getVersion).map(DefaultArtifactVersion::new)
 							.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
 							.ifPresent(response::addCompletionItem);
-					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
+					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response, cancelChecker);
 				}
 			} else {
 				Optional<MavenProject> filesystem = computeFilesystemParent(request);
@@ -304,14 +305,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			// TODO completion/resolve to get description for local artifacts
 			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 					.map(this::toArtifactInfo).collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, response);
+			internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, response, cancelChecker);
 			break;
 		case PLUGINS_ELT:
 		case PLUGIN_ELT:
 			// TODO completion/resolve to get description for local artifacts
 			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
 					.map(this::toArtifactInfo).collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, response);
+			internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, response, cancelChecker);
 			break;
 		case PARENT_ELT:
 			Optional<MavenProject> filesystem = computeFilesystemParent(request);
@@ -609,7 +610,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	private void internalCollectRemoteGAVCompletion(ICompletionRequest request, boolean onlyPlugins,
-			Collection<ArtifactInfo> artifactInfosCollector, ICompletionResponse nonArtifactCollector) {
+			Collection<ArtifactInfo> artifactInfosCollector, ICompletionResponse nonArtifactCollector, CancelChecker cancelChecker) {
 		DOMElement node = request.getParentElement();
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		if (artifactToSearch == null) {
@@ -629,12 +630,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
 			try {
 				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
+					cancelChecker.checkCanceled();
 					final CompletionItem updatingItem = new CompletionItem("Updating index for " + repository);
 					updatingItem.setPreselect(true);
 					updatingItem.setInsertText("");
 					updatingItem.setKind(CompletionItemKind.Event);
 					updateItems.add(updatingItem);
 					return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
+						cancelChecker.checkCanceled();
 						switch (node.getLocalName()) {
 						case GROUP_ID_ELT:
 							// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
@@ -648,6 +651,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 										.map(groupId -> toCompletionItem(groupId, null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							}
+							cancelChecker.checkCanceled();
 							return updatingItem;
 						case ARTIFACT_ID_ELT:
 							if (onlyPlugins) {
@@ -656,6 +660,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 							} else {
 								artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
 							}
+							cancelChecker.checkCanceled();
 							return updatingItem;
 						case VERSION_ELT:
 							if (onlyPlugins) {
@@ -667,14 +672,17 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 										.map(version -> toCompletionItem(version.toString(), null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							}
+							cancelChecker.checkCanceled();
 							return updatingItem;
 						case DEPENDENCIES_ELT:
 						case DEPENDENCY_ELT:
 							artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
+							cancelChecker.checkCanceled();
 							return updatingItem;
 						case PLUGINS_ELT:
 						case PLUGIN_ELT:
 							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+							cancelChecker.checkCanceled();
 							return updatingItem;
 						}
 						return (CompletionItem) null;
