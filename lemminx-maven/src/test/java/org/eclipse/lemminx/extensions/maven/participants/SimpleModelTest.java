@@ -291,12 +291,73 @@ public class SimpleModelTest {
 				new XMLValidationSettings(), () -> {});
 		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
+		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
 		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
-				createDOMDocument("/modules/module-b-pom.xml", languageService), 
+				document, 
 				new XMLValidationSettings(), () -> {});
 		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 	}
+	
+	@Test
+	public void testModulesCompletionInDependency() throws IOException, URISyntaxException {
+		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
+				createDOMDocument("/modules/module-a-pom.xml", languageService), 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
+		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
+		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
+				document, 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+
+		// in <dependency />
+		// for group ID
+		List<CompletionItem> completions = languageService.doComplete(document, new Position(10, 15), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("org.test.modules"::equals));
+
+		// for artifact ID:
+		completions = languageService.doComplete(document, new Position(11, 18), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("ModuleA"::equals));
+
+		// for versions
+		completions = languageService.doComplete(document, new Position(12, 15), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("0.0.1-SNAPSHOT"::equals));
+	}
+
+	@Test
+	public void testModulesCompletionInParent() throws IOException, URISyntaxException {
+		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
+				createDOMDocument("/modules/module-a-pom.xml", languageService), 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+
+		DOMDocument document = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
+		List<Diagnostic> diagnosticsC = languageService.doDiagnostics(
+				document, 
+				new XMLValidationSettings(), () -> {});
+		assertFalse(diagnosticsC.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+
+		// in <parent />
+		// for group ID
+		List<CompletionItem> completions = languageService.doComplete(document, new Position(9, 13), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("org.test.modules"::equals));
+
+		// for artifact ID:
+		completions = languageService.doComplete(document, new Position(10, 16), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("ModuleA"::equals));
+
+		// for versions
+		completions = languageService.doComplete(document, new Position(11, 13), new SharedSettings()).getItems();
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+				.anyMatch("0.0.1-SNAPSHOT"::equals));
+	}
+	
 	@Test
 	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);

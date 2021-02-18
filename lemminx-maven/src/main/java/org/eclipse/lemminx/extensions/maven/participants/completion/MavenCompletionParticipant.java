@@ -249,6 +249,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
 				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
 			}
+			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
 			break;
 		case ARTIFACT_ID_ELT:
 			if (isParentDeclaration) {
@@ -266,6 +267,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 								.map(this::toArtifactInfo).collect(Collectors.toList()));
 				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response);
 			}
+			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
 			break;
 		case VERSION_ELT:
 			if (!isParentDeclaration) {
@@ -286,6 +288,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// TODO localRepo
 				// TODO remoteRepos
 			}
+			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
 			if (allArtifactInfos.isEmpty()) {
 				response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
 			}
@@ -859,5 +862,37 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
 		Map<Object, Boolean> map = new ConcurrentHashMap<>();
 		return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
+	}
+	
+	private void internalCollectWorkspaceArtifacts(ICompletionRequest request, Collection<ArtifactInfo> artifactInfosCollector,
+			Optional<String> groupId, Optional<String> artifactId) {
+		DOMElement parent = request.getParentElement();
+		if (parent == null || parent.getLocalName() == null) {
+			return;
+		}
+		DOMElement grandParent = parent.getParentElement();
+		if (grandParent == null || 
+				(!PARENT_ELT.equals(grandParent.getLocalName()) &&
+						!DEPENDENCY_ELT.equals(grandParent.getLocalName()) &&
+						!PLUGIN_ELT.equals(grandParent.getLocalName()))) {
+			return;
+		}
+		
+		String groupIdFilter = groupId.orElse(null);
+		String artifactIdFilter = artifactId.orElse(null);
+		
+		switch (parent.getLocalName()) {
+		case ARTIFACT_ID_ELT:
+			plugin.getProjectCache().getProjects().stream().map(this::toArtifactInfo)
+			.filter(a -> groupIdFilter == null || groupIdFilter.equals(a.getGroupId()))
+			.forEach(artifactInfosCollector::add);
+			break;
+		case GROUP_ID_ELT:
+		case VERSION_ELT:
+			plugin.getProjectCache().getProjects().stream().map(this::toArtifactInfo)
+			.filter(a -> artifactIdFilter == null || artifactIdFilter.equals(a.getArtifactId()))
+			.forEach(artifactInfosCollector::add);
+			break;
+		}
 	}
 }
