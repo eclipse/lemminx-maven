@@ -2,13 +2,45 @@
 
 ## Upcoming Release
 
+### 0.3.1
 
+* 📅 Release Date (tentative): Mid-March, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.0...0.3.1
 
 ## Latest Release
 
+### 0.3.0
+
+* 📅 Release Date: February 19th, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.2.0...0.3.0
+
+#### Use LemMinX 0.15
+
+This allows to consume newer APIs. As a result, LemMinX-Maven 0.3.0 is __not__ compatible with LemMinX 0.14.x and older.
+
+#### Fixed consumption of Maven settings
+
+Maven settings were not properly honored in previous release. Some bug was fixed and Maven settings (eg proxy, mirrors and so on) are now supposed to be used.
+
+#### Resolve dependencies and parent from workspace
+
+Using LemMinX 0.15 allows LemMinX-Maven to leverage with `workspaceFolders` LSP operation. LemMinX-Maven is now able to resolve dependencies and parent references that were declared as workspaceFolders, additionally to the various local and remote repositories.
+
+#### New format for settings/configuration
+
+To better align with VSCode requirements, the configuration/initializationOptions are now expected to be passed as a hierarchy of JSON objects, not as flat `.`-separated properties.
+
+#### Completion of properties without ${ prefix
+
+Properties are now suggested for completion without having to prefix with `${`.
+
+#### Bugfixes & Silence some exceptions
+
+Some exceptions are now avoided, and some remaining not-so-excetional exceptions are now silenced.
+
 ### 0.2.0
 
-* 📅 Release Date (tentative): December 1st, 2020
+* 📅 Release Date: December 3rd, 2020
 * All changes: https://github.com/eclipse/lemminx-maven/compare/0.1.1...0.2.0
 
 #### Important fixes
