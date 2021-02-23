@@ -4,6 +4,8 @@ _Want to provide some powerful Maven pom edition support in your software withou
 
 This project is an [Eclipse LemMinX](https://github.com/eclipse/lemminx) (XML Language Server) extension to provide some extra assistance to edition of Maven POM files
 
+  <a href="https://mickaelistria.github.io/redirctToEclipseIDECloneCommand/redirect.html"><img src="https://mickaelistria.github.io/redirctToEclipseIDECloneCommand/cloneToEclipseBadge.png" alt="Clone to Eclipse IDE"/></a>  
+
 ## Features
 
 Additionally to the XSD based assistance provided by LemMinX when editing pom files, this extension adds:
