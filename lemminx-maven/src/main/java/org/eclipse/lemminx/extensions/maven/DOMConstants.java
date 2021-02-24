@@ -18,6 +18,7 @@ public class DOMConstants {
 
 	}
 
+	public static final String PROJECT_ELT = "project";
 	public static final String MODULE_ELT = "module";
 	public static final String RELATIVE_PATH_ELT = "relativePath";
 	public static final String CONFIGURATION_ELT = "configuration";

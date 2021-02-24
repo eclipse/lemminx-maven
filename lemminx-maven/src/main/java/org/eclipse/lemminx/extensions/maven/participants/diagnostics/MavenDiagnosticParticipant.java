@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2020 Red Hat Inc. and others.
+ * Copyright (c) 2019-2021 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -12,6 +12,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_EL
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +53,11 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			return;
 		}
 
-		plugin.getProjectCache().getProblemsFor(xmlDocument).stream().map(this::toDiagnostic).forEach(diagnostics::add);
+		Collection<ModelProblem> problems = plugin.getProjectCache().getProblemsFor(xmlDocument);
+		if (problems != null) {
+			problems.stream().map(this::toDiagnostic).forEach(diagnostics::add);
+		}
+		
 		DOMElement documentElement = xmlDocument.getDocumentElement();
 		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
