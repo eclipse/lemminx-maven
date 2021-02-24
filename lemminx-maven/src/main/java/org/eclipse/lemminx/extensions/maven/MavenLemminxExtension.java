@@ -12,12 +12,22 @@
 package org.eclipse.lemminx.extensions.maven;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -31,6 +41,7 @@ import org.apache.maven.execution.MavenSession;
 import org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MavenPluginManager;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.settings.Settings;
 import org.apache.maven.settings.io.SettingsReader;
@@ -61,6 +72,7 @@ import org.eclipse.lemminx.services.extensions.save.ISaveContext;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
 import org.eclipse.lemminx.settings.AllXMLSettings;
 import org.eclipse.lemminx.settings.InitializationOptionsSettings;
+import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lsp4j.InitializeParams;
 
 import com.google.common.base.Objects;
@@ -92,6 +104,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private BuildPluginManager buildPluginManager;
 
 	XMLMavenSettings settings = new XMLMavenSettings();
+	private URIResolverExtensionManager resolverExtensionManager = new URIResolverExtensionManager();
 
 	@Override
 	public void doSave(ISaveContext context) {
@@ -215,8 +228,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenRequest;
 	}
 
-
-
 	private static File getFileFromOptions(String element, File defaults) {
 		if (element == null) {
 			return defaults;
@@ -291,16 +302,20 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 	public static boolean match(DOMDocument document) {
 		try {
-			File file = new File(URI.create(document.getDocumentURI()));
-			return (file.getName().startsWith("pom") && file.getName().endsWith(".xml"))
-					|| file.getName().endsWith(Maven.POMv4);
+			return match(new File(URI.create(document.getDocumentURI())).toPath());
 		} catch (Exception ex) {
 			// usually because of not so tolerant Java URI API
 			LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
 			return false;
 		}
 	}
-
+	
+	public static boolean match(Path file) {
+		String fileName = file != null ? file.getFileName().toString() : null;
+		return fileName != null && ((fileName.startsWith("pom") && fileName.endsWith(".xml"))
+				|| fileName.endsWith(Maven.POMv4));
+	}
+	
 	public MavenProjectCache getProjectCache() {
 		initialize();
 		return this.cache;
@@ -337,9 +352,59 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
+		initialize();
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
 		if (workspaceReader instanceof MavenLemminxWorkspaceReader) {
-			// TODO
+			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
+			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
+
+			if (projectsToAdd != null) {
+				projectsToAdd.stream().forEach(u -> getProjectCache().addDocument(u));
+			}
+
+			if (projectsToRemove != null) {
+				projectsToRemove.stream().forEach(u -> getProjectCache().removeDocument(u));
+			}
 		}
+	}
+	
+	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
+		Collection<MavenProject> cachedProjects = getProjectCache().getProjects();
+		return cachedProjects.stream().filter(p -> {
+			return Arrays.asList(removed).stream().filter(uri -> {
+				Path removedPath = new File(uri).toPath();
+				return p.getFile().toPath().startsWith(removedPath);
+			}).findAny().isPresent();
+		}).map(p -> p.getFile().toURI()).collect(Collectors.toUnmodifiableList());
+	}
+	
+	private List<URI> computeAddedWorkspaceProjects(URI[] added) {
+		List<URI> projectsToAdd = new ArrayList<URI>();
+		Arrays.asList(added).stream().forEach(uri -> {
+			Path addedPath = new File(uri).toPath();
+			try {
+				Files.walkFileTree(addedPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
+					@Override
+					public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
+						if (file.getFileName().toString().charAt(0) == '.') {
+							return FileVisitResult.SKIP_SUBTREE;
+						}
+						return FileVisitResult.CONTINUE;
+					}
+
+					@Override
+					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+						if (match(file)) {
+							projectsToAdd.add(file.toUri());
+						}
+						return FileVisitResult.CONTINUE;
+					}
+				});
+			} catch (IOException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			}
+		});
+		
+		return projectsToAdd;
 	}
 }
