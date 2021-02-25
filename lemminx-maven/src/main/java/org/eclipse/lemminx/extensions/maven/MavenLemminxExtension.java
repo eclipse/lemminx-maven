@@ -104,7 +104,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private BuildPluginManager buildPluginManager;
 
 	XMLMavenSettings settings = new XMLMavenSettings();
-	private URIResolverExtensionManager resolverExtensionManager = new URIResolverExtensionManager();
+	private URIResolverExtensionManager resolverExtensionManager;
 
 	@Override
 	public void doSave(ISaveContext context) {
@@ -131,6 +131,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			settings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings).getMaven();
 		}
 		this.currentRegistry = registry;
+		this.resolverExtensionManager = registry.getResolverExtensionManager();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
@@ -351,6 +352,11 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return Optional.ofNullable(indexSearcher);
 	}
 
+	public URIResolverExtensionManager getUriResolveExtentionManager() {
+		initialize();
+		return resolverExtensionManager;
+	}
+	
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		initialize();
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();

@@ -15,8 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,11 +51,10 @@ import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
-import org.eclipse.lsp4j.TextDocumentItem;
+import org.eclipse.lemminx.utils.DOMUtils;
 
 public class MavenProjectCache {
 
@@ -76,7 +73,6 @@ public class MavenProjectCache {
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
 	private Properties systemProperties;
-	private URIResolverExtensionManager resolverExtensionManager = new URIResolverExtensionManager();
 
 	public MavenProjectCache(MavenLemminxExtension lemminxMavenPlugin) {
 		this.lemminxMavenPlugin = lemminxMavenPlugin;
@@ -129,17 +125,12 @@ public class MavenProjectCache {
 	 * @param document A document to add
 	 */
 	public void addDocument(URI uri) {
-		DOMDocument document;
-		try {
-			document = createDOMDocument(uri);
-			if (document != null) {
-				DOMElement documentElement = document.getDocumentElement();
-				if (documentElement != null && PROJECT_ELT.equals(documentElement.getLocalName())) {
-					parseAndCache(document);
-				}
+		DOMDocument document = DOMUtils.loadDocument(uri.toString(), lemminxMavenPlugin.getUriResolveExtentionManager());
+		if (document != null) {
+			DOMElement documentElement = document.getDocumentElement();
+			if (documentElement != null && PROJECT_ELT.equals(documentElement.getLocalName())) {
+				parseAndCache(document);
 			}
-		} catch (IOException | URISyntaxException e) {
-			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 	}
 	
@@ -273,13 +264,5 @@ public class MavenProjectCache {
 
 	public Collection<MavenProject> getProjects() {
 		return projectCache.values();
-	}
-	
-	private DOMDocument createDOMDocument(URI uri) throws IOException, URISyntaxException {
-		File file = new File(uri);
-		String contents = Files.readString(file.toPath());
-		return org.eclipse.lemminx.dom.DOMParser.getInstance()
-				.parse(new TextDocument(new TextDocumentItem(uri.toString(), "xml", 1, contents)), 
-						resolverExtensionManager);
 	}
 }
