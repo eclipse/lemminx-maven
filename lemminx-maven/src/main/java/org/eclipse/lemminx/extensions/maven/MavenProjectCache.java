@@ -53,7 +53,6 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
-import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lemminx.utils.DOMUtils;
 
 public class MavenProjectCache {

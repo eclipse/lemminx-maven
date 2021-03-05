@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020 Red Hat Inc. and others.
+ * Copyright (c) 2020-2021 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -23,8 +23,10 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.Maven;
+import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -76,6 +78,18 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		Dependency dependency = MavenParseUtils.parseArtifact(request.getParentElement());
 		DOMNode parentNode = DOMUtils.findClosestParentNode(request, PARENT_ELT);
 		if (parentNode != null && parentNode.isElement()) {
+			// Find in workspace
+			if (isWellDefinedDependency(dependency)) {
+				File workspaceArtifactLocation = findWorkspaceArtifact(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+				if (workspaceArtifactLocation != null) {
+					LocationLink location = toLocationNoRange(workspaceArtifactLocation, element);
+					if (location != null) {
+						locations.add(location);
+					}
+					return;
+				}
+			}
+			
 			Optional<String> relativePath = DOMUtils.findChildElementText(element, RELATIVE_PATH_ELT);
 			if (relativePath.isPresent()) {
 				File relativeFile = new File(currentFolder, relativePath.get());
@@ -95,6 +109,18 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			}
 		}
 		if (dependency != null && element != null) {
+			// Find in workspace
+			if (isWellDefinedDependency(dependency)) {
+				File workspaceArtifactLocation = findWorkspaceArtifact(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+				if (workspaceArtifactLocation != null) {
+					LocationLink location = toLocationNoRange(workspaceArtifactLocation, element);
+					if (location != null) {
+						locations.add(location);
+					}
+					return;
+				}
+			}
+			
 			File artifactLocation = getArtifactLocation(dependency, element.getOwnerDocument());
 			LocationLink location = toLocationNoRange(artifactLocation, element);
 			if (location != null) {
@@ -103,6 +129,43 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		}
 	}
 
+	public File findWorkspaceArtifact(String groupId, String artifactId, String version) {
+		String projectKey = ArtifactUtils.key(groupId, artifactId, version);
+		Optional<MavenProject> matchingProject = plugin.getProjectCache().getProjects().stream()
+				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion())))
+				.findAny();
+
+		if (matchingProject.isPresent()) {
+			MavenProject project = matchingProject.get();
+			File file = project.getFile();
+			
+			if (file == null && project != project.getExecutionProject()) {
+				file = project.getExecutionProject().getFile();
+			}
+			return file;
+		}
+		return null;
+	}
+	
+	private static boolean isWellDefinedDependency(Dependency dependency) {
+		try {
+			notNullNorBlank(dependency.getGroupId());
+			notNullNorBlank(dependency.getArtifactId());
+			notNullNorBlank(dependency.getVersion());
+		} catch (Exception e) {
+			return false;
+		}
+		return true;
+	}
+	
+	private static void notNullNorBlank(String str) {
+        int c = str != null && str.length() > 0 ? str.charAt( 0 ) : 0;
+        if ( ( c < '0' || c > '9' ) && ( c < 'a' || c > 'z' ) )
+        {
+            Validate.notBlank( str, "Argument can neither be null, empty nor blank" );
+        }
+    }
+	
 	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
 		Pair<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {

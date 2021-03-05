@@ -11,11 +11,8 @@ package org.eclipse.lemminx.extensions.maven;
 import java.net.URI;
 
 import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
-import org.eclipse.lsp4j.DidChangeConfigurationParams;
-import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.WorkspaceFolder;
-import org.eclipse.lsp4j.services.WorkspaceService;
 
 public class MavenWorkspaceService implements IWorkspaceServiceParticipant {
 
