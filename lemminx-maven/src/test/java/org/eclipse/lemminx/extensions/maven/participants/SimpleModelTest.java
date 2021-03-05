@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -17,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -30,21 +33,26 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
+import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.WorkspaceFolder;
+import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -358,6 +366,60 @@ public class SimpleModelTest {
 				.anyMatch("0.0.1-SNAPSHOT"::equals));
 	}
 	
+	@Test
+	public void testModulesDefinitionInDependency() throws IOException, URISyntaxException {
+		// We need the targetDocument to be placed to MavenProjectCache
+		XMLLanguageService languageService = new XMLLanguageService();
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+
+		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
+		Position pos = new Position(11, 18);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		assertFalse(definitionLinks.isEmpty());
+
+		DOMDocument targetDocument = createDOMDocument("/modules/module-a-pom.xml", languageService);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+	}
+
+	@Test
+	public void testModulesDefinitionInParent() throws IOException, URISyntaxException {
+		// We need the targetDocument to be placed to MavenProjectCache
+		XMLLanguageService languageService = new XMLLanguageService();
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+
+		DOMDocument document = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
+		Position pos = new Position(10, 16);
+		List<? extends LocationLink> definitionLinks = languageService.findDefinition(document, pos, () -> {
+		});
+		assertFalse(definitionLinks.isEmpty());
+
+		DOMDocument targetDocument = createDOMDocument("/modules/module-a-pom.xml", languageService);
+		assertTrue(definitionLinks.stream().anyMatch(link -> link.getTargetUri().equals(targetDocument.getDocumentURI())));
+	}
+
 	@Test
 	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
