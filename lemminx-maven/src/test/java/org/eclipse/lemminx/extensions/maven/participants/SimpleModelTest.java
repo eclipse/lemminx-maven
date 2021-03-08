@@ -421,6 +421,80 @@ public class SimpleModelTest {
 	}
 
 	@Test
+ 	public void testModulesHoverInDependency() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		XMLLanguageService languageService = new XMLLanguageService();
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+
+		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
+		
+		// Hover over groupID text
+		Position pos = new Position(10, 16);	// <groupId>o|rg.test.modules</groupId>
+		Hover hover = languageService.doHover(document,pos, new SharedSettings());
+		Range firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+		
+		// Hover over artifactID text
+		pos = new Position(11, 19); 	// <artifactId>M|oduleA</artifactId>
+		hover = languageService.doHover(document, pos, new SharedSettings());
+		firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+
+		// Hover over version text
+ 		pos = new Position(12, 16);		// <version>0|.0.1-SNAPSHOT</version>
+		hover = languageService.doHover(document, pos, new SharedSettings());
+		firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+	}
+
+	@Test
+ 	public void testModulesHoverInParent() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		XMLLanguageService languageService = new XMLLanguageService();
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+
+		DOMDocument document = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
+		
+		// Hover over groupID text
+		Position pos = new Position(9, 14);	// <groupId>o|rg.test.modules</groupId>
+		Hover hover = languageService.doHover(document, pos, new SharedSettings());
+		Range firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+		
+		// Hover over artifactID text
+		pos = new Position(10, 17); 	// <artifactId>M|oduleA</artifactId>
+		hover = languageService.doHover(document, pos, new SharedSettings());
+		firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+
+		// Hover over version text
+ 		pos = new Position(11, 14);		// <version>0|.0.1-SNAPSHOT</version>
+		hover = languageService.doHover(document, pos, new SharedSettings());
+		firstHoverRange = hover.getRange();
+ 		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
+	}
+	
+	@Test
 	public void testParentDefinitionWithRelativePath() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		Position pos = new Position(6, 9);

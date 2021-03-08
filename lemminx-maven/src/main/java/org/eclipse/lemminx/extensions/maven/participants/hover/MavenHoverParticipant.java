@@ -11,9 +11,12 @@ package org.eclipse.lemminx.extensions.maven.participants.hover;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
+import java.io.File;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
@@ -43,6 +46,7 @@ import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -70,6 +74,7 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 public class MavenHoverParticipant extends HoverParticipantAdapter {
@@ -112,6 +117,45 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return null;
 	}
 
+	private Hover findWorkspaceArtifactDescription(IHoverRequest request) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
+		DOMNode node = request.getNode();
+		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
+		try {
+			Optional<String> localDescription = plugin.getProjectCache().getProjects().stream()
+				.filter(a -> (artifactToSearch.getGroupId() == null
+					|| artifactToSearch.getGroupId().equals(a.getGroupId()))
+					&& (artifactToSearch.getArtifactId() == null
+							|| artifactToSearch.getArtifactId().equals(a.getArtifactId()))
+					&& (artifactToSearch.getVersion() == null
+							|| artifactToSearch.getVersion().equals(a.getVersion())))
+				.sorted(Comparator.comparing((MavenProject p) -> new DefaultArtifactVersion(p.getVersion())).reversed())
+			.	findFirst().map(p -> {
+					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
+							: UnaryOperator.identity();
+					String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+					String message = "";
+	
+					if (p.getName() != null) {
+						message += toBold.apply(p.getName());
+					}
+	
+					if (p.getDescription() != null) {
+						message += lineBreak + p.getDescription();
+					}
+					
+					return message;
+				}).map(message -> (message.length() > 2 ? message : null));
+			if (localDescription.isPresent()) {
+				return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT,
+						localDescription.get()));
+			}
+		}  catch (Exception e) {
+			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
+		}			
+		return null;
+	}
+	
 	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Collection<String> possibleHovers = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -287,7 +331,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 
 		switch (parent.getLocalName()) {
+		case GROUP_ID_ELT:
 		case ARTIFACT_ID_ELT:
+		case VERSION_ELT:
+			Hover hover = findWorkspaceArtifactDescription(request);
+			if(hover != null) {
+				return hover;
+			}
 			if (isParentDeclaration) {
 				return null;
 			} else {

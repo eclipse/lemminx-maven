@@ -6,4 +6,6 @@
   <artifactId>ModuleA</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <packaging>pom</packaging>
+  <name>ModuleA Test Project</name>
+  <description>This is a test description for ModuleA</description>
 </project>
