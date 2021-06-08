@@ -536,4 +536,12 @@ public class SimpleModelTest {
 		DOMDocument document = createDOMDocument("/it1/pom.xml", languageService);
 		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
 	}
+
+	@Test
+	public void testSystemPath() throws Exception {
+		DOMDocument document = createDOMDocument("/pom-systemPath.xml", languageService);
+		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(
+				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+	}
+
 }
