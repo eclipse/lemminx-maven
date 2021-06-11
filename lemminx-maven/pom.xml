@@ -23,6 +23,7 @@
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.7.0</junit-jupiter.version>
 		<lemminx.version>0.16.2</lemminx.version>
+		<maven.version>3.8.1</maven.version>
 	</properties>
 
 	<dependencies>
@@ -54,25 +55,25 @@
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-artifact</artifactId>
-			<version>3.6.3</version>
+			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-plugin-api</artifactId>
-			<version>3.6.3</version>
+			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-core</artifactId>
-			<version>3.6.3</version>
+			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-embedder</artifactId>
-			<version>3.6.3</version>
+			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
@@ -84,7 +85,7 @@
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-compat</artifactId>
-			<version>3.6.3</version>
+			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
