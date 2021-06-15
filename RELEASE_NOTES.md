@@ -2,12 +2,27 @@
 
 ## Upcoming Release
 
-### 0.3.1
+### 0.3.2
 
-* 📅 Release Date (tentative): Mid-March, 2021
-* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.0...0.3.1
+* 📅 Release Date: ?
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.1...0.3.2
 
 ## Latest Release
+
+### 0.3.1
+
+* 📅 Release Date: June 15th, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.0...0.3.1
+
+#### Resolve dependencies against workspace projects
+
+Maven projects that are already visible to the Language Server (their root folder is set as a `workspaceFolder` or a `pom.xml` file was already visible) are now used with high priority when resolving dependencies. As a result, the change that happen in the workspace now affect resolution of other projects in this same workspace.
+
+This allows to get faster and more reactive feedback when working across multiple projects.
+
+#### Fix resolution of ${basedir}
+
+`${basedir}` wasn't properly resolved in some cases, leading to suboptimal assistance or error detection. This is now fixed, so a bunch of features should now work slightly better.
 
 ### 0.3.0
 
