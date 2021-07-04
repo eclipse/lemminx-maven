@@ -174,10 +174,9 @@ public class MavenPluginUtils {
 			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
 		}
 
-		return lemminxMavenPlugin.getMavenPluginManager()
-				.getPluginDescriptor(plugin, project.getPluginRepositories().stream()
-						.map(MavenPluginUtils::toRemoteRepo).collect(Collectors.toList()),
-						lemminxMavenPlugin.getMavenSession().getRepositorySession());
+		return lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
+				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
+				lemminxMavenPlugin.getMavenSession().getRepositorySession());
 	}
 
 }
