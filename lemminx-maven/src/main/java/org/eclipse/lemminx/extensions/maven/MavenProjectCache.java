@@ -40,7 +40,6 @@ import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.model.building.ModelProblem.Version;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import org.apache.maven.project.DefaultProjectBuilder;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
@@ -251,7 +250,6 @@ public class MavenProjectCache {
 		}
 		try {
 			projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
-			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
 		} catch (ComponentLookupException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}

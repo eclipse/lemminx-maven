@@ -203,7 +203,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						localDescription.get()));
 			}
 		} catch (Exception e1) {
-			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
+			LOGGER.log(Level.SEVERE, e1.toString(), e1);
 		}
 		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
 			try {

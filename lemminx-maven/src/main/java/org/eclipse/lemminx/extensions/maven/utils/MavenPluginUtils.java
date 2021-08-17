@@ -159,13 +159,11 @@ public class MavenPluginUtils {
 		Plugin plugin = project.getPlugin(pluginKey);
 		if (plugin == null && project.getPluginManagement() != null) {
 			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
-
-			if (plugin == null && artifactId.isPresent()) {
-				// pluginArtifactMap will be empty if PluginManagement is null
-				for (Entry<String, Artifact> entry : project.getPluginArtifactMap().entrySet()) {
-					if (entry.getValue().getArtifactId().equals(artifactId.get())) {
-						plugin = project.getPlugin(entry.getKey());
-					}
+		}
+		if (plugin == null && artifactId.isPresent()) {
+			for (Entry<String, Artifact> entry : project.getPluginArtifactMap().entrySet()) {
+				if (entry.getValue().getArtifactId().equals(artifactId.get())) {
+					plugin = project.getPlugin(entry.getKey());
 				}
 			}
 		}

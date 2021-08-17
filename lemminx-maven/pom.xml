@@ -23,7 +23,7 @@
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.7.0</junit-jupiter.version>
 		<lemminx.version>0.16.2</lemminx.version>
-		<maven.version>3.8.1</maven.version>
+		<maven.version>4.0.0-alpha-1-SNAPSHOT</maven.version>
 	</properties>
 
 	<dependencies>
@@ -79,7 +79,7 @@
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-impl</artifactId>
-			<version>1.6.1</version>
+			<version>1.7.1</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
@@ -189,6 +189,11 @@
 				<enabled>true</enabled>
 			</releases>
 		</repository>
+		<repository>
+			<id>apache.snapshots</id>
+			<url>https://repository.apache.org/snapshots/</url>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
 	</repositories>
 
 	<distributionManagement>
@@ -231,4 +236,5 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
+	
 </project>
