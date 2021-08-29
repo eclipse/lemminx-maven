@@ -222,13 +222,22 @@ public class MavenLemminxExtension implements IXMLExtension {
 		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
 		mavenRequest.setLocalRepository(localRepo);
 		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
-		mavenRequest.setRemoteRepositories(defaultRemoteRepositories);
-		mavenRequest.setPluginArtifactRepositories(defaultRemoteRepositories);
+	  mavenRequest.setRemoteRepositories(joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
+		mavenRequest.setPluginArtifactRepositories(joinRemoteRepositories(mavenRequest.getPluginArtifactRepositories(), defaultRemoteRepositories));
 		mavenRequest.setSystemProperties(System.getProperties());
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
 		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader(this));
 		return mavenRequest;
+	}
+	
+	private List<ArtifactRepository> joinRemoteRepositories(List<ArtifactRepository> a, List<ArtifactRepository> b) {
+	  if (a.isEmpty()) {
+	    return b;
+	  }
+	  List<ArtifactRepository> remotes = new ArrayList<>(a);
+	  remotes.addAll(b);
+	  return remotes;	  
 	}
 
 	private static File getFileFromOptions(String element, File defaults) {
