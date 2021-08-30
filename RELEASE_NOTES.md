@@ -2,7 +2,7 @@
 
 ## Upcoming Release
 
-### 0.3.2
+### 0.3.3
 
 * 📅 Release Date: August 30th, 2021
 * All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.1...0.3.2
@@ -12,6 +12,15 @@
 Repositories defined in settings.xml should not be properly used.
 
 ## Latest Release
+
+### 0.3.2
+
+* 📅 Release Date: August 30th, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.1...0.3.2
+
+#### Fix issues regarding repos defined in settings.xml
+
+Repositories defined in settings.xml should not be properly used.
 
 ### 0.3.1
 
