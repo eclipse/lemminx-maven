@@ -13,6 +13,7 @@ import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -542,6 +544,15 @@ public class SimpleModelTest {
 		DOMDocument document = createDOMDocument("/pom-systemPath.xml", languageService);
 		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(
 				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+	}
+
+	@Test
+	public void testPluginInProfileOnly() throws Exception {
+		DOMDocument document = createDOMDocument("/pom-gpg.xml", languageService);
+		Optional<Diagnostic> diagnostics = languageService.doDiagnostics(
+				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Warning).findAny();
+		assertTrue(diagnostics.isEmpty(), () -> diagnostics.map(Object::toString).get());
+		
 	}
 
 }

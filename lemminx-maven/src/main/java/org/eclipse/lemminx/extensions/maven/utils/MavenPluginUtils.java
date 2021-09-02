@@ -18,6 +18,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -35,6 +36,7 @@ import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
+import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
@@ -156,6 +158,35 @@ public class MavenPluginUtils {
 		if (artifactId.isPresent()) {
 			pluginKey += artifactId.get();
 		}
+		Plugin plugin = findPluginInProject(project, pluginKey, artifactId);
+
+		if (plugin == null) {
+			DOMNode profileNode = DOMUtils.findClosestParentNode(request, "profile");
+			if (profileNode != null) {
+				project = profileNode.getChildren().stream() //
+						.filter(DOMElement.class::isInstance) //
+						.map(DOMElement.class::cast) //
+						.filter(node -> "id".equals(node.getLocalName())) //
+						.map(node -> node.getChild(0).getTextContent())
+						.filter(Objects::nonNull)
+						.map(profileId -> lemminxMavenPlugin.getProjectCache().getSnapshotProject(request.getXMLDocument(), profileId)) //
+						.filter(Objects::nonNull)
+						.findFirst().orElse(null);
+				if (project != null) {
+					plugin = findPluginInProject(project, pluginKey, artifactId);
+				}
+			}
+		}
+		if (plugin == null) {
+			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
+		}
+
+		return lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
+				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
+				lemminxMavenPlugin.getMavenSession().getRepositorySession());
+	}
+
+	private static Plugin findPluginInProject(MavenProject project, String pluginKey, Optional<String> artifactId) {
 		Plugin plugin = project.getPlugin(pluginKey);
 		if (plugin == null && project.getPluginManagement() != null) {
 			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
@@ -167,14 +198,7 @@ public class MavenPluginUtils {
 				}
 			}
 		}
-
-		if (plugin == null) {
-			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
-		}
-
-		return lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
-				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
-				lemminxMavenPlugin.getMavenSession().getRepositorySession());
+		return plugin;
 	}
 
 }
