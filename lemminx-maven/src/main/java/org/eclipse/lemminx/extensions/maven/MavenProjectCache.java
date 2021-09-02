@@ -264,4 +264,26 @@ public class MavenProjectCache {
 	public Collection<MavenProject> getProjects() {
 		return projectCache.values();
 	}
+
+	public MavenProject getSnapshotProject(DOMDocument document, String profileId) {
+		// it would be nice to directly rebuild from Model instead of reparsing text
+		ProjectBuildingRequest request = newProjectBuildingRequest();
+		if (profileId != null) {
+			request.setActiveProfileIds(List.of(profileId));
+		}
+		try {
+			return projectBuilder.build(new FileModelSource(new File(document.getDocumentURI())) {
+				@Override
+				public InputStream getInputStream() throws IOException {
+					return new ByteArrayInputStream(document.getText().getBytes());
+				}
+			}, request).getProject();
+		} catch (ProjectBuildingException e) {
+			List<ProjectBuildingResult> result = e.getResults();
+			if (result != null && result.size() == 1 && result.get(0).getProject() != null) {
+				return result.get(0).getProject();
+			}
+		}
+		return null;
+	}
 }
