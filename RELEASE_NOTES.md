@@ -2,16 +2,29 @@
 
 ## Upcoming Release
 
+### 0.4.0
+
+* 📅 Release Date: September 3rd, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.3...0.4.0
+
+#### Use LemMinX 0.18.0
+
+Update to newer version and APIs of LemMinX, so LemMinX-Maven 0.4.0 is compatible with 0.18.x.
+
+#### Fix resolution of plugins in pluginManagement
+
+If a plugin is only defined in pluginManagement; it should now be properly resolved and no warning would be emitted, and completion and other documentation should be available.
+
+## Latest Release
+
 ### 0.3.3
 
 * 📅 Release Date: August 30th, 2021
-* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.1...0.3.2
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.3.2...0.3.3
 
 #### Fix issues regarding repos defined in settings.xml
 
 Repositories defined in settings.xml should not be properly used.
-
-## Latest Release
 
 ### 0.3.2
 
