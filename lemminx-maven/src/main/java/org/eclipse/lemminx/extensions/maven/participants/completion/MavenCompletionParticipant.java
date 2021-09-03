@@ -350,7 +350,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		res.setFilterText(text);
 		TextEdit edit = new TextEdit();
 		edit.setNewText(text);
-		res.setTextEdit(edit);
+		res.setTextEdit(Either.forLeft(edit));
 		Position endOffset = request.getXMLDocument().positionAt(request.getOffset());
 		for (int startOffset = Math.max(0, request.getOffset() - text.length()); startOffset <= request
 				.getOffset(); startOffset++) {
@@ -435,7 +435,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					new Range(new Position(0, 0),
 							request.getXMLDocument().positionAt(request.getXMLDocument().getText().length())),
 					new String(stream.toByteArray()));
-			item.setTextEdit(textEdit);
+			item.setTextEdit(Either.forLeft(textEdit));
 		}
 		return item;
 	}
@@ -466,7 +466,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		Range replaceRange = doc.getTextDocument().getWordRangeAt(request.getOffset(), ARTIFACT_ID_PATTERN);
 
 		TextEdit textEdit = new TextEdit();
-		item.setTextEdit(textEdit);
+		item.setTextEdit(Either.forLeft(textEdit));
 		textEdit.setRange(replaceRange);
 		if (strategy == GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING) {
 			item.setKind(CompletionItemKind.Value);
@@ -567,7 +567,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		TextEdit edit = new TextEdit();
 		edit.setNewText('<' + name + ">$0</" + name + '>');
 		edit.setRange(request.getReplaceRange());
-		res.setTextEdit(edit);
+		res.setTextEdit(Either.forLeft(edit));
 		res.setKind(CompletionItemKind.Field);
 		res.setFilterText(edit.getNewText());
 		res.setSortText(name);
@@ -811,7 +811,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		res.setLabel(pathString);
 		res.setFilterText(pathString);
 		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
-		res.setTextEdit(new TextEdit(replaceRange, pathString));
+		res.setTextEdit(Either.forLeft(new TextEdit(replaceRange, pathString)));
 
 		return res;
 	}
@@ -833,7 +833,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			item.setKind(CompletionItemKind.Property);
 			item.setDocumentation(Either.forLeft(documentationExtractor.apply(o)));
 			item.setFilterText(insertText);
-			item.setTextEdit(new TextEdit(range, insertText));
+			item.setTextEdit(Either.forLeft(new TextEdit(range, insertText)));
 			item.setInsertTextFormat(InsertTextFormat.PlainText);
 			return item;
 		}).collect(Collectors.toList());
@@ -859,7 +859,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 		item.setFilterText(insertText);
 		item.setInsertTextFormat(InsertTextFormat.PlainText);
-		item.setTextEdit(new TextEdit(range, insertText));
+		item.setTextEdit(Either.forLeft(new TextEdit(range, insertText)));
 		return item;
 	}
 

@@ -9,11 +9,9 @@
 package org.eclipse.lemminx.extensions.maven.participants;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,7 +26,6 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -55,6 +52,7 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -156,7 +154,7 @@ public class SimpleModelTest {
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
 		List<CompletionItem> completions = languageService.doComplete(document, new Position(16, 49), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("${env.PATH}"::equals));
 	}
 
@@ -164,9 +162,9 @@ public class SimpleModelTest {
 	@Timeout(15000)
 	public void testCompleteScope() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-scope.xml", languageService);
-		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("compile"::equals));
-		assertTrue(languageService.doComplete(document, new Position(1, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(languageService.doComplete(document, new Position(1, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("compile</scope>"::equals));
 	}
 
@@ -174,9 +172,9 @@ public class SimpleModelTest {
 	@Timeout(15000)
 	public void testCompletePhase() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-phase.xml", languageService);
-		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(languageService.doComplete(document, new Position(0, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("generate-resources"::equals));
-		assertTrue(languageService.doComplete(document, new Position(1, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(languageService.doComplete(document, new Position(1, 7), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("generate-resources</phase>"::equals));
 	}
 
@@ -324,17 +322,17 @@ public class SimpleModelTest {
 		// in <dependency />
 		// for group ID
 		List<CompletionItem> completions = languageService.doComplete(document, new Position(10, 15), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("org.test.modules"::equals));
 
 		// for artifact ID:
 		completions = languageService.doComplete(document, new Position(11, 18), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("ModuleA"::equals));
 
 		// for versions
 		completions = languageService.doComplete(document, new Position(12, 15), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("0.0.1-SNAPSHOT"::equals));
 	}
 
@@ -354,17 +352,17 @@ public class SimpleModelTest {
 		// in <parent />
 		// for group ID
 		List<CompletionItem> completions = languageService.doComplete(document, new Position(9, 13), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("org.test.modules"::equals));
 
 		// for artifact ID:
 		completions = languageService.doComplete(document, new Position(10, 16), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("ModuleA"::equals));
 
 		// for versions
 		completions = languageService.doComplete(document, new Position(11, 13), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText)
+		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
 				.anyMatch("0.0.1-SNAPSHOT"::equals));
 	}
 	
@@ -527,7 +525,7 @@ public class SimpleModelTest {
 	@Test
 	public void testCompleteSNAPSHOT() throws Exception {
 		DOMDocument document = createDOMDocument("/pom-version.xml", languageService);
-		Optional<TextEdit> edit = languageService.doComplete(document, new Position(0, 11), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).findFirst();
+		Optional<TextEdit> edit = languageService.doComplete(document, new Position(0, 11), new SharedSettings()).getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).findFirst();
 		assertTrue(edit.isPresent());
 		assertEquals("-SNAPSHOT", edit.get().getNewText());
 		assertEquals(new Range(new Position(0, 9), new Position(0, 11)), edit.get().getRange());

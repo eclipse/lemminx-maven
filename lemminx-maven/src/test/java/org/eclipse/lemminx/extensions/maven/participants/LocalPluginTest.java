@@ -32,6 +32,7 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,7 @@ public class LocalPluginTest {
 	public void testCompleteGoal() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		assertTrue(languageService.doComplete(createDOMDocument("/pom-complete-plugin-goal.xml", languageService),
 				new Position(18, 19), new SharedSettings())
-			.getItems().stream().map(CompletionItem::getTextEdit).map(TextEdit::getNewText).anyMatch("test"::equals));
+			.getItems().stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText).anyMatch("test"::equals));
 	}
 
 	@Test
@@ -132,7 +133,7 @@ public class LocalPluginTest {
 		// Expected replace range is the whole text node range
 		Range expectedReplaceRange = new Range(new Position(11, 10), new Position(11, 26));
 
-		assertTrue(completions.stream().map(item -> item.getTextEdit().getRange()).anyMatch(expectedReplaceRange::equals));
+		assertTrue(completions.stream().map(item -> item.getTextEdit().getLeft().getRange()).anyMatch(expectedReplaceRange::equals));
 	}
 
 	// Hover related tests
