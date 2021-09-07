@@ -43,6 +43,7 @@
 			<groupId>org.eclipse.lemminx</groupId>
 			<artifactId>org.eclipse.lemminx</artifactId>
 			<version>${lemminx.version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.lemminx</groupId>
@@ -167,7 +168,7 @@
 				</configuration>
 				<executions>
 					<execution>
-						<id>zip-with-dependencies</id>
+						<id>jar-with-dependencies</id>
 						<phase>package</phase>
 						<goals>
 							<goal>single</goal>
