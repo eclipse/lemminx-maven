@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,6 +36,7 @@ import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSetting
 import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
+import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -45,6 +47,7 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
@@ -550,7 +553,19 @@ public class SimpleModelTest {
 		Optional<Diagnostic> diagnostics = languageService.doDiagnostics(
 				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Warning).findAny();
 		assertTrue(diagnostics.isEmpty(), () -> diagnostics.map(Object::toString).get());
-		
 	}
 
+	@Test
+	public void testParentAsWorkspaceFolderInInitializeParam() throws Exception {
+		InitializeParams params = new InitializeParams();
+		String childFolder = "/parentAsSiblingProjectWithoutRelativePath/child";
+		params.setWorkspaceFolders(List.of(
+				new WorkspaceFolder(MavenLemminxTestsUtils.class.getResource(childFolder).toURI().toString()),
+				new WorkspaceFolder(MavenLemminxTestsUtils.class.getResource("/parentAsSiblingProjectWithoutRelativePath/parent").toURI().toString())));
+		languageService.initializeParams(params);
+		DOMDocument document = createDOMDocument(childFolder + "/pom.xml", languageService);
+		Optional<Diagnostic> diagnostics = languageService.doDiagnostics(
+				document, new XMLValidationSettings(), () -> {}).stream().findAny();
+		assertTrue(diagnostics.isEmpty(), () -> diagnostics.map(Object::toString).get());
+	}
 }

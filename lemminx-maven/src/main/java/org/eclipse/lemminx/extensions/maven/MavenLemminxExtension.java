@@ -75,6 +75,7 @@ import org.eclipse.lemminx.settings.AllXMLSettings;
 import org.eclipse.lemminx.settings.InitializationOptionsSettings;
 import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lsp4j.InitializeParams;
+import org.eclipse.lsp4j.WorkspaceFolder;
 
 import com.google.common.base.Objects;
 
@@ -106,6 +107,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 	XMLMavenSettings settings = new XMLMavenSettings();
 	private URIResolverExtensionManager resolverExtensionManager;
+	private List<WorkspaceFolder> initialWorkspaceFolders = List.of();
 
 	@Override
 	public void doSave(ISaveContext context) {
@@ -127,9 +129,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 	@Override
 	public void start(InitializeParams params, XMLExtensionsRegistry registry) {
 		if (params != null) {
+			this.initialWorkspaceFolders = params.getWorkspaceFolders();
 			Object initOptions = InitializationOptionsSettings.getSettings(params);
 			Object xmlSettings = AllXMLSettings.getAllXMLSettings(initOptions);
-			settings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings).getMaven();
+			XMLMavenGeneralSettings generalXmlSettings = XMLMavenGeneralSettings.getGeneralXMLSettings(xmlSettings);
+			if (generalXmlSettings != null) {
+				settings = generalXmlSettings.getMaven();
+			}
 		}
 		this.currentRegistry = registry;
 		this.resolverExtensionManager = registry.getResolverExtensionManager();
@@ -158,7 +164,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 			return;
 		}
 		try {
-
 			this.container = newPlexusContainer();
 			this.container.addComponent(new ModelValidatorMNG7170(), ModelValidator.class, "workaround-MNG7170");
 			mavenRequest = initMavenRequest(container, settings);
@@ -175,6 +180,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);
+			didChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
 		} catch (Exception e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			stop(currentRegistry);
@@ -222,7 +228,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
 		mavenRequest.setLocalRepository(localRepo);
 		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
-	  mavenRequest.setRemoteRepositories(joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
+		mavenRequest.setRemoteRepositories(joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
 		mavenRequest.setPluginArtifactRepositories(joinRemoteRepositories(mavenRequest.getPluginArtifactRepositories(), defaultRemoteRepositories));
 		mavenRequest.setSystemProperties(System.getProperties());
 		mavenRequest.setCacheNotFound(true);
@@ -375,6 +381,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
+			// Optimize: for workspace folder and MavenWorkspaceReader, we don't need to keep the whole Maven project
+			// Also, we could add multiple document at once to share the common parents and so on.
 			if (projectsToAdd != null) {
 				projectsToAdd.stream().forEach(u -> getProjectCache().addDocument(u));
 			}
@@ -388,15 +396,15 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
 		Collection<MavenProject> cachedProjects = getProjectCache().getProjects();
 		return cachedProjects.stream().filter(p -> {
-			return Arrays.asList(removed).stream().filter(uri -> {
+			return Arrays.stream(removed).anyMatch(uri -> {
 				Path removedPath = new File(uri).toPath();
 				return p.getFile().toPath().startsWith(removedPath);
-			}).findAny().isPresent();
+			});
 		}).map(p -> p.getFile().toURI()).collect(Collectors.toUnmodifiableList());
 	}
 	
 	private List<URI> computeAddedWorkspaceProjects(URI[] added) {
-		List<URI> projectsToAdd = new ArrayList<URI>();
+		List<URI> projectsToAdd = new ArrayList<>();
 		Arrays.asList(added).stream().forEach(uri -> {
 			Path addedPath = new File(uri).toPath();
 			try {

@@ -44,6 +44,8 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	@Override
 	public File findArtifact(Artifact artifact) {
 		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+		// Optimize: Instead of storing MavenProjects (which are expensive), we should make the workspace folder store the
+		// artifact->File mapping directly.
 		Optional<MavenProject> matchingProject = plugin.getProjectCache().getProjects().stream()
 				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion())))
 				.findAny();
