@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 Takari, Inc.
+ * Copyright (c) 2015, 2021 Takari, Inc.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -45,7 +45,6 @@ import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.reflect.ClassPath;
 import com.google.common.reflect.ClassPath.ClassInfo;
 
@@ -440,16 +439,12 @@ public class PlexusConfigHelper {
 		return parameters;
 	}
 
-	private static final Set<String> INLINE_TYPES;
-
-	static {
-		INLINE_TYPES = ImmutableSet.<String>of(byte.class.getName(), Byte.class.getName(), short.class.getName(),
+	private static final Set<String> INLINE_TYPES = Set.of(byte.class.getName(), Byte.class.getName(), short.class.getName(),
 				Short.class.getName(), int.class.getName(), Integer.class.getName(), long.class.getName(),
 				Long.class.getName(), float.class.getName(), Float.class.getName(), double.class.getName(),
 				Double.class.getName(), boolean.class.getName(), Boolean.class.getName(), char.class.getName(),
 				Character.class.getName(), String.class.getName(), StringBuilder.class.getName(),
 				StringBuffer.class.getName(), File.class.getName(), URI.class.getName(), URL.class.getName(),
 				Date.class.getName(), "org.codehaus.plexus.configuration.PlexusConfiguration");
-	}
 
 }
