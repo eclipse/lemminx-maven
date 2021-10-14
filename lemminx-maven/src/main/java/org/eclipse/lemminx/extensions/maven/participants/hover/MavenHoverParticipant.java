@@ -16,7 +16,6 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
-import java.io.File;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +43,6 @@ import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -72,7 +70,6 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
-import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 public class MavenHoverParticipant extends HoverParticipantAdapter {
