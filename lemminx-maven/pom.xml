@@ -23,7 +23,7 @@
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.8.1</junit-jupiter.version>
 		<lemminx.version>0.18.0</lemminx.version>
-		<maven.version>3.8.1</maven.version>
+		<maven.version>3.8.2</maven.version>
 	</properties>
 
 	<dependencies>
