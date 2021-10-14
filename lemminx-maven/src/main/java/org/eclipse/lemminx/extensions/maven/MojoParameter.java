@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 Takari, Inc.
+ * Copyright (c) 2015, 2021 Takari, Inc.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -19,11 +19,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
-
-import com.google.common.base.Objects;
 
 // TODO: Make Maven bug about moving this upstream
 public class MojoParameter {
@@ -206,7 +205,7 @@ public class MojoParameter {
 
 	@Override
 	public int hashCode() {
-		return Objects.hashCode(required, map, multiple, type, getNestedParameters().size(), name, expression, description,
+		return Objects.hash(required, map, multiple, type, getNestedParameters().size(), name, expression, description,
 				defaultValue);
 	}
 
@@ -218,12 +217,12 @@ public class MojoParameter {
 		MojoParameter otherMojo = (MojoParameter) obj;
 
 		return (this.isRequired() == otherMojo.isRequired()) && (this.isMap() == otherMojo.isMap())
-				&& (this.isMultiple() == otherMojo.isMultiple()) && (Objects.equal(this.getType(), otherMojo.getType()))
-				&& (Objects.equal(this.getNestedParameters(), otherMojo.getNestedParameters()))
-				&& (Objects.equal(this.getName(), otherMojo.getName())
-						&& (Objects.equal(this.getExpression(), otherMojo.getExpression())
-								&& (Objects.equal(this.getDescription(), otherMojo.getDescription()))))
-				&& (Objects.equal(this.getDefaultValue(), otherMojo.getDefaultValue()));
+				&& (this.isMultiple() == otherMojo.isMultiple()) && (Objects.equals(this.getType(), otherMojo.getType()))
+				&& (Objects.equals(this.getNestedParameters(), otherMojo.getNestedParameters()))
+				&& (Objects.equals(this.getName(), otherMojo.getName())
+						&& (Objects.equals(this.getExpression(), otherMojo.getExpression())
+								&& (Objects.equals(this.getDescription(), otherMojo.getDescription()))))
+				&& (Objects.equals(this.getDefaultValue(), otherMojo.getDefaultValue()));
 	}
 
 }

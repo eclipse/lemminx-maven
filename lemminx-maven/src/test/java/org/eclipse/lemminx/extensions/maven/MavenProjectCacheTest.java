@@ -9,7 +9,6 @@
 package org.eclipse.lemminx.extensions.maven;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,7 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -36,8 +35,6 @@ import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import com.google.common.io.Files;
 
 @ExtendWith(NoMavenCentralIndexExtension.class)
 public class MavenProjectCacheTest {
@@ -78,13 +75,13 @@ public class MavenProjectCacheTest {
 		String initialContent = FileUtils.readFileToString(parentPomFile, "UTF-8");
 		try {
 			String content = initialContent.replaceAll("myProperty", "modifiedProperty");
-			Files.write(content.getBytes(Charset.defaultCharset()), parentPomFile);
+			Files.writeString(parentPomFile.toPath(), content);
 			doc.getTextDocument().setVersion(2); // Simulate some change
 			MavenProject modifiedProject = cache.getLastSuccessfulMavenProject(doc);
 			assertTrue(modifiedProject.getProperties().containsKey("modifiedProperty"),
 					modifiedProject.getProperties().toString());
 		} finally {
-			Files.write(initialContent.getBytes(Charset.defaultCharset()), parentPomFile);
+			Files.writeString(parentPomFile.toPath(), initialContent);
 		}
 	}
 

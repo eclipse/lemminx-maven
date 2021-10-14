@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2021 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -77,8 +78,6 @@ import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.WorkspaceFolder;
 
-import com.google.common.base.Objects;
-
 /**
  * Extension for pom.xml.
  *
@@ -118,7 +117,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 				return;
 			}
 			XMLMavenSettings newSettings = generalXMLSettings.getMaven();
-			if (newSettings != null && !Objects.equal(this.settings, newSettings)) {
+			if (newSettings != null && !Objects.equals(this.settings, newSettings)) {
 				stop(registry);
 				this.settings = newSettings;
 				start(null, registry);
