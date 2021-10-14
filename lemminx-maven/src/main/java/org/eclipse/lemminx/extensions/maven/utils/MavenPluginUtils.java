@@ -46,7 +46,6 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
-import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;

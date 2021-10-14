@@ -19,17 +19,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-import javax.annotation.PostConstruct;
-
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
-import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
-import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
