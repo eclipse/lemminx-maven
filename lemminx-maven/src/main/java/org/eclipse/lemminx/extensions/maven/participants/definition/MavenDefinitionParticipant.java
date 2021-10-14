@@ -19,12 +19,12 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.Validate;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.Maven;
 import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.model.Dependency;
@@ -167,7 +167,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
     }
 	
 	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
-		Pair<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
+		Map.Entry<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {
 			return null;
 		}
@@ -177,7 +177,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return null;
 		}
 		MavenProject childProj = project;
-		while (project != null && project.getProperties().containsKey(mavenProperty.getRight())) {
+		while (project != null && project.getProperties().containsKey(mavenProperty.getValue())) {
 			childProj = project;
 			project = project.getParent();
 		}
@@ -187,13 +187,13 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 
 		if (childProj.getFile().toURI().toString().equals(xmlDocument.getDocumentURI())) {
 			// Property is defined in the same file as the request
-			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getRight()).stream()
+			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getValue()).stream()
 					.filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		} else {
 			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 					childProj.getFile().toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
-			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getRight())
+			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getValue())
 					.stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
 		}
 
@@ -201,7 +201,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return null;
 		}
 
-		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getLeft());
+		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getKey());
 	}
 
 	private boolean match(File relativeFile, Dependency dependency) {

@@ -39,8 +39,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
@@ -325,7 +323,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		boolean isParentDeclaration = PARENT_ELT.equals(parent.getLocalName())
 				|| (grandParent != null && PARENT_ELT.equals(grandParent.getLocalName()));
 
-		Pair<Range, String> mavenProperty = getMavenPropertyInRequest(request);
+		Map.Entry<Range, String> mavenProperty = getMavenPropertyInRequest(request);
 		if (mavenProperty != null) {
 			return collectProperty(request, mavenProperty);
 		}
@@ -352,7 +350,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return null;
 	}
 
-	public static Pair<Range, String> getMavenPropertyInRequest(IPositionRequest request) {
+	public static Map.Entry<Range, String> getMavenPropertyInRequest(IPositionRequest request) {
 		DOMNode tag = request.getNode();
 		String tagText = tag.getNodeValue();
 		if (tagText == null) {
@@ -375,12 +373,12 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			int textStart = request.getNode().getStart();
 			Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
 					textStart + indexCloseAfter - 1, request.getXMLDocument());
-			return new ImmutablePair<Range, String>(propertyRange, propertyText);
+			return Map.entry(propertyRange, propertyText);
 		}
 		return null;
 	}
 
-	private Hover collectProperty(IHoverRequest request, Pair<Range, String> property) {
+	private Hover collectProperty(IHoverRequest request, Map.Entry<Range, String> property) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 		DOMDocument doc = request.getXMLDocument();
@@ -391,13 +389,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 			for (Entry<String, String> prop : allProps.entrySet()) {
 				String mavenProperty = prop.getKey();
-				if (property.getRight().equals(mavenProperty)) {
+				if (property.getValue().equals(mavenProperty)) {
 					String message = toBold.apply("Property: ") + mavenProperty + lineBreak + toBold.apply("Value: ")
 							+ prop.getValue() + lineBreak;
 
 					Hover hover = new Hover(
 							new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
-					hover.setRange(property.getLeft());
+					hover.setRange(property.getKey());
 					return hover;
 				}
 			}
