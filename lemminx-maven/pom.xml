@@ -134,6 +134,7 @@
 				<version>3.2.1</version>
 				<executions>
 					<execution>
+						<?m2e ignore?>
 						<id>provision-test-localrepo</id>
 						<goals><goal>run</goal></goals>
 						<phase>generate-test-resources</phase>

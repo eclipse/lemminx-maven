@@ -15,16 +15,22 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 
+import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -40,11 +46,14 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
+import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 
 public class MavenPluginUtils {
+
+	private static final Logger LOGGER = Logger.getLogger(MavenPluginUtils.class.getName());
 
 	private MavenPluginUtils() {
 		// Utility class, not meant to be instantiated
@@ -181,9 +190,35 @@ public class MavenPluginUtils {
 			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
 		}
 
-		return lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
+		PluginDescriptor pluginDescriptor = null;
+		try {
+			pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
 				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
 				lemminxMavenPlugin.getMavenSession().getRepositorySession());
+		} catch (PluginResolutionException ex) {
+			LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+		}
+		if (pluginDescriptor == null && "0.0.1-SNAPSHOT".equals(plugin.getVersion())) { // probably missing or not parsed version
+			Optional<DefaultArtifactVersion> version;
+			final Plugin thePlugin = plugin;
+			try {
+				version = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+					.filter(gav -> thePlugin.getArtifactId().equals(gav.getArtifactId()))
+					.filter(gav -> thePlugin.getGroupId().equals(gav.getGroupId()))
+					.map(Gav::getVersion) //
+					.map(DefaultArtifactVersion::new) //
+					.collect(Collectors.maxBy(Comparator.naturalOrder()));
+				if (version.isPresent()) {
+					plugin.setVersion(version.get().toString());
+					pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
+							project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
+							lemminxMavenPlugin.getMavenSession().getRepositorySession());
+				}
+			} catch (IOException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			}
+		}
+		return pluginDescriptor;
 	}
 
 	private static Plugin findPluginInProject(MavenProject project, String pluginKey, Optional<String> artifactId) {

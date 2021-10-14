@@ -19,12 +19,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.io.FileUtils;
+import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
+import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
+import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
@@ -107,4 +112,13 @@ public class PluginResolutionTest {
         assertTrue(diagnostics.isEmpty(), "No validation error or warning found");
     }
 
+	@Test
+    public void testPluginAssistanceForUnknownVersion()
+            throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+        DOMDocument document = createDOMDocument("/pom-plugin-incorrectVersion.xml", languageService);
+        SharedSettings settings = new SharedSettings();
+
+        assertTrue(languageService.doHover(document, new Position(12, 40), settings).getContents().getRight().getValue().contains("Compiles"));
+		assertTrue(languageService.doComplete(document, new Position(16, 10), settings).getItems().stream().anyMatch(item -> item.getLabel().equals("compilerVersion")));
+    }
 }

@@ -1,0 +1,22 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">  <modelVersion>4.0.0</modelVersion>
+  <groupId>demo</groupId>
+  <artifactId>demo</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${version}</version>
+        <executions>
+            <execution><goals><goal>compile</goal></goals></execution>
+        </executions>
+        <configuration>
+          <release>14</release>
+          
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -274,7 +274,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			if (!isParentDeclaration) {
 				if (artifactId.isPresent()) {
 					plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-							.filter(gav -> gav.getGroupId().equals(artifactId.get()))
+							.filter(gav -> gav.getArtifactId().equals(artifactId.get()))
 							.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get())).findAny()
 							.map(Gav::getVersion).map(DefaultArtifactVersion::new)
 							.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
