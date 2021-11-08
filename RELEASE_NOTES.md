@@ -2,6 +2,17 @@
 
 ## Upcoming Release
 
+### 0.4.1
+
+* 📅 Release Date: November 8th, 2021
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.4.0...0.4.1
+
+#### Support referencing other projects from workspaceFolders
+
+Pom files can now reference pom files from other folders/projects by reacting to the workspaceFolders request. This allows more successful resolutions.
+
+#### Improve plugin assistance
+
 ### 0.4.0
 
 * 📅 Release Date: September 3rd, 2021
@@ -13,7 +24,10 @@ Update to newer version and APIs of LemMinX, so LemMinX-Maven 0.4.0 is compatibl
 
 #### Fix resolution of plugins in pluginManagement
 
-If a plugin is only defined in pluginManagement; it should now be properly resolved and no warning would be emitted, and completion and other documentation should be available.
+If a plugin is only defined in pluginManagement; it should now be properly resolved and no warning would be emitted, and completion and other documentation should be available even if the desired plugin version can't be resolved, by using the most recent locally available version.
+
+#### Updated dependencies
+
 
 ## Latest Release
 
