@@ -377,18 +377,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 		initialize();
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
 		if (workspaceReader instanceof MavenLemminxWorkspaceReader) {
+			MavenLemminxWorkspaceReader reader = (MavenLemminxWorkspaceReader)workspaceReader;
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
-			// Optimize: for workspace folder and MavenWorkspaceReader, we don't need to keep the whole Maven project
-			// Also, we could add multiple document at once to share the common parents and so on.
-			if (projectsToAdd != null) {
-				projectsToAdd.stream().forEach(u -> getProjectCache().addDocument(u));
-			}
-
-			if (projectsToRemove != null) {
-				projectsToRemove.stream().forEach(u -> getProjectCache().removeDocument(u));
-			}
+			// TODO Optimize: we could add multiple document at once to share the common parents and so on.
+			projectsToAdd.stream().forEach(reader::enqueue);
+			projectsToRemove.stream().forEach(reader::remove);
 		}
 	}
 	

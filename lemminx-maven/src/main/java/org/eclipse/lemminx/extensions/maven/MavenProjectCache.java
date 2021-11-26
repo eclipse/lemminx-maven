@@ -117,31 +117,6 @@ public class MavenProjectCache {
 		}
 	}
 
-	/**
-	 * Parses and adds a document for a given URI into the projects cache
-	 * 
-	 * @param uri An URI of a document to add
-	 * @param document A document to add
-	 */
-	public void addDocument(URI uri) {
-		DOMDocument document = DOMUtils.loadDocument(uri.toString(), lemminxMavenPlugin.getUriResolveExtentionManager());
-		if (document != null) {
-			DOMElement documentElement = document.getDocumentElement();
-			if (documentElement != null && PROJECT_ELT.equals(documentElement.getLocalName())) {
-				parseAndCache(document);
-			}
-		}
-	}
-	
-	/**
-	 * Removes a document for a given URI from the projects cache
-	 * @param uri An URI of a document to remove
-	 */
-	public void removeDocument(URI uri) {
-		projectCache.remove(uri);
-		problemCache.remove(uri);
-	}
-
 	public Optional<MavenProject> getSnapshotProject(File file) {
 		MavenProject lastKnownVersionMavenProject = projectCache.get(file.toURI());
 		if (lastKnownVersionMavenProject != null) {

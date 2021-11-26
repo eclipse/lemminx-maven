@@ -9,16 +9,29 @@
 package org.eclipse.lemminx.extensions.maven;
 
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.aether.repository.WorkspaceRepository;
 import org.eclipse.aether.util.artifact.ArtifactIdUtils;
@@ -28,12 +41,19 @@ import org.eclipse.aether.util.artifact.ArtifactIdUtils;
  * instead of usual Maven repos.
  */
 public class MavenLemminxWorkspaceReader implements WorkspaceReader {
-	private WorkspaceRepository repository;
-	private MavenLemminxExtension plugin;
+	private final WorkspaceRepository repository;
+	private final MavenLemminxExtension plugin;
+	
+	private ThreadLocal<Boolean> skipFlushBeforeResult = new ThreadLocal<>();
+	private final Executor executor = Executors.newSingleThreadExecutor();
+	private final Set<CompletableFuture<?>> ongoingWork = Collections.synchronizedSet(new HashSet<>());
+
+	private Map<Artifact, File> workspaceArtifacts = new ConcurrentHashMap<>();
 	
 	public MavenLemminxWorkspaceReader(MavenLemminxExtension plugin) {
 		this.plugin = plugin;
 		repository = new WorkspaceRepository("workspace");
+		skipFlushBeforeResult.set(false);
 	}
 
 	@Override
@@ -43,45 +63,51 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
 	@Override
 	public File findArtifact(Artifact artifact) {
-		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-		// Optimize: Instead of storing MavenProjects (which are expensive), we should make the workspace folder store the
-		// artifact->File mapping directly.
-		Optional<MavenProject> matchingProject = plugin.getProjectCache().getProjects().stream()
-				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion())))
-				.findAny();
-
-		if (matchingProject.isPresent()) {
-			MavenProject project = matchingProject.get();
-			File file = find(project, artifact);
-			if (file == null && project != project.getExecutionProject()) {
-				file = find(project.getExecutionProject(), artifact);
-			}
-			return file;
+		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
+			waitForCompletion();
 		}
-		return null;
+		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+		return plugin.getProjectCache().getProjects().stream()
+				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getArtifact())))
+				.map(project -> {
+					File file = find(project, artifact);
+					if (file == null && project != project.getExecutionProject()) {
+						file = find(project.getExecutionProject(), artifact);
+					}
+					return file;
+				}).filter(Objects::nonNull)
+				.findAny()
+				.or(() -> workspaceArtifacts.entrySet().stream() //
+						.filter(entry -> ArtifactUtils.key(entry.getKey().getGroupId(), entry.getKey().getArtifactId(), entry.getKey().getVersion()).equals(projectKey))
+						.map(Entry::getValue)
+						.findAny())
+				.orElse(null);
 	}
  
 	@Override
 	public List<String> findVersions(Artifact artifact) {
+		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
+			waitForCompletion();
+		}
 		String key = ArtifactUtils.versionlessKey(artifact.getGroupId(), artifact.getArtifactId());
-		List<MavenProject> projects = plugin.getProjectCache().getProjects().stream()
-				.filter(p -> key.equals(ArtifactUtils.versionlessKey(p.getGroupId(), p.getArtifactId())))
-				.collect(Collectors.toList());
-
-		if (projects == null || projects.isEmpty()) {
-			return Collections.emptyList();
-		}
-
-		List<String> versions = new ArrayList<>();
-
-		for (MavenProject project : projects) {
-			if (find(project, artifact) != null) {
-				versions.add(project.getVersion());
-			}
-		}
-		return Collections.unmodifiableList(versions);
+		SortedSet<String> res = new TreeSet<>(Comparator.reverseOrder());
+		plugin.getProjectCache().getProjects().stream() //
+				.filter(p -> key.equals(ArtifactUtils.versionlessKey(p.getArtifact()))) //
+				.filter(p -> find(p, artifact) != null) //
+				.map(MavenProject::getVersion) //
+				.forEach(res::add);
+		workspaceArtifacts.entrySet().stream() //
+				.filter(entry -> Objects.equals(key, ArtifactUtils.versionlessKey(entry.getKey().getGroupId(), entry.getKey().getArtifactId())))
+				.map(Entry::getKey)
+				.map(Artifact::getVersion)
+				.forEach(res::add);
+		return new ArrayList<>(res);
 	}
 	
+	private void waitForCompletion() {
+		CompletableFuture.allOf(ongoingWork.toArray(CompletableFuture[]::new)).join();
+	}
+
 	private File find(MavenProject project, Artifact artifact) {
 		if ("pom".equals(artifact.getExtension())) {
 			return project.getFile();
@@ -119,5 +145,27 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				&& requested.getVersion().equals(attached.getVersion())
 				&& requested.getExtension().equals(attached.getExtension())
 				&& requested.getClassifier().equals(attached.getClassifier());
+	}
+
+	/**
+	 * Parses and adds a document for a given URI into the projects cache
+	 * 
+	 * @param uri An URI of a document to add
+	 * @param document A document to add
+	 */
+	public void enqueue(URI uri) {
+		CompletableFuture<?> f = CompletableFuture.runAsync(() -> {
+			File file = new File(uri);
+			skipFlushBeforeResult.set(true); // avoid deadlock
+			Optional<MavenProject> snapshotProject = plugin.getProjectCache().getSnapshotProject(file);
+			skipFlushBeforeResult.set(false);
+			snapshotProject.map(mavenProject -> new DefaultArtifact(mavenProject.getGroupId(), mavenProject.getArtifactId(), null, mavenProject.getVersion())).ifPresent(artifact -> workspaceArtifacts.put(artifact, file));
+		}, executor);
+		ongoingWork.add(f);
+		f.thenRun(() -> ongoingWork.remove(f));
+	}
+
+	public void remove(URI uri) {
+		workspaceArtifacts.values().remove(new File(uri));
 	}
 }

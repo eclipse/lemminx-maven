@@ -52,6 +52,12 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.properties.internal.EnvironmentUtils;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.impl.ArtifactResolver;
+import org.eclipse.aether.resolution.ArtifactRequest;
+import org.eclipse.aether.resolution.ArtifactResolutionException;
+import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -113,42 +119,43 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	}
 
 	private Hover findWorkspaceArtifactDescription(IHoverRequest request) {
-		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		DOMNode node = request.getNode();
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
-		try {
-			Optional<String> localDescription = plugin.getProjectCache().getProjects().stream()
-				.filter(a -> (artifactToSearch.getGroupId() == null
-					|| artifactToSearch.getGroupId().equals(a.getGroupId()))
-					&& (artifactToSearch.getArtifactId() == null
-							|| artifactToSearch.getArtifactId().equals(a.getArtifactId()))
-					&& (artifactToSearch.getVersion() == null
-							|| artifactToSearch.getVersion().equals(a.getVersion())))
-				.sorted(Comparator.comparing((MavenProject p) -> new DefaultArtifactVersion(p.getVersion())).reversed())
-			.	findFirst().map(p -> {
-					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
-							: UnaryOperator.identity();
-					String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-					String message = "";
-	
-					if (p.getName() != null) {
-						message += toBold.apply(p.getName());
-					}
-	
-					if (p.getDescription() != null) {
-						message += lineBreak + p.getDescription();
-					}
-					
-					return message;
-				}).map(message -> (message.length() > 2 ? message : null));
-			if (localDescription.isPresent()) {
-				return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT,
-						localDescription.get()));
+		if (artifactToSearch.getGroupId() != null && artifactToSearch.getArtifactId() != null && artifactToSearch.getVersion() != null) {
+			try {
+				// first try to resolve project to ensure dependencies and other referenced items are probably available
+				MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+				ArtifactResult result = plugin.getPlexusContainer().lookup(ArtifactResolver.class).resolveArtifact(plugin.getMavenSession().getRepositorySession(), new ArtifactRequest(new DefaultArtifact(artifactToSearch.getGroupId(), artifactToSearch.getArtifactId(), null, artifactToSearch.getVersion()), null /* TODO pass project remote repsitories */, null));
+				if (result != null && result.getArtifact() != null && result.getArtifact().getFile() != null) {
+					return hoverForProject(request.canSupportMarkupKind(MarkupKind.MARKDOWN), plugin.getProjectCache().getSnapshotProject(result.getArtifact().getFile()).orElse(null));
+				}
+			} catch (ArtifactResolutionException | ComponentLookupException e) {
+				// can happen
 			}
-		}  catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getCause().toString(), e);
-		}			
+		}
+		// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
+		MavenProject p;
 		return null;
+	}
+
+	private Hover hoverForProject(boolean supportsMarkdown, MavenProject p) {
+		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
+				: UnaryOperator.identity();
+		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+		String message = "";
+
+		if (p.getName() != null) {
+			message += toBold.apply(p.getName());
+		}
+
+		if (p.getDescription() != null) {
+			message += lineBreak + p.getDescription();
+		}
+		if (message.isBlank()) {
+			return null;
+		}
+		return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT,
+				message));
 	}
 	
 	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
@@ -329,15 +336,15 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		case GROUP_ID_ELT:
 		case ARTIFACT_ID_ELT:
 		case VERSION_ELT:
-			Hover hover = findWorkspaceArtifactDescription(request);
-			if(hover != null) {
-				return hover;
+			MavenProject mavenProject = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+			Hover hover = isParentDeclaration && mavenProject != null && mavenProject.getParent() != null ? hoverForProject(request.canSupportMarkupKind(MarkupKind.MARKDOWN), mavenProject.getParent()) : null;
+			if (hover == null) {
+				hover = findWorkspaceArtifactDescription(request);
 			}
-			if (isParentDeclaration) {
-				return null;
-			} else {
-				return collectArtifactDescription(request, isPlugin);
+			if (hover == null) {
+				hover = collectArtifactDescription(request, isPlugin);
 			}
+			return hover;
 		case GOAL_ELT:
 			return collectGoal(request);
 		default:
