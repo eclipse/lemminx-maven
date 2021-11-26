@@ -26,9 +26,15 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.maven.Maven;
-import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.impl.ArtifactResolver;
+import org.eclipse.aether.resolution.ArtifactRequest;
+import org.eclipse.aether.resolution.ArtifactResolutionException;
+import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -57,7 +63,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return;
 		}
-
+		// make sure model is resolved and up-to-date
 		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
 
 		LocationLink propertyLocation = findMavenPropertyLocation(request);
@@ -130,19 +136,18 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	public File findWorkspaceArtifact(String groupId, String artifactId, String version) {
-		String projectKey = ArtifactUtils.key(groupId, artifactId, version);
-		Optional<MavenProject> matchingProject = plugin.getProjectCache().getProjects().stream()
-				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion())))
-				.findAny();
-
-		if (matchingProject.isPresent()) {
-			MavenProject project = matchingProject.get();
-			File file = project.getFile();
-			
-			if (file == null && project != project.getExecutionProject()) {
-				file = project.getExecutionProject().getFile();
+		try {
+			ArtifactResult result = plugin.getPlexusContainer().lookup(ArtifactResolver.class).resolveArtifact(plugin.getMavenSession().getRepositorySession(), new ArtifactRequest(new DefaultArtifact(groupId, artifactId, "", version), null, null));
+			if (result == null) {
+				return null;
 			}
-			return file;
+			Artifact artifact = result.getArtifact();
+			if (artifact == null) {
+				return null;
+			}
+			return artifact.getFile();
+		} catch (ArtifactResolutionException | ComponentLookupException e) {
+			// can happen
 		}
 		return null;
 	}
