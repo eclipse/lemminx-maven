@@ -8,8 +8,6 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -21,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,13 +44,10 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.lemminx.dom.DOMDocument;
-import org.eclipse.lemminx.dom.DOMElement;
-import org.eclipse.lemminx.utils.DOMUtils;
 
 public class MavenProjectCache {
 
@@ -71,7 +65,6 @@ public class MavenProjectCache {
 	private ProjectBuilder projectBuilder;
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
-	private Properties systemProperties;
 
 	public MavenProjectCache(MavenLemminxExtension lemminxMavenPlugin) {
 		this.lemminxMavenPlugin = lemminxMavenPlugin;
@@ -80,9 +73,6 @@ public class MavenProjectCache {
 		this.lastCheckedVersion = new HashMap<>();
 		this.projectCache = new HashMap<>();
 		this.problemCache = new HashMap<>();
-		systemProperties = new Properties();
-		EnvironmentUtils.addEnvVars(systemProperties);
-		systemProperties.putAll(System.getProperties());
 		initializeMavenBuildState();
 	}
 
@@ -210,7 +200,7 @@ public class MavenProjectCache {
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
-		request.setSystemProperties(systemProperties);
+		request.setSystemProperties(mavenRequest.getSystemProperties());
 		request.setLocalRepository(mavenRequest.getLocalRepository());
 		request.setRemoteRepositories(mavenRequest.getRemoteRepositories());
 		request.setPluginArtifactRepositories(mavenRequest.getPluginArtifactRepositories());
