@@ -1,0 +1,163 @@
+/*******************************************************************************
+ * Copyright (c) 2021 Red Hat Inc. and others.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *******************************************************************************/
+package org.eclipse.lemminx.extensions.maven;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Properties;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+@ExtendWith(NoMavenCentralIndexExtension.class)
+public class InitMavenRequestTest {
+
+	private static final String TEST_LOCAL_REPO_PATH = "/.m2/bug383repository";
+	private static final String MAVEN_LOCAL_REPO_PROPERTY_NAME = "maven.repo.local";
+	
+	private static final String TEST_DUMMY_PROPERTY_NAME = "DUMMY_USER_HOME";
+	private static final String HOSTNAME_ENV_VARIABLE_NAME = isWindows() ? "COMPUTERNAME" : "HOSTNAME";
+	private static final String MAVEN_PROJECTBASEDIR_ENV_VARIABLE_NAME = "MAVEN_PROJECTBASEDIR";
+	private static final String HOME_ENV_VARIABLE_NAME =  isWindows() ?  "HOMEPATH" : "HOME";
+	
+	@Test
+	public void testUserSettingsWithSystemProperty() throws Exception {
+		final File localSettingsFile = generateSettingsXml(TEST_DUMMY_PROPERTY_NAME);
+		String localRepoProperty = System.getProperty(MAVEN_LOCAL_REPO_PROPERTY_NAME);
+		Properties properties = System.getProperties();
+		try {
+			properties.remove(MAVEN_LOCAL_REPO_PROPERTY_NAME); // Not to use local repository set from properties
+			
+			// Add a DUMMY environment variable to check later if it's really resolved to a real path
+			// Avoiding any ${HOME} and ${user.home} variable/properties values as they are 
+			// used as defaults in maven
+			String hostname = "/" + System.getenv(HOSTNAME_ENV_VARIABLE_NAME);
+			properties.put(TEST_DUMMY_PROPERTY_NAME, hostname);
+			System.setProperties(properties);
+			
+			MavenLemminxExtension plugin = new MavenLemminxExtension();
+			plugin.settings.setGlobalSettings(null);
+			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
+			
+			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
+			File expectedLocalRepoPath = new File(hostname, TEST_LOCAL_REPO_PATH); 
+			assertNotNull(localRepositoryPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+		} finally {
+			if (localSettingsFile != null) {
+				localSettingsFile.delete();
+			}
+			
+			// Restore original System properties
+			properties.remove(TEST_DUMMY_PROPERTY_NAME);
+			if (localRepoProperty != null) {
+				properties.put(MAVEN_LOCAL_REPO_PROPERTY_NAME, localRepoProperty);
+			}
+			System.setProperties(properties);
+		}
+	}
+	
+	@Test
+	public void testUserSettingsWithEnvVariables() throws Exception {
+		final File localSettingsFile = generateSettingsXml(MAVEN_PROJECTBASEDIR_ENV_VARIABLE_NAME);
+		String localRepoProperty = System.getProperty(MAVEN_LOCAL_REPO_PROPERTY_NAME);
+		Properties properties = System.getProperties();
+		try {
+			properties.remove(MAVEN_LOCAL_REPO_PROPERTY_NAME); // Not to use local repository set from properties
+			System.setProperties(properties);
+
+			String mavenProjectBasedirVariable = System.getenv(MAVEN_PROJECTBASEDIR_ENV_VARIABLE_NAME);
+			
+			MavenLemminxExtension plugin = new MavenLemminxExtension();
+			plugin.settings.setGlobalSettings(null);
+			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
+			
+			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
+			File expectedLocalRepoPath = new File(mavenProjectBasedirVariable, TEST_LOCAL_REPO_PATH); 
+			assertNotNull(localRepositoryPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+		} finally {
+			if (localSettingsFile != null) {
+				localSettingsFile.delete();
+			}
+
+			// Restore original System properties
+			if (localRepoProperty != null) {
+				properties.put(MAVEN_LOCAL_REPO_PROPERTY_NAME, localRepoProperty);
+			}
+			System.setProperties(properties);
+		}
+	}
+
+	@Test
+	public void testUserSettingsWithHomeEnvVariables() throws Exception {
+		final File localSettingsFile = generateSettingsXml(HOME_ENV_VARIABLE_NAME);
+		String localRepoProperty = System.getProperty(MAVEN_LOCAL_REPO_PROPERTY_NAME);
+		Properties properties = System.getProperties();
+		try {
+			properties.remove(MAVEN_LOCAL_REPO_PROPERTY_NAME); // Not to use local repository set from properties
+			System.setProperties(properties);
+
+			String homeVariable = System.getenv(HOME_ENV_VARIABLE_NAME);
+			
+			MavenLemminxExtension plugin = new MavenLemminxExtension();
+			plugin.settings.setGlobalSettings(null);
+			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
+			
+			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
+			File expectedLocalRepoPath = new File(homeVariable, TEST_LOCAL_REPO_PATH); 
+			assertNotNull(localRepositoryPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+		} finally {
+			if (localSettingsFile != null) {
+				localSettingsFile.delete();
+			}
+
+			// Restore original System properties
+			if (localRepoProperty != null) {
+				properties.put(MAVEN_LOCAL_REPO_PROPERTY_NAME, localRepoProperty);
+			}
+			System.setProperties(properties);
+		}
+	}
+	
+	private static boolean isWindows() {
+		return System.getProperty("os.name", "").toLowerCase().contains("windows");
+	}
+	
+	private static String VARIABLE_TO_REPLACE = "%VARIABLE%";
+	private static String settingsXmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+			+ "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0                       http://maven.apache.org/xsd/settings-1.0.0.xsd\">\n"
+			+ "    <localRepository>${%VARIABLE%}/.m2/bug383repository</localRepository>\n"
+			+ "</settings>";
+	private static String SETTINGS_FILE_PATH = System.getProperty("java.io.tmpdir") + "/" +
+			InitMavenRequestTest.class.getSimpleName() + "/settings.xml";
+	
+	private File generateSettingsXml(String variableName) {
+		try {
+			File settingsXmlFile = new File(SETTINGS_FILE_PATH);
+			settingsXmlFile.getParentFile().mkdirs();
+			try (BufferedWriter bw = new BufferedWriter(new FileWriter(settingsXmlFile, false));) {
+			    bw.write(settingsXmlContent.replace(VARIABLE_TO_REPLACE, variableName));
+			    bw.close();
+			}
+			return settingsXmlFile;
+		} catch (IOException  e) {
+			e.printStackTrace();
+			fail(e);
+		}
+		return null;
+	}
+}

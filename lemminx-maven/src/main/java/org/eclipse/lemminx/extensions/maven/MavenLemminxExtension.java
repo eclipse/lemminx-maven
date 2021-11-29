@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -44,9 +45,13 @@ import org.apache.maven.model.validation.ModelValidator;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.settings.Settings;
-import org.apache.maven.settings.io.SettingsReader;
+import org.apache.maven.settings.building.DefaultSettingsBuildingRequest;
+import org.apache.maven.settings.building.SettingsBuilder;
+import org.apache.maven.settings.building.SettingsBuildingException;
+import org.apache.maven.settings.building.SettingsBuildingRequest;
 import org.codehaus.plexus.ContainerConfiguration;
 import org.codehaus.plexus.DefaultContainerConfiguration;
 import org.codehaus.plexus.DefaultPlexusContainer;
@@ -56,6 +61,7 @@ import org.codehaus.plexus.PlexusContainerException;
 import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -107,7 +113,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	XMLMavenSettings settings = new XMLMavenSettings();
 	private URIResolverExtensionManager resolverExtensionManager;
 	private List<WorkspaceFolder> initialWorkspaceFolders = List.of();
-
+	
 	@Override
 	public void doSave(ISaveContext context) {
 		if (context.getType() == SaveContextType.SETTINGS) {
@@ -188,25 +194,31 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
-		SettingsReader reader = container.lookup(SettingsReader.class);
-		MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
+		Properties systemProperties = getSystemProperties();
+		mavenRequest.setSystemProperties(systemProperties);
 		{
-			final File globalSettingsFile = getFileFromOptions(options.getGlobalSettings(), SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
-			if (globalSettingsFile.canRead()) {
-				mavenRequest.setGlobalSettingsFile(globalSettingsFile);
-				Settings globalSettings = reader.read(globalSettingsFile, null);
-				requestPopulator.populateFromSettings(mavenRequest, globalSettings);
-			}
-		}
-		{
-			final File localSettingsFile = getFileFromOptions(options.getUserSettings(), SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
-			if (localSettingsFile.canRead()) {
-				mavenRequest.setUserSettingsFile(localSettingsFile);
-				Settings userSettings = reader.read(localSettingsFile, null);
-				requestPopulator.populateFromSettings(mavenRequest, userSettings);
-			}
-		}
+			final File globalSettingsFile = getFileFromOptions(options.getGlobalSettings(),
+					SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+			final File localSettingsFile = getFileFromOptions(options.getUserSettings(),
+					SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
 
+			Settings settngs = buildSettings(container,
+		    		globalSettingsFile.canRead() ? globalSettingsFile : null,
+		    		localSettingsFile.canRead() ? localSettingsFile : null,
+		    		systemProperties);
+			
+		    if (settngs != null) {
+				if (globalSettingsFile.canRead()) {
+					mavenRequest.setGlobalSettingsFile(globalSettingsFile);
+				}
+				if (localSettingsFile.canRead()) {
+					mavenRequest.setUserSettingsFile(localSettingsFile);
+				}
+				MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
+				requestPopulator.populateFromSettings(mavenRequest, settngs);
+		    }
+		}
+		
 		String localRepoProperty = System.getProperty("maven.repo.local");
 		if (localRepoProperty != null) {
 			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
@@ -229,20 +241,57 @@ public class MavenLemminxExtension implements IXMLExtension {
 		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
 		mavenRequest.setRemoteRepositories(joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
 		mavenRequest.setPluginArtifactRepositories(joinRemoteRepositories(mavenRequest.getPluginArtifactRepositories(), defaultRemoteRepositories));
-		mavenRequest.setSystemProperties(System.getProperties());
+		mavenRequest.setSystemProperties(systemProperties);
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
 		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader(this));
 		return mavenRequest;
 	}
+
+	public Settings buildSettings(PlexusContainer container, File globalSettingsFile, File userSettingsFile, Properties systemProperties) {
+		SettingsBuildingRequest request = new DefaultSettingsBuildingRequest();
+		request.setGlobalSettingsFile(globalSettingsFile);
+		request.setUserSettingsFile(userSettingsFile != null ? userSettingsFile
+				: SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
+		request.setSystemProperties(systemProperties);
+		try {
+			return container.lookup(SettingsBuilder.class).build(request).getEffectiveSettings();
+		} catch (SettingsBuildingException | ComponentLookupException ex) {
+			return null;
+		}
+	}
 	
+	/*
+	 * Thread-safe properties copy implementation.
+	 * <p>
+	 * {@link Properties#entrySet()} iterator is not thread safe and fails with
+	 * {@link ConcurrentModificationException} if the source properties "is
+	 * structurally modified at any time after the iterator is created". The
+	 * solution is to use thread-safe {@link Properties#stringPropertyNames()}
+	 * enumerate and copy properties.
+	 *
+	 * @see https://bugs.eclipse.org/bugs/show_bug.cgi?id=440696
+	 */
+	private static Properties getSystemProperties() {
+		Properties systemProperties = new Properties();
+		EnvironmentUtils.addEnvVars(systemProperties);
+		Properties from = System.getProperties();
+		for (String key : from.stringPropertyNames()) {
+			String value = from.getProperty(key);
+			if (value != null) {
+				systemProperties.put(key, value);
+			}
+		}
+		return systemProperties;
+	}
+
 	private List<ArtifactRepository> joinRemoteRepositories(List<ArtifactRepository> a, List<ArtifactRepository> b) {
-	  if (a.isEmpty()) {
-	    return b;
-	  }
-	  List<ArtifactRepository> remotes = new ArrayList<>(a);
-	  remotes.addAll(b);
-	  return remotes;	  
+		if (a.isEmpty()) {
+			return b;
+		}
+		List<ArtifactRepository> remotes = new ArrayList<>(a);
+		remotes.addAll(b);
+		return remotes;
 	}
 
 	private static File getFileFromOptions(String element, File defaults) {
@@ -326,13 +375,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 			return false;
 		}
 	}
-	
+
 	public static boolean match(Path file) {
 		String fileName = file != null ? file.getFileName().toString() : null;
 		return fileName != null && ((fileName.startsWith("pom") && fileName.endsWith(".xml"))
 				|| fileName.endsWith(Maven.POMv4));
 	}
-	
+
 	public MavenProjectCache getProjectCache() {
 		initialize();
 		return this.cache;
@@ -362,7 +411,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		initialize();
 		return mavenPluginManager;
 	}
-	
+
 	public Optional<RemoteRepositoryIndexSearcher> getIndexSearcher() {
 		initialize();
 		return Optional.ofNullable(indexSearcher);
@@ -372,7 +421,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		initialize();
 		return resolverExtensionManager;
 	}
-	
+
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		initialize();
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
@@ -386,7 +435,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			projectsToRemove.stream().forEach(reader::remove);
 		}
 	}
-	
+
 	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
 		Collection<MavenProject> cachedProjects = getProjectCache().getProjects();
 		return cachedProjects.stream().filter(p -> {
@@ -396,7 +445,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			});
 		}).map(p -> p.getFile().toURI()).collect(Collectors.toUnmodifiableList());
 	}
-	
+
 	private List<URI> computeAddedWorkspaceProjects(URI[] added) {
 		List<URI> projectsToAdd = new ArrayList<>();
 		Arrays.asList(added).stream().forEach(uri -> {
@@ -423,7 +472,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 		});
-		
+
 		return projectsToAdd;
 	}
 }
