@@ -7,20 +7,14 @@
 	<artifactId>test</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
-	<dependencies>
-		<dependency>
-			<groupId>remote.repo.t</groupId>
-			<artifactId></artifactId>
-			<version></version>
-		</dependency>
-	</dependencies>
-	
-	<repositories>
-		<repository>
-			<id>testRemoteRepo</id>
-			<layout>m2</layout>
-			<url>remoteRepoURL</url>
-		</repository>
-	</repositories>
-	
+<build>
+    <plugins>
+        <plugin>
+            <groupId>com.github.gianttreelp.proguardservicesmapper</groupId>
+            <artifactId>proguard-services-mapper-maven</artifactId>
+            <version></version>
+        </plugin>
+    </plugins>
+</build>
+
 </project>

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2020 Red Hat Inc. and others.
+ * Copyright (c) 2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -14,9 +14,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.lemminx.dom.DOMDocument;
-import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
+import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -25,16 +26,20 @@ import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-@ExtendWith(NoMavenCentralIndexExtension.class)
-public class IndexBasedAssistanceTest {
+public class RemoteCentralRepoAssistanceTest {
 
 	private XMLLanguageService languageService;
 
+	@BeforeAll
+	private static void setup() {
+		RemoteCentralRepositorySearcher.disableCentralSearch = false;
+	}	
+	
 	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
@@ -62,40 +67,51 @@ public class IndexBasedAssistanceTest {
 		do {
 			items = languageService.doComplete(document, position, settings).getItems();
 			Thread.sleep(500);
-		} while (items.stream().map(CompletionItem::getLabel).noneMatch(expectedLabel::equals));
+		} while (items.stream().map(CompletionItem::getLabel)
+				.map(l-> { 
+						int index = l.lastIndexOf(':');
+						return index >= 0 ? l.substring(0, index) : l;
+					})
+				.noneMatch(expectedLabel::startsWith));
 	}
 
 	@Test
-	public void testRemoteGroupIdCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralGroupIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-groupId-complete.xml"), //
-				new Position(11, 20), "remote.repo.test");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-groupId-complete.xml"), //
+				new Position(11, 33), "org.fujion.webjars");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
 	@Test
-	public void testRemoteArtifactIdCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralArtifactIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-artifactId-complete.xml"), //
-				new Position(12, 15), "test1-jar - remote.repo.test:test1-jar:2.0.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-artifactId-complete.xml"), //
+				new Position(12, 24), "webjar-angular - org.fujion.webjars:webjar-angular:");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
 	@Test
-	public void testRemoteVersionCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralVersionCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-version-complete.xml"), //
-				new Position(13, 13), "1.0.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-version-complete.xml"), //
+				new Position(13, 21), "13.1.1-1");
 		// if we get out of the loop, then it's OK; otherwise we get a timeout
 	}
 
 	@Test
-	@Timeout(15000)
-	public void testRemoteArtifactHover()
+//	@Timeout(15000)
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralArtifactHover()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		String description = "This is a test description for test1";
-		final DOMDocument document = createDOMDocument("/pom-remote-artifact-hover.xml");
-		final Position position = new Position(14, 18);
+		// TODO: Currently Central REST API doesn't provide the description field, 
+		// so, the hover is generated from the artifact info for testing purposes
+		String description = "org.fujion.webjars|webjar-angular";
+		final DOMDocument document = createDOMDocument("/pom-remote-central-artifact-hover.xml");
+		final Position position = new Position(14, 25);
 		Hover hover;
 		do {
 			hover = languageService.doHover(document, position, new SharedSettings());
@@ -103,29 +119,31 @@ public class IndexBasedAssistanceTest {
 		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
 		// if got out of the loop without timeout, then test is PASSED
 	}
-
+	
 	@Test
-	public void testRemotePluginGroupIdCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralPluginGroupIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-groupId-complete.xml"), //
-				new Position(11, 14), "remote.repo.test");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-groupId-complete.xml"), //
+				new Position(12, 45), "com.github.gianttreelp.proguardservicesmapper");
 		// if got out of the loop without timeout, then test is PASSED
 	}
 
 	@Test
-	public void testRemotePluginArtifactIdCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralPluginArtifactIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-artifactId-complete.xml"), //
-				new Position(12, 15), "test-maven-plugin - remote.repo.test:test-maven-plugin:1.0.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-artifactId-complete.xml"), //
+				new Position(13, 24), "proguard-services-mapper-maven - com.github.gianttreelp.proguardservicesmapper:proguard-services-mapper-maven:");
 		// if got out of the loop without timeout, then test is PASSED
 	}
 
 	@Test
-	public void testRemotePluginVersionCompletion()
+	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
+	public void testRemoteCentralPluginVersionCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-plugin-version-complete.xml"), //
-				new Position(13, 12), "1.0.0");
+		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-version-complete.xml"), //
+				new Position(14, 21), "1.0");
 		// if got out of the loop without timeout, then test is PASSED
 	}
-
 }

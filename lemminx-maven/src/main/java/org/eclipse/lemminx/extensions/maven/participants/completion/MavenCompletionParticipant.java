@@ -54,7 +54,6 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.maven.Maven;
-import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
@@ -76,7 +75,6 @@ import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.Phase;
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
-import org.eclipse.lemminx.extensions.maven.searcher.RemoteRepositoryIndexSearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
@@ -98,6 +96,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
+	public static final String WAITING_LABEL = "⏳  Waiting for Maven Central Response...";
+	
 	private static final Logger LOGGER = Logger.getLogger(MavenCompletionParticipant.class.getName());
 	private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("[-.a-zA-Z0-9]+");
 
@@ -620,76 +620,67 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 		Range range = XMLPositionUtility.createRange(node.getStartTagCloseOffset() + 1, node.getEndTagOpenOffset(),
 				doc);
-		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
-		List<String> remoteArtifactRepositories = project != null ? //
-				project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl)
-						.collect(Collectors.toList())
-				: //
-				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl());
-		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(remoteArtifactRepositories.size()));
-		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
+		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(1));
+		final CompletionItem updatingItem = new CompletionItem(WAITING_LABEL);
+		updatingItem.setPreselect(false);
+		updatingItem.setInsertText("");
+		updatingItem.setKind(CompletionItemKind.Event);
+		updateItems.add(updatingItem);
+
+		plugin.getCentralSearcher().ifPresent(centralSearcher -> {
 			try {
-				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
-					cancelChecker.checkCanceled();
-					final CompletionItem updatingItem = new CompletionItem("Updating index for " + repository);
-					updatingItem.setPreselect(true);
-					updatingItem.setInsertText("");
-					updatingItem.setKind(CompletionItemKind.Event);
-					updateItems.add(updatingItem);
-					return indexSearcher.getIndexingContext(URI.create(repository)).thenApplyAsync(index -> {
+				CompletableFuture.runAsync(() -> {
 						cancelChecker.checkCanceled();
 						switch (node.getLocalName()) {
 						case GROUP_ID_ELT:
 							// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
 							// parameter
 							if (onlyPlugins) {
-								indexSearcher.getPluginGroupIds(artifactToSearch, index).stream()
+								centralSearcher.getPluginGroupIds(artifactToSearch).stream()
 										.map(groupId -> toCompletionItem(groupId, null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							} else {
-								indexSearcher.getGroupIds(artifactToSearch, index).stream()
+								centralSearcher.getGroupIds(artifactToSearch).stream()
 										.map(groupId -> toCompletionItem(groupId, null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							}
 							cancelChecker.checkCanceled();
-							return updatingItem;
+							return;
 						case ARTIFACT_ID_ELT:
 							if (onlyPlugins) {
 								artifactInfosCollector
-										.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+										.addAll(centralSearcher.getPluginArtifacts(artifactToSearch));
 							} else {
-								artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
+								artifactInfosCollector.addAll(centralSearcher.getArtifacts(artifactToSearch));
 							}
 							cancelChecker.checkCanceled();
-							return updatingItem;
+							return;
 						case VERSION_ELT:
 							if (onlyPlugins) {
-								indexSearcher.getPluginArtifactVersions(artifactToSearch, index).stream()
+								centralSearcher.getPluginArtifactVersions(artifactToSearch).stream()
 										.map(version -> toCompletionItem(version.toString(), null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							} else {
-								indexSearcher.getArtifactVersions(artifactToSearch, index).stream()
+								centralSearcher.getArtifactVersions(artifactToSearch).stream()
 										.map(version -> toCompletionItem(version.toString(), null, range))
 										.forEach(nonArtifactCollector::addCompletionItem);
 							}
 							cancelChecker.checkCanceled();
-							return updatingItem;
+							return;
 						case DEPENDENCIES_ELT:
 						case DEPENDENCY_ELT:
-							artifactInfosCollector.addAll(indexSearcher.getArtifacts(artifactToSearch, index));
+							artifactInfosCollector.addAll(centralSearcher.getArtifacts(artifactToSearch));
 							cancelChecker.checkCanceled();
-							return updatingItem;
+							return;
 						case PLUGINS_ELT:
 						case PLUGIN_ELT:
-							artifactInfosCollector.addAll(indexSearcher.getPluginArtifacts(artifactToSearch, index));
+							artifactInfosCollector.addAll(centralSearcher.getPluginArtifacts(artifactToSearch));
 							cancelChecker.checkCanceled();
-							return updatingItem;
+							return;
 						}
-						return (CompletionItem) null;
-					}).whenComplete((ok, error) -> updateItems.remove(ok));
-				}).toArray(CompletableFuture<?>[]::new)).get(2, TimeUnit.SECONDS);
+					}).whenComplete((ok, error) -> updateItems.remove(updatingItem)).get(2, TimeUnit.SECONDS);
 			} catch (InterruptedException | ExecutionException exception) {
-				LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
+				LOGGER.log(Level.SEVERE, exception.getCause() != null ? exception.getCause().toString() : exception.getMessage(), exception);
 			} catch (TimeoutException e) {
 				// nothing to log, some work still pending
 				updateItems.forEach(nonArtifactCollector::addCompletionItem);

@@ -16,7 +16,6 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
-import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -38,7 +37,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.artifact.Gav;
@@ -63,7 +61,7 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
-import org.eclipse.lemminx.extensions.maven.searcher.RemoteRepositoryIndexSearcher;
+import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
@@ -73,6 +71,7 @@ import org.eclipse.lemminx.services.extensions.HoverParticipantAdapter;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
+import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
@@ -165,11 +164,6 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMDocument doc = request.getXMLDocument();
 
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
-		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
-		List<String> remoteArtifactRepositories = project == null ? //
-				Collections.singletonList(RemoteRepositoryIndexSearcher.CENTRAL_REPO.getUrl()) : //
-				project.getRemoteArtifactRepositories().stream().map(ArtifactRepository::getUrl)
-						.collect(Collectors.toList());
 
 		try {
 			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
@@ -207,29 +201,27 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
 		}
-		plugin.getIndexSearcher().ifPresent(indexSearcher -> {
+		
+		final String updatingItem = MavenCompletionParticipant.WAITING_LABEL;
+		possibleHovers.add(updatingItem);
+		
+		plugin.getCentralSearcher().ifPresent(centralSearcher -> {
 			try {
-				CompletableFuture.allOf(remoteArtifactRepositories.stream().map(repository -> {
-					final String updatingItem = "Updating index for " + repository;
-					possibleHovers.add(updatingItem);
-
-					return indexSearcher.getIndexingContext(URI.create(repository)).thenAccept(index -> {
-						if (isPlugin) {
-							// TODO: make a new function that gets only the exact artifact ID match, or just
-							// take the first thing given
-							indexSearcher.getPluginArtifacts(artifactToSearch, index).stream()
-									.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
-									.forEach(possibleHovers::add);
-						} else {
-							indexSearcher.getArtifacts(artifactToSearch, index).stream()
-									.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
-									.forEach(possibleHovers::add);
-						}
-					}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem));
-
-				}).toArray(CompletableFuture<?>[]::new)).get(10, TimeUnit.SECONDS);
+				CompletableFuture.runAsync(() -> {
+					if (isPlugin) {
+						// TODO: make a new function that gets only the exact artifact ID match, or just
+						// take the first thing given
+						centralSearcher.getPluginArtifacts(artifactToSearch).stream()
+								.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
+								.forEach(possibleHovers::add);
+					} else {
+						centralSearcher.getArtifacts(artifactToSearch).stream()
+								.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
+								.forEach(possibleHovers::add);
+					}
+				}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem)).get(10, TimeUnit.SECONDS);
 			} catch (InterruptedException | ExecutionException exception) {
-				LOGGER.log(Level.SEVERE, exception.getCause().toString(), exception);
+				LOGGER.log(Level.SEVERE, exception.getCause() != null ? exception.getCause().toString() : exception.getMessage(), exception);
 			} catch (TimeoutException e) {
 				// nothing to log, some work still pending
 			}

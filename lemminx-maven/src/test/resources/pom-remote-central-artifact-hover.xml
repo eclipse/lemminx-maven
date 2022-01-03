@@ -6,21 +6,14 @@
 	<groupId>org.test</groupId>
 	<artifactId>test</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-<build>
-	<plugins>
-		<plugin>
-			<groupId>remote.repo.t</groupId>
-			<artifactId></artifactId>
-			<version></version>
-		</plugin>
-	</plugins>
-</build>
-	<repositories>
-		<repository>
-			<id>testRemoteRepo</id>
-			<layout>m2</layout>
-			<url>remoteRepoURL</url>
-		</repository>
-	</repositories>
+	<packaging>pom</packaging>
 	
+
+	<dependencies>
+		<dependency>
+            <groupId>org.fujion.webjars</groupId>
+            <artifactId>webjar-angular</artifactId>
+		</dependency>
+	</dependencies>
+
 </project>
