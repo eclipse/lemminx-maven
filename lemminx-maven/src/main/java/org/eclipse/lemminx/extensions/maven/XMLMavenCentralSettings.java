@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -13,7 +13,7 @@ package org.eclipse.lemminx.extensions.maven;
 
 import java.util.Objects;
 
-public class XMLMavenIndexSettings {
+public class XMLMavenCentralSettings {
 
 	private boolean skip;
 
@@ -38,7 +38,7 @@ public class XMLMavenIndexSettings {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		XMLMavenIndexSettings other = (XMLMavenIndexSettings) obj;
+		XMLMavenCentralSettings other = (XMLMavenCentralSettings) obj;
 		return skip == other.skip;
 	}
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2021 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -70,7 +70,7 @@ import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinit
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
-import org.eclipse.lemminx.extensions.maven.searcher.RemoteRepositoryIndexSearcher;
+import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.services.extensions.ICompletionParticipant;
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
@@ -102,7 +102,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private MavenWorkspaceService workspaceServiceParticipant;
 
 	private MavenProjectCache cache;
-	private RemoteRepositoryIndexSearcher indexSearcher;
+	private RemoteCentralRepositorySearcher centralSearcher;
 	private LocalRepositorySearcher localRepositorySearcher;
 	private MavenExecutionRequest mavenRequest;
 	private MavenPluginManager mavenPluginManager;
@@ -179,8 +179,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			if (!settings.getIndex().isSkip()) {
-				indexSearcher = new RemoteRepositoryIndexSearcher(this, container, Optional.ofNullable(settings.getIndexLocation()).map(File::new));
+			if (!settings.getCentral().isSkip()) {
+				centralSearcher = new RemoteCentralRepositorySearcher(this);
 			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
@@ -353,10 +353,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 			localRepositorySearcher.stop();
 			localRepositorySearcher = null;
 		}
-		if (indexSearcher != null) {
-			indexSearcher.closeContext();
-			indexSearcher = null;
-		}
 		cache = null;
 		if (container != null) {
 			container.dispose();
@@ -412,9 +408,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenPluginManager;
 	}
 
-	public Optional<RemoteRepositoryIndexSearcher> getIndexSearcher() {
+	public Optional<RemoteCentralRepositorySearcher> getCentralSearcher() {
 		initialize();
-		return Optional.ofNullable(indexSearcher);
+		return Optional.ofNullable(centralSearcher);
 	}
 
 	public URIResolverExtensionManager getUriResolveExtentionManager() {

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021, 2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -15,7 +15,7 @@ import java.util.Objects;
 
 public class XMLMavenSettings {
 
-	private XMLMavenIndexSettings index;
+	private XMLMavenCentralSettings central;
 
 	private XMLMavenRepoSettings repo;
 
@@ -26,16 +26,16 @@ public class XMLMavenSettings {
 	private String indexLocation;
 
 	public XMLMavenSettings() {
-		setIndex(new XMLMavenIndexSettings());
+		setCentral(new XMLMavenCentralSettings());
 		setRepo(new XMLMavenRepoSettings());
 	}
 
-	public XMLMavenIndexSettings getIndex() {
-		return index;
+	public XMLMavenCentralSettings getCentral() {
+		return central;
 	}
 
-	public void setIndex(XMLMavenIndexSettings index) {
-		this.index = index;
+	public void setCentral(XMLMavenCentralSettings central) {
+		this.central = central;
 	}
 
 	public XMLMavenRepoSettings getRepo() {
@@ -72,7 +72,7 @@ public class XMLMavenSettings {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(globalSettings, index, indexLocation, repo, userSettings);
+		return Objects.hash(globalSettings, central, indexLocation, repo, userSettings);
 	}
 
 	@Override
@@ -84,7 +84,7 @@ public class XMLMavenSettings {
 		if (getClass() != obj.getClass())
 			return false;
 		XMLMavenSettings other = (XMLMavenSettings) obj;
-		return Objects.equals(globalSettings, other.globalSettings) && Objects.equals(index, other.index)
+		return Objects.equals(globalSettings, other.globalSettings) && Objects.equals(central, other.central)
 				&& Objects.equals(indexLocation, other.indexLocation) && Objects.equals(repo, other.repo)
 				&& Objects.equals(userSettings, other.userSettings);
 	}

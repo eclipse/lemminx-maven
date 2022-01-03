@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -12,11 +12,11 @@ import static org.eclipse.lemminx.XMLAssert.c;
 import static org.eclipse.lemminx.XMLAssert.te;
 import static org.eclipse.lemminx.XMLAssert.testCompletionFor;
 
-import org.eclipse.lemminx.extensions.maven.NoMavenCentralIndexExtension;
+import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-@ExtendWith(NoMavenCentralIndexExtension.class)
+@ExtendWith(NoMavenCentralExtension.class)
 public class MavenCompletionParticipantTest {
 
 	@Test

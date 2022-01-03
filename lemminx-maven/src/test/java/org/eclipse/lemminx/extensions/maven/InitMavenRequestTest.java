@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -21,7 +21,7 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-@ExtendWith(NoMavenCentralIndexExtension.class)
+@ExtendWith(NoMavenCentralExtension.class)
 public class InitMavenRequestTest {
 
 	private static final String TEST_LOCAL_REPO_PATH = "/.m2/bug383repository";
