@@ -78,9 +78,9 @@ public class MavenPluginUtils {
 
 		description = MarkdownUtils.htmlXMLToMarkdown(description);
 
-		String markdownDescription = toBold.apply("Required: ") + parameter.isRequired() + lineBreak
-				+ toBold.apply("Type: ") + type + lineBreak + toBold.apply("Expression: ") + expression + lineBreak
-				+ toBold.apply("Default Value: ") + defaultValue + lineBreak + description;
+		String markdownDescription = description + lineBreak +  toBold.apply("Required: ") + parameter.isRequired() + 
+				lineBreak + toBold.apply("Type: ") + type + lineBreak + toBold.apply("Expression: ") + expression + 
+				lineBreak + toBold.apply("Default Value: ") + defaultValue;
 
 		return new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, markdownDescription);
 	}
