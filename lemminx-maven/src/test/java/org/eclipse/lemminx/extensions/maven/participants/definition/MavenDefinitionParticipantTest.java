@@ -24,9 +24,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public class MavenDefinitionParticipantTest {
 	
 	@Test
-	public void testOneExistingDependencyDependenciesCompletion() throws Exception {
+	public void testFullyQualifiedDependency() throws Exception {
 		XMLLanguageService languageService = new XMLLanguageService();
 		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/pom-localrepo-test-dependencies.xml", languageService), new Position(14, 20), ()->{});
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("maven-compiler-plugin-3.8.1.pom")));
+	}
+
+	@Test
+	public void testDependencyWithVersionAsProperty() throws Exception {
+		XMLLanguageService languageService = new XMLLanguageService();
+		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/pom-localrepo-test-dependencies-propertyVersion.xml", languageService), new Position(17, 20), ()->{});
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("maven-compiler-plugin-3.8.1.pom")), definitions.toString());
 	}
 }

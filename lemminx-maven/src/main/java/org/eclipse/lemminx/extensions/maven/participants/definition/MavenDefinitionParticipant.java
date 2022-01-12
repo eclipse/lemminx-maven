@@ -119,18 +119,14 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			if (isWellDefinedDependency(dependency)) {
 				File workspaceArtifactLocation = findWorkspaceArtifact(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
 				if (workspaceArtifactLocation != null) {
-					LocationLink location = toLocationNoRange(workspaceArtifactLocation, element);
-					if (location != null) {
-						locations.add(location);
-					}
+					locations.add(toLocationNoRange(workspaceArtifactLocation, element));
 					return;
 				}
 			}
 			
 			File artifactLocation = getArtifactLocation(dependency, element.getOwnerDocument());
-			LocationLink location = toLocationNoRange(artifactLocation, element);
-			if (location != null) {
-				locations.add(location);
+			if (artifactLocation != null && artifactLocation.isFile()) {
+				locations.add(toLocationNoRange(artifactLocation, element));
 			}
 		}
 	}
@@ -218,6 +214,10 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	}
 
 	private File getArtifactLocation(Dependency dependency, DOMDocument doc) {
+		if (dependency.getVersion() != null && dependency.getVersion().contains("$")) {
+			dependency = dependency.clone();
+			dependency.setVersion(null);
+		}
 		if (dependency.getGroupId() == null || dependency.getVersion() == null) {
 			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 			if (p != null) {
@@ -236,6 +236,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		if (localArtifact != null) {
 			return localArtifact;
 		}
+		
 		return null;
 	}
 
