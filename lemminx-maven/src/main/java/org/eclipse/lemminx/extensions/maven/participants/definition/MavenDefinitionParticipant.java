@@ -91,8 +91,8 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 					LocationLink location = toLocationNoRange(workspaceArtifactLocation, element);
 					if (location != null) {
 						locations.add(location);
+						return;
 					}
-					return;
 				}
 			}
 			
@@ -104,14 +104,21 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 				}
 				if (relativeFile.isFile()) {
 					locations.add(toLocationNoRange(relativeFile, parentNode));
+					return;
 				}
-				return;
 			} else {
 				File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
 				if (match(relativeFile, dependency)) {
 					locations.add(toLocationNoRange(relativeFile, parentNode));
+					return;
+				} else {
+					// those next lines may actually be more generic and suit parent definition in any case
+					MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+					if (project != null && project.getParentFile() != null) {
+						locations.add(toLocationNoRange(project.getParentFile(), parentNode));
+						return;
+					}
 				}
-				return;
 			}
 		}
 		if (dependency != null && element != null) {

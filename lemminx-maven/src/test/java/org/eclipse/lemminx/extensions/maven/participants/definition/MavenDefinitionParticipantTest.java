@@ -36,4 +36,12 @@ public class MavenDefinitionParticipantTest {
 		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/pom-localrepo-test-dependencies-propertyVersion.xml", languageService), new Position(17, 20), ()->{});
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("maven-compiler-plugin-3.8.1.pom")), definitions.toString());
 	}
+
+	
+	@Test
+	public void testParentFromRepo() throws Exception {
+		XMLLanguageService languageService = new XMLLanguageService();
+		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/pom-parent-from-repo.xml", languageService), new Position(6, 30), ()->{});
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("spring-boot-starter-parent-2.6.2.pom")));
+	}
 }
