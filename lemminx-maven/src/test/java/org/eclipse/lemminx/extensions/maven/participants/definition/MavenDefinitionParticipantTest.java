@@ -41,7 +41,7 @@ public class MavenDefinitionParticipantTest {
 	@Test
 	public void testParentFromRepo() throws Exception {
 		XMLLanguageService languageService = new XMLLanguageService();
-		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/pom-parent-from-repo.xml", languageService), new Position(6, 30), ()->{});
+		List<? extends LocationLink> definitions = languageService.findDefinition(createDOMDocument("/parent-from-repo.pom", languageService), new Position(6, 30), ()->{});
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("spring-boot-starter-parent-2.6.2.pom")));
 	}
 }

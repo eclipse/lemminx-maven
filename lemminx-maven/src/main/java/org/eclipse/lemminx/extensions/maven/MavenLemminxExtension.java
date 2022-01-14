@@ -379,7 +379,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	public static boolean match(Path file) {
 		String fileName = file != null ? file.getFileName().toString() : null;
 		return fileName != null && ((fileName.startsWith("pom") && fileName.endsWith(".xml"))
-				|| fileName.endsWith(Maven.POMv4));
+				|| fileName.endsWith(Maven.POMv4) || fileName.endsWith(".pom"));
 	}
 
 	public MavenProjectCache getProjectCache() {
