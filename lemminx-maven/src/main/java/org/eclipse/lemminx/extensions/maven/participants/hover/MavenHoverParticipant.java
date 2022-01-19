@@ -16,30 +16,20 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.index.ArtifactInfo;
-import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
@@ -51,6 +41,7 @@ import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.impl.ArtifactResolver;
 import org.eclipse.aether.resolution.ArtifactRequest;
@@ -61,7 +52,6 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
-import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
@@ -71,7 +61,6 @@ import org.eclipse.lemminx.services.extensions.HoverParticipantAdapter;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
-import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
@@ -159,7 +148,6 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	
 	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
-		Collection<String> possibleHovers = Collections.synchronizedSet(new LinkedHashSet<>());
 		DOMNode node = request.getNode();
 		DOMDocument doc = request.getXMLDocument();
 
@@ -175,7 +163,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 									|| artifactToSearch.getArtifactId().equals(gav.getArtifactId()))
 							&& (artifactToSearch.getVersion() == null
 									|| artifactToSearch.getVersion().equals(gav.getVersion())))
-					.sorted(Comparator.comparing((Gav gav) -> new DefaultArtifactVersion(gav.getVersion())).reversed())
+					.sorted(Comparator.comparing((Artifact artifact) -> new DefaultArtifactVersion(artifact.getVersion())).reversed())
 					.findFirst().map(plugin.getLocalRepositorySearcher()::findLocalFile).map(file -> builder
 							.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
 					.map(model -> {
@@ -199,38 +187,11 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						localDescription.get()));
 			}
 		} catch (Exception e1) {
-			LOGGER.log(Level.SEVERE, e1.getCause().toString(), e1);
+			LOGGER.log(Level.SEVERE, e1.toString(), e1);
 		}
 		
-		final String updatingItem = MavenCompletionParticipant.WAITING_LABEL;
-		possibleHovers.add(updatingItem);
-		
-		plugin.getCentralSearcher().ifPresent(centralSearcher -> {
-			try {
-				CompletableFuture.runAsync(() -> {
-					if (isPlugin) {
-						// TODO: make a new function that gets only the exact artifact ID match, or just
-						// take the first thing given
-						centralSearcher.getPluginArtifacts(artifactToSearch).stream()
-								.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
-								.forEach(possibleHovers::add);
-					} else {
-						centralSearcher.getArtifacts(artifactToSearch).stream()
-								.map(ArtifactInfo::getDescription).filter(Objects::nonNull)
-								.forEach(possibleHovers::add);
-					}
-				}).whenComplete((ok, error) -> possibleHovers.remove(updatingItem)).get(10, TimeUnit.SECONDS);
-			} catch (InterruptedException | ExecutionException exception) {
-				LOGGER.log(Level.SEVERE, exception.getCause() != null ? exception.getCause().toString() : exception.getMessage(), exception);
-			} catch (TimeoutException e) {
-				// nothing to log, some work still pending
-			}
-		});
-		if (possibleHovers.isEmpty()) {
-			return null;
-		}
-
-		return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, possibleHovers.iterator().next()));
+		// we don't have description or other valuable information for non-local artifacts.
+		return null;
 	}
 
 	private Hover collectGoal(IPositionRequest request) {

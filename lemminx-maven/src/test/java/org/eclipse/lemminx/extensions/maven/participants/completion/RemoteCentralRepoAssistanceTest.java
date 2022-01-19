@@ -103,24 +103,6 @@ public class RemoteCentralRepoAssistanceTest {
 	}
 
 	@Test
-//	@Timeout(15000)
-	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralArtifactHover()
-			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		// TODO: Currently Central REST API doesn't provide the description field, 
-		// so, the hover is generated from the artifact info for testing purposes
-		String description = "org.fujion.webjars|webjar-angular";
-		final DOMDocument document = createDOMDocument("/pom-remote-central-artifact-hover.xml");
-		final Position position = new Position(14, 25);
-		Hover hover;
-		do {
-			hover = languageService.doHover(document, position, new SharedSettings());
-			Thread.sleep(500);
-		} while (!(((MarkupContent) hover.getContents().getRight()).getValue().contains(description)));
-		// if got out of the loop without timeout, then test is PASSED
-	}
-	
-	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
 	public void testRemoteCentralPluginGroupIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
