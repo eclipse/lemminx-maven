@@ -30,8 +30,9 @@ import java.util.stream.Collectors;
 
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Dependency;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
 
 public class LocalRepositorySearcher {
 
@@ -43,24 +44,24 @@ public class LocalRepositorySearcher {
 		this.localRepository = localRepository;
 	}
 
-	private Map<File, Collection<Gav>> cache = new HashMap<>();
+	private Map<File, Collection<Artifact>> cache = new HashMap<>();
 	private WatchKey watchKey;
 	private WatchService watchService;
 
 	public Set<String> searchGroupIds() throws IOException {
-		return getLocalArtifactsLastVersion().stream().map(Gav::getGroupId).distinct().collect(Collectors.toSet());
+		return getLocalArtifactsLastVersion().stream().map(Artifact::getGroupId).distinct().collect(Collectors.toSet());
 	}
 
 	public Set<String> searchPluginGroupIds() throws IOException {
-		return getLocalPluginArtifacts().stream().map(Gav::getGroupId).distinct().collect(Collectors.toSet());
+		return getLocalPluginArtifacts().stream().map(Artifact::getGroupId).distinct().collect(Collectors.toSet());
 	}
 
-	public Collection<Gav> getLocalPluginArtifacts() throws IOException {
+	public Collection<Artifact> getLocalPluginArtifacts() throws IOException {
 		return getLocalArtifactsLastVersion().stream().filter(gav -> gav.getArtifactId().contains("-plugin")).collect(Collectors.toSet());
 	}
 
-	public Collection<Gav> getLocalArtifactsLastVersion() throws IOException {
-		Collection<Gav> res = cache.get(localRepository);
+	public Collection<Artifact> getLocalArtifactsLastVersion() throws IOException {
+		Collection<Artifact> res = cache.get(localRepository);
 		if (res == null) {
 			res = computeLocalArtifacts();
 			Path localRepoPath = localRepository.toPath();
@@ -86,9 +87,9 @@ public class LocalRepositorySearcher {
 		return res;
 	}
 
-	public Collection<Gav> computeLocalArtifacts() throws IOException {
+	public Collection<Artifact> computeLocalArtifacts() throws IOException {
 		final Path repoPath = localRepository.toPath();
-		Map<String, Gav> groupIdArtifactIdToVersion = new HashMap<>();
+		Map<String, Artifact> groupIdArtifactIdToVersion = new HashMap<>();
 		Files.walkFileTree(repoPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
@@ -110,7 +111,7 @@ public class LocalRepositorySearcher {
 					return FileVisitResult.SKIP_SUBTREE;
 				}
 				String groupIdArtifactId = groupId + ':' + artifactId;
-				Gav existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
+				Artifact existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
 				boolean replace = existingGav == null;
 				if (existingGav != null) {
 					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
@@ -118,7 +119,7 @@ public class LocalRepositorySearcher {
 					replace |= (existingVersion.toString().endsWith("-SNAPSHOT") && !version.toString().endsWith("-SNAPSHOT"));
 				}
 				if (replace) {
-					groupIdArtifactIdToVersion.put(groupIdArtifactId, new Gav(groupId, artifactId, version.toString()));
+					groupIdArtifactIdToVersion.put(groupIdArtifactId, new DefaultArtifact(groupId, artifactId, null, version.toString()));
 				}
 				return FileVisitResult.SKIP_SUBTREE;
 			}
@@ -131,7 +132,7 @@ public class LocalRepositorySearcher {
 	public File findLocalFile(Dependency dependency) {
 		return new File(localRepository, dependency.getGroupId().replace('.', File.separatorChar) + File.separatorChar + dependency.getArtifactId() + File.separatorChar + dependency.getVersion() + File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom");
 	}
-	public File findLocalFile(Gav gav) {
+	public File findLocalFile(Artifact gav) {
 		return new File(localRepository, gav.getGroupId().replace('.', File.separatorChar) + File.separatorChar + gav.getArtifactId() + File.separatorChar + gav.getVersion() + File.separatorChar + gav.getArtifactId() + '-' + gav.getVersion() + ".pom");
 	}
 

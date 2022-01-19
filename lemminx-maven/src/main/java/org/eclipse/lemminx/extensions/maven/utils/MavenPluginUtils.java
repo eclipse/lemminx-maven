@@ -28,9 +28,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -40,6 +38,7 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
 import org.eclipse.lemminx.dom.DOMElement;
@@ -204,7 +203,7 @@ public class MavenPluginUtils {
 				version = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 					.filter(gav -> thePlugin.getArtifactId().equals(gav.getArtifactId()))
 					.filter(gav -> thePlugin.getGroupId().equals(gav.getGroupId()))
-					.map(Gav::getVersion) //
+					.map(Artifact::getVersion) //
 					.map(DefaultArtifactVersion::new) //
 					.collect(Collectors.maxBy(Comparator.naturalOrder()));
 				if (version.isPresent()) {
@@ -226,7 +225,7 @@ public class MavenPluginUtils {
 			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
 		}
 		if (plugin == null && artifactId.isPresent()) {
-			for (Entry<String, Artifact> entry : project.getPluginArtifactMap().entrySet()) {
+			for (Entry<String, org.apache.maven.artifact.Artifact> entry : project.getPluginArtifactMap().entrySet()) {
 				if (entry.getValue().getArtifactId().equals(artifactId.get())) {
 					plugin = project.getPlugin(entry.getKey());
 				}

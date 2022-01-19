@@ -23,8 +23,9 @@ import java.util.logging.Logger;
 
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.model.Dependency;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 
@@ -46,7 +47,6 @@ public class RemoteCentralRepositorySearcher {
 	private static final String VERSION = "v";
 	private static final String LATEST_VERSION = "latestVersion";
 	private static final String PACKAGING = "p";
-	private static final String REPO_ID = "repositoryId";
 	private static final String SEPARATOR = ":";
 	private static final String PARAM_SEPARATOR = " AND ";
 	private static final String ASTERISK = "*";
@@ -85,7 +85,7 @@ public class RemoteCentralRepositorySearcher {
 	 *                         {@code Map<String artifactId, String artifactDescription>}
 	 * @return
 	 */
-	public Collection<ArtifactInfo> getArtifacts(Dependency artifactToSearch) {
+	public Collection<Artifact> getArtifacts(Dependency artifactToSearch) {
 		return disableCentralSearch ? Collections.emptySet() : internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_JAR);
 	}
 				
@@ -97,7 +97,7 @@ public class RemoteCentralRepositorySearcher {
 		return disableCentralSearch ? Collections.emptySet() : internalGetGroupIds(artifactToSearch, PACKAGING_TYPE_JAR);
 	}
 
-	public Collection<ArtifactInfo> getPluginArtifacts(Dependency artifactToSearch) {
+	public Collection<Artifact> getPluginArtifacts(Dependency artifactToSearch) {
 		return disableCentralSearch ? Collections.emptySet() : internalGetArtifacts(artifactToSearch, PACKAGING_TYPE_MAVEN_PLUGIN);
 	}
 
@@ -110,7 +110,7 @@ public class RemoteCentralRepositorySearcher {
 	}
 	
 	
-	private Collection<ArtifactInfo> internalGetArtifacts(Dependency artifactToSearch, String packaging) {
+	private Collection<Artifact> internalGetArtifacts(Dependency artifactToSearch, String packaging) {
 		GetRequest request = createDefaultRequest();
 		
 		Map<String, String> queryPatams = new HashMap<>();
@@ -125,10 +125,10 @@ public class RemoteCentralRepositorySearcher {
 		}
 
 		final int[] count = {0};
-		List<ArtifactInfo> artifactInfos = new ArrayList<>();
+		List<Artifact> artifactInfos = new ArrayList<>();
 		responseBody.getJSONArray("docs").forEach(d -> {
 			count[0]++;
-			ArtifactInfo artifactInfo = toArtifactInfo((JSONObject)d);
+			Artifact artifactInfo = toArtifact((JSONObject)d);
 			artifactInfos.add(artifactInfo);
 		});
 				
@@ -237,15 +237,12 @@ public class RemoteCentralRepositorySearcher {
 		return null;
 	}
 
-	private static final ArtifactInfo toArtifactInfo(JSONObject object) {
+	private static final Artifact toArtifact(JSONObject object) {
 		String g = object.has(GROUP_ID) ? object.getString(GROUP_ID) : null;
 		String a = object.has(ARTIFACT_ID) ? object.getString(ARTIFACT_ID) : null;
 		String v = object.has(LATEST_VERSION) ? object.getString(LATEST_VERSION) : null;
 		String p = object.has(PACKAGING) ? object.getString(PACKAGING) : null;
-		String r = object.has(REPO_ID) ? object.getString(REPO_ID) : null;
-		ArtifactInfo artifactInfo = new ArtifactInfo(r, g, a, v, null, null);
-		artifactInfo.setPackaging(p);
-		artifactInfo.setDescription(artifactInfo.toString()); // TODO: Currently description is not provided
+		Artifact artifactInfo = new DefaultArtifact(g, a, null, v);
 		return artifactInfo;
 	}
 	

@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Collection;
 import java.util.Set;
 
-import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
-import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.model.Dependency;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +42,7 @@ public class RemoteCentralRepoTest {
 		dep.setVersion(V);
 		
 		System.out.println("\nDep: " + dep.toString());
-		Collection<ArtifactInfo> artifactInfos = repoSearcher.getArtifacts(dep);
+		Collection<Artifact> artifactInfos = repoSearcher.getArtifacts(dep);
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
 	
@@ -127,7 +127,7 @@ public class RemoteCentralRepoTest {
 		dep.setVersion(V);
 		
 		System.out.println("\nDep: " + dep.toString());
-		Collection<ArtifactInfo> artifactInfos = repoSearcher.getPluginArtifacts(dep);
+		Collection<Artifact> artifactInfos = repoSearcher.getPluginArtifacts(dep);
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
 	
