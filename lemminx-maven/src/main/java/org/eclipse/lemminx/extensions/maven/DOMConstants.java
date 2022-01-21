@@ -38,4 +38,6 @@ public class DOMConstants {
 	public static final String PROPERTIES_ELT = "properties";
 	public static final String TYPE_ELT = "type";
 	public static final String CLASSIFIER_ELT = "classifier";
+	public static final String EXCLUSION_ELT = "exclusion";
+	public static final String EXCLUSIONS_ELT = "exclusions";
 }
