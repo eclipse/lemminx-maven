@@ -443,8 +443,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,
 			GAVInsertionStrategy strategy) {
-		boolean insertGroupId = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
-				.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent();
+		boolean hasGroupIdSet = DOMUtils.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent() 
+						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
+		boolean insertGroupId = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !hasGroupIdSet;
 		boolean insertVersion = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
 				.findChildElementText(request.getParentElement().getParentElement(), VERSION_ELT).isPresent();
 		CompletionItem item = new CompletionItem();
