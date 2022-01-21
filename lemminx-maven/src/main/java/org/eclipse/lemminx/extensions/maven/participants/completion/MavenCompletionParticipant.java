@@ -8,20 +8,7 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.completion;
 
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PHASE_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.SCOPE_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -69,6 +56,7 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.extensions.maven.DOMConstants;
 import org.eclipse.lemminx.extensions.maven.DependencyScope;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
@@ -446,8 +434,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		boolean hasGroupIdSet = DOMUtils.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent() 
 						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
 		boolean insertGroupId = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !hasGroupIdSet;
-		boolean insertVersion = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
-				.findChildElementText(request.getParentElement().getParentElement(), VERSION_ELT).isPresent();
+		boolean isExclusion = DOMUtils.findClosestParentNode(request, DOMConstants.EXCLUSIONS_ELT) != null;
+		boolean insertVersion = !isExclusion && (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
+				.findChildElementText(request.getParentElement().getParentElement(), VERSION_ELT).isPresent());
 		CompletionItem item = new CompletionItem();
 		if (artifactInfo.description != null) {
 			item.setDocumentation(artifactInfo.description);
