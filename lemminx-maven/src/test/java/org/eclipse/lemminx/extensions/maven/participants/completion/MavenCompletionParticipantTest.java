@@ -139,4 +139,29 @@ public class MavenCompletionParticipantTest {
 						"${spring.version}"),
 						"${spring.version}"));
 	}
+
+	@Test
+	public void testInsertionWithAlreadyExistingGroupId() throws Exception {
+		String pom = //
+				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+				+ "	xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
+				+ "	xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+				+ "	<modelVersion>4.0.0</modelVersion>\n"
+				+ "	<groupId>org.test</groupId>\n"
+				+ "	<artifactId>test</artifactId>\n"
+				+ "	<version>0.0.1-SNAPSHOT</version>\n"
+				+ "	<dependencies>\n"
+				+ "		<dependency>\n"
+				+ "			<groupId>org.apache.maven.plugins</groupId>\n"
+				+ "			|\n"
+				+ "		</dependency>\n"
+				+ "	</dependencies>\n"
+				+ "</project>";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
+				te(10, 3, 10, 3, //
+						"<artifactId>maven-surefire-plugin</artifactId>\n			<version>2.22.2</version>"),
+						"maven-surefire-plugin"));
+	}
+
 }
