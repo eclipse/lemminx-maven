@@ -5,7 +5,7 @@
 
 	<groupId>org.eclipse.lemminx</groupId>
 	<artifactId>lemminx-maven</artifactId>
-	<version>0.5.0</version>
+	<version>0.5.1-SNAPSHOT</version>
 
 	<licenses>
 		<license>
