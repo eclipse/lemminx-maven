@@ -1,6 +1,25 @@
 # LemMinx-Maven Releases
 
-## Upcoming Release
+### 0.5.0
+
+* 📅 Release Date: January 24th, 2022
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.4.1...0.5.0
+
+#### Use search.maven.org search engine for completion
+
+Completion proposals now include the results of search against search.maven.org . Those results are usually of high quality.
+
+#### Removed dependency on indexer
+
+Usage of Maven index for assistance has been entirely removed. This can save from long downloads and saves a large amount of disk-space and RAM by removing many dependencies.
+
+#### Other fixes and improvements
+
+* Performance are improved for `workspaceProjects`
+* definition (Ctrl+Click) also works for dependencies with version being a property
+* definition also works for parent artifact when it's in local Maven repo
+* `*.pom` files are supported just like `pom.xml` files
+
 
 ### 0.4.1
 
