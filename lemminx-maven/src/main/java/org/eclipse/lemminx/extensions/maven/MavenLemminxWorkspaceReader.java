@@ -11,21 +11,19 @@ package org.eclipse.lemminx.extensions.maven;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.ArtifactUtils;
@@ -41,12 +39,14 @@ import org.eclipse.aether.util.artifact.ArtifactIdUtils;
  * instead of usual Maven repos.
  */
 public class MavenLemminxWorkspaceReader implements WorkspaceReader {
+
+	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
+
 	private final WorkspaceRepository repository;
 	private final MavenLemminxExtension plugin;
 	
 	private ThreadLocal<Boolean> skipFlushBeforeResult = new ThreadLocal<>();
-	private final Executor executor = Executors.newSingleThreadExecutor();
-	private final Set<CompletableFuture<?>> ongoingWork = Collections.synchronizedSet(new HashSet<>());
+	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
 	private Map<Artifact, File> workspaceArtifacts = new ConcurrentHashMap<>();
 	
@@ -105,7 +105,11 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	}
 	
 	private void waitForCompletion() {
-		CompletableFuture.allOf(ongoingWork.toArray(CompletableFuture[]::new)).join();
+		try {
+			executor.awaitTermination(5, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			LOGGER.severe(e.getMessage());
+		}
 	}
 
 	private File find(MavenProject project, Artifact artifact) {
@@ -151,18 +155,27 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	 * Parses and adds a document for a given URI into the projects cache
 	 * 
 	 * @param uri An URI of a document to add
-	 * @param document A document to add
+	 * @param documents documents to add
 	 */
-	public void enqueue(URI uri) {
-		CompletableFuture<?> f = CompletableFuture.runAsync(() -> {
-			File file = new File(uri);
-			skipFlushBeforeResult.set(true); // avoid deadlock
-			Optional<MavenProject> snapshotProject = plugin.getProjectCache().getSnapshotProject(file);
-			skipFlushBeforeResult.set(false);
-			snapshotProject.map(mavenProject -> new DefaultArtifact(mavenProject.getGroupId(), mavenProject.getArtifactId(), null, mavenProject.getVersion())).ifPresent(artifact -> workspaceArtifacts.put(artifact, file));
-		}, executor);
-		ongoingWork.add(f);
-		f.thenRun(() -> ongoingWork.remove(f));
+	public void addToWorkspace(Collection<URI> uris) {
+		// TODO also populate from parent projects is possible
+		// so a safer heuristic would be to populate from leaf to root
+		// to avoid computing parents multiple times
+		for (URI uri : uris) {
+			executor.execute(() -> {
+				File file = new File(uri);
+				if (workspaceArtifacts.containsValue(file)) {
+					return;
+				}
+				skipFlushBeforeResult.set(true); // avoid deadlock
+//				synchronized (MavenLemminxWorkspaceReader.this) {
+				plugin.getProjectCache().getSnapshotProject(file) //
+					.map(mavenProject -> new DefaultArtifact(mavenProject.getGroupId(), mavenProject.getArtifactId(), null, mavenProject.getVersion())) //
+					.ifPresent(artifact -> workspaceArtifacts.put(artifact, file));
+//				}
+				skipFlushBeforeResult.set(false);
+			});
+		}
 	}
 
 	public void remove(URI uri) {
