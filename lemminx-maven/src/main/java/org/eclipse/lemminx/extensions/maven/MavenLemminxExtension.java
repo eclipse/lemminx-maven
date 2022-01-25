@@ -426,8 +426,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
-			// TODO Optimize: we could add multiple document at once to share the common parents and so on.
-			projectsToAdd.stream().forEach(reader::enqueue);
+			reader.addToWorkspace(projectsToAdd);
 			projectsToRemove.stream().forEach(reader::remove);
 		}
 	}
