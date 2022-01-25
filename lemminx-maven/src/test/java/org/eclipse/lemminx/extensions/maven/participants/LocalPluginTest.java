@@ -26,6 +26,7 @@ import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
@@ -247,5 +248,12 @@ public class LocalPluginTest {
 	public void testParentPluginManagementResolved() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-pluginManagement-child.xml", languageService);
 		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
+	}
+
+	@Test
+	public void testParentPluginManagementConfigurationInChildren() throws IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-pluginManagement-child.xml", languageService);
+		CompletionList completion = languageService.doComplete(document, new Position(20, 20) /*after <configuration>*/, new SharedSettings());
+		assertTrue(completion.getItems().stream().map(CompletionItem::getLabel).anyMatch("argLine"::equals), completion::toString);
 	}
 }
