@@ -173,7 +173,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				}).filter(Objects::nonNull)
 				.findAny()
 				.or(() -> {
-					if (!skipFlushBeforeResult.get().booleanValue()) {
+					if (skipFlushBeforeResult.get() != Boolean.TRUE) {
 						while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(projectKey).isEmpty()) {
 							try {
 								Thread.sleep(POLLING_INTERVAL);
