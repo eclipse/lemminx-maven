@@ -9,7 +9,9 @@
 package org.eclipse.lemminx.extensions.maven;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +38,11 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.aether.repository.WorkspaceRepository;
 import org.eclipse.aether.util.artifact.ArtifactIdUtils;
+import org.eclipse.lemminx.commons.TextDocument;
+import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.dom.DOMElement;
+import org.eclipse.lemminx.dom.DOMParser;
+import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 
 /**
  * This workspace reader allows to resolve GAV to local workspaceFolders that match
@@ -61,15 +68,41 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				skipFlushBeforeResult.set(true); // avoid deadlock as building project will go through this workspace reader
 				Optional<MavenProject> snapshotProject = plugin.getProjectCache().getSnapshotProject(pomFile);
 				skipFlushBeforeResult.set(false);
-				if (snapshotProject.isPresent()) {
-					MavenProject project = snapshotProject.get();
-					while (project != null) {
+				snapshotProject.ifPresentOrElse(project -> {
+					while (project != null) { 
 						File pom = project.getFile();
-						workspaceArtifacts.put(new DefaultArtifact(project.getGroupId(), project.getArtifactId(), null, project.getVersion()), pom);
+						if (toProcess.contains(pom)) {
+							workspaceArtifacts.put(new DefaultArtifact(project.getGroupId(), project.getArtifactId(), null, project.getVersion()), pom);
+						}
 						propagateProcessed(pom);
 						project = project.getParent();
 					}
-				}
+				}, () -> { // try reading GAV at least
+					try {
+						String fileContent = String.join(System.lineSeparator(), Files.readAllLines(pomFile.toPath()));
+						
+						DOMDocument doc = DOMParser.getInstance().parse(new TextDocument(fileContent, pomFile.toURI().toString()), null);
+						doc.getChildren().stream() //
+							.filter(DOMElement.class::isInstance) //
+							.map(DOMElement.class::cast) //
+							.filter(node -> DOMConstants.PROJECT_ELT.equals(node.getLocalName())) //
+							.forEach(projectNode -> {
+								Optional<DOMElement> parentElement = DOMUtils.findChildElement(projectNode, DOMConstants.PARENT_ELT);
+								Optional<String> groupId = DOMUtils.findChildElementText(projectNode, DOMConstants.GROUP_ID_ELT)
+										.or(() -> parentElement.flatMap(parent -> DOMUtils.findChildElementText(parent, DOMConstants.GROUP_ID_ELT)));
+								Optional<String> artifactId = DOMUtils.findChildElementText(projectNode, DOMConstants.ARTIFACT_ID_ELT);
+								Optional<String> version = DOMUtils.findChildElementText(projectNode, DOMConstants.VERSION_ELT)
+										.or(() -> parentElement.flatMap(parent -> DOMUtils.findChildElementText(parent, DOMConstants.VERSION_ELT)));
+								if (groupId.isPresent() && !groupId.get().contains("$") && //
+									artifactId.isPresent() && !artifactId.get().contains("$") &&
+									version.isPresent() && !version.get().contains("$")) {
+									workspaceArtifacts.put(new DefaultArtifact(groupId.get(), artifactId.get(), null, version.get()), pomFile);
+								}
+							});
+					} catch (IOException ex) {
+						LOGGER.fine(ex.getMessage());
+					}
+				});
 			}
 			// ensure we remove it from further processing even in case no MavenProject can be built
 			propagateProcessed(pomFile);

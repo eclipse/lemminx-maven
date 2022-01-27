@@ -20,6 +20,7 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.services.extensions.ICompletionRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.w3c.dom.Text;
 
 public class DOMUtils {
 
@@ -76,9 +77,19 @@ public class DOMUtils {
 		return false;
 	}
 
+	public static Optional<DOMElement> findChildElement(DOMNode parent, String elementName) {
+		return parent.getChildren().stream().filter(node -> elementName.equals(node.getLocalName()))
+				.filter(DOMElement.class::isInstance).map(DOMElement.class::cast).findAny();
+	}
+
 	public static Optional<String> findChildElementText(DOMNode pluginNode, final String elementName) {
-		return pluginNode.getChildren().stream().filter(node -> elementName.equals(node.getLocalName()))
-				.flatMap(node -> node.getChildren().stream()).findAny().map(DOMNode::getTextContent).map(String::trim);
+		return findChildElement(pluginNode, elementName) //
+				.stream() //
+				.flatMap(element -> element.getChildren().stream()) //
+				.filter(Text.class::isInstance)
+				.map(Text.class::cast)
+				.map(Text::getData)
+				.findFirst();
 	}
 
 	public static String getOneLevelIndent(ICompletionRequest request) throws BadLocationException {
