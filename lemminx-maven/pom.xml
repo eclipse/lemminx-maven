@@ -32,6 +32,13 @@
 			<artifactId>junit-jupiter</artifactId>
 			<version>${junit-jupiter.version}</version>
 			<scope>test</scope>
+			<!-- Provided by Java -->
+			<exclusions>
+				<exclusion>
+					<groupId>xml-apis</groupId>
+					<artifactId>xml-apis</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -43,6 +50,13 @@
 			<groupId>org.eclipse.lemminx</groupId>
 			<artifactId>org.eclipse.lemminx</artifactId>
 			<version>${lemminx.version}</version>
+			<!-- Provided by Java -->
+			<exclusions>
+				<exclusion>
+					<groupId>xml-apis</groupId>
+					<artifactId>xml-apis</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.lemminx</groupId>
@@ -51,6 +65,13 @@
 			<scope>test</scope>
 			<classifier>tests</classifier>
 			<type>test-jar</type>
+			<!-- Provided by Java -->
+			<exclusions>
+				<exclusion>
+					<groupId>xml-apis</groupId>
+					<artifactId>xml-apis</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven</groupId>
