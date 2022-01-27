@@ -1,5 +1,13 @@
 # LemMinx-Maven Releases
 
+### 0.5.1
+
+* 📅 Release Date: January 27th, 2022
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.5.0...0.5.1
+
+#### Numerous optimizations and performance improvement
+
+
 ### 0.5.0
 
 * 📅 Release Date: January 24th, 2022
