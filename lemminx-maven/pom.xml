@@ -21,9 +21,9 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<lemminx.maven.indexDirectory>${project.build.directory}/test-index</lemminx.maven.indexDirectory>
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
-		<junit-jupiter.version>5.8.1</junit-jupiter.version>
-		<lemminx.version>0.18.0</lemminx.version>
-		<maven.version>3.8.2</maven.version>
+		<junit-jupiter.version>5.8.2</junit-jupiter.version>
+		<lemminx.version>0.18.2</lemminx.version>
+		<maven.version>3.8.4</maven.version>
 	</properties>
 
 	<dependencies>
@@ -122,7 +122,7 @@
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
 			<artifactId>wagon-http</artifactId>
-			<version>3.4.3</version>
+			<version>3.5.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
@@ -213,25 +213,21 @@
 			<dependency>
 				<groupId>com.google.inject</groupId>
 				<artifactId>guice</artifactId>
-				<version>4.2.3</version>
 				<classifier>no_aop</classifier>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-lang3</artifactId>
-				<version>3.4</version>
 				<scope>provided</scope>
 			</dependency>
 			<dependency>
 				<groupId>com.google.guava</groupId>
 				<artifactId>guava</artifactId>
-				<version>29.0-jre</version>
 				<scope>provided</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.jsoup</groupId>
 				<artifactId>jsoup</artifactId>
-				<version>1.9.2</version>
 				<scope>provided</scope>
 			</dependency>
 		</dependencies>
