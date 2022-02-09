@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2021 Red Hat Inc. and others.
+ * Copyright (c) 2019-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -235,7 +235,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				collectSimpleCompletionItems(
 						isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds()
 								: plugin.getLocalRepositorySearcher().searchGroupIds(),
-						Function.identity(), Function.identity(), request).forEach(response::addCompletionAttribute);
+						Function.identity(), Function.identity(), request)
+							.stream().filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
+							.forEach(response::addCompletionAttribute);
 				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, response, cancelChecker);
 			}
 			internalCollectWorkspaceArtifacts(request, allArtifactInfos, groupId, artifactId);
@@ -326,6 +328,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					.values().stream()
 					.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
 					.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
+					.filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
 					.forEach(response::addCompletionItem);
 		}
 		if (request.getNode().isText()) {
@@ -619,6 +622,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 									centralSearcher.getGroupIds(artifactToSearch))
 								.stream() //
 								.map(groupId -> toCompletionItem(groupId, null, range)) //
+								.filter(completionItem -> !nonArtifactCollector.hasAttribute(completionItem.getLabel()))
 								.forEach(nonArtifactCollector::addCompletionItem);
 							cancelChecker.checkCanceled();
 							return;
@@ -788,6 +792,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		boolean needClosingTag = node.getEndTagOpenOffset() == DOMNode.NULL_VALUE;
 		Range range = XMLPositionUtility.createRange(node.getStartTagCloseOffset() + 1,
 				needClosingTag ? node.getStartTagOpenOffset() + 1 : node.getEndTagOpenOffset(), doc);
+		final Set<String> collectedItemLabels = Collections.synchronizedSet(new HashSet<>());
 
 		return items.stream().map(o -> {
 			String label = insertionTextExtractor.apply(o);
@@ -800,7 +805,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			item.setTextEdit(Either.forLeft(new TextEdit(range, insertText)));
 			item.setInsertTextFormat(InsertTextFormat.PlainText);
 			return item;
-		}).collect(Collectors.toList());
+		})
+		.filter(completionItem -> {
+			if (!collectedItemLabels.contains(completionItem.getLabel())) {
+				collectedItemLabels.add(completionItem.getLabel());
+				return true;
+			}
+			return false;
+		})
+		.collect(Collectors.toList());
 	}
 
 	/**
