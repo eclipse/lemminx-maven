@@ -22,7 +22,7 @@
 		<lemminx.maven.indexDirectory>${project.build.directory}/test-index</lemminx.maven.indexDirectory>
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.8.2</junit-jupiter.version>
-		<lemminx.version>0.18.4</lemminx.version>
+		<lemminx.version>0.19.0</lemminx.version>
 		<maven.version>3.8.4</maven.version>
 	</properties>
 
