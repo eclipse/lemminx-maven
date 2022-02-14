@@ -163,7 +163,8 @@ public class LocalPluginTest {
 
 		//<annotationProcessorPath> hover
 		hoverContents = languageService.doHover(doc,
-				new Position(20, 9), getMarkdownSharedSettings()).getContents().getRight().getValue();
+				new Position(20, 9), getMarkdownSharedSettings())
+				.getContents().getRight().getValue();
 		//annotationProcessorPath type should be a DependencyCoordinate and its description should be that of annotationsProcessorPath
 		assertTrue(hoverContents.contains("org.apache.maven.plugin.compiler.DependencyCoordinate"));
 		assertTrue(hoverContents.contains("Classpath elements to supply as annotation processor path."));

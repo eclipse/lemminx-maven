@@ -27,7 +27,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 		System.out.println("testPluginManagementFullyQualifiedPlugin()");
 		XMLLanguageService languageService = new XMLLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
-		System.out.println("testPluginManagementFullyQualifiedPlugin(): TEXT: " + document.getText());
+//		System.out.println("testPluginManagementFullyQualifiedPlugin(): TEXT: " + document.getText());
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(14, 32), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginManagementFullyQualifiedPlugin(): " + uri));
 		

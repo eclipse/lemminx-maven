@@ -62,10 +62,10 @@ import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.Phase;
 import org.eclipse.lemminx.extensions.maven.participants.ArtifactWithDescription;
-import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
+import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
 import org.eclipse.lemminx.services.extensions.CompletionParticipantAdapter;
 import org.eclipse.lemminx.services.extensions.ICompletionRequest;
@@ -126,60 +126,58 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		DOMNode tag = request.getNode();
 		if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
 			collectPluginConfiguration(request).forEach(response::addCompletionItem);
-			return;
 		}
 	}
 
 	// TODO: Factor this with MavenHoverParticipant's equivalent method
 	private List<CompletionItem> collectPluginConfiguration(ICompletionRequest request) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
-		Set<MojoParameter> parameters;
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
+			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
+
+			if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
+				// The configuration element being completed is at the top level
+				return parameters.stream()
+						.map(param -> toTag(param.getName(),
+								MavenPluginUtils.getMarkupDescription(param, null, supportsMarkdown), request))
+	 					.collect(Collectors.toList());
+	 		}
+	
+			// Nested case: node is a grand child of configuration
+			// Get the node's ancestor which is a child of configuration
+			DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
+			if (parentParameterNode != null) {
+				List<MojoParameter> parentParameters = parameters.stream()
+						.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
+						.collect(Collectors.toList());
+				if (!parentParameters.isEmpty()) {
+					MojoParameter parentParameter = parentParameters.get(0);
+	
+					if (parentParameter.getNestedParameters().size() == 1) {
+						// The parent parameter must be a collection of a type
+						MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
+						Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
+						if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
+							return Collections.singletonList(toTag(nestedParameter.getName(), MavenPluginUtils
+									.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown), request));
+						}
+					}
+	
+					// Get all deeply nested parameters
+					List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
+					nestedParameters.add(parentParameter);
+					return nestedParameters.stream()
+							.map(param -> toTag(param.getName(),
+									MavenPluginUtils.getMarkupDescription(param, parentParameter, supportsMarkdown),
+									request))
+							.collect(Collectors.toList());
+				}
+			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			return null;
 		}
 
-		if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
-			// The configuration element being completed is at the top level
-			return parameters.stream()
-					.map(param -> toTag(param.getName(),
-							MavenPluginUtils.getMarkupDescription(param, null, supportsMarkdown), request))
-					.collect(Collectors.toList());
-		}
-
-		// Nested case: node is a grand child of configuration
-		// Get the node's ancestor which is a child of configuration
-		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
-		if (parentParameterNode != null) {
-			List<MojoParameter> parentParameters = parameters.stream()
-					.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
-					.collect(Collectors.toList());
-			if (!parentParameters.isEmpty()) {
-				MojoParameter parentParameter = parentParameters.get(0);
-
-				if (parentParameter.getNestedParameters().size() == 1) {
-					// The parent parameter must be a collection of a type
-					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
-					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
-					if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-						return Collections.singletonList(toTag(nestedParameter.getName(), MavenPluginUtils
-								.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown), request));
-					}
-				}
-
-				// Get all deeply nested parameters
-				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
-				nestedParameters.add(parentParameter);
-				return nestedParameters.stream()
-						.map(param -> toTag(param.getName(),
-								MavenPluginUtils.getMarkupDescription(param, parentParameter, supportsMarkdown),
-								request))
-						.collect(Collectors.toList());
-			}
-		}
-		return null;
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -196,10 +194,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 		DOMElement grandParent = parent.getParentElement();
-		boolean isPlugin = PLUGIN_ELT.equals(parent.getLocalName())
-				|| (grandParent != null && PLUGIN_ELT.equals(grandParent.getLocalName()));
-		boolean isParentDeclaration = PARENT_ELT.equals(parent.getLocalName())
-				|| (grandParent != null && PARENT_ELT.equals(grandParent.getLocalName()));
+		boolean isPlugin = ParticipantUtils.isPlugin(parent);
+		boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
 		Optional<String> groupId = grandParent == null ? Optional.empty()
 				: grandParent.getChildren().stream().filter(DOMNode::isElement)
 						.filter(node -> GROUP_ID_ELT.equals(node.getLocalName()))
@@ -542,7 +538,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return item;
 	}
 
-	private CompletionItem toTag(String name, MarkupContent description, ICompletionRequest request) {
+	private static CompletionItem toTag(String name, MarkupContent description, ICompletionRequest request) {
 		CompletionItem res = new CompletionItem(name);
 		res.setDocumentation(Either.forRight(description));
 		res.setInsertTextFormat(InsertTextFormat.Snippet);
@@ -561,7 +557,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		if (project == null) {
 			return Collections.emptySet();
 		}
-		Map<String, String> allProps = MavenHoverParticipant.getMavenProjectProperties(project);
+		Map<String, String> allProps = ParticipantUtils.getMavenProjectProperties(project);
 
 		return allProps.entrySet().stream().map(property -> {
 			try {

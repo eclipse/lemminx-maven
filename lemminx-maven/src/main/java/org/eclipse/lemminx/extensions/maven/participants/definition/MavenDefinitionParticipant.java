@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2021 Red Hat Inc. and others.
+ * Copyright (c) 2020-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -8,28 +8,19 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.definition;
 
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.io.File;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -37,23 +28,14 @@ import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
-import org.eclipse.aether.impl.ArtifactResolver;
-import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
-import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
-import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
-import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
+import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.extensions.IDefinitionParticipant;
 import org.eclipse.lemminx.services.extensions.IDefinitionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
@@ -84,7 +66,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return;
 		}
 
-		DOMElement element = findInterestingElement(request.getNode());
+		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
 		if (element != null && MODULE_ELT.equals(element.getLocalName())) {
 			File subModuleFile = new File(currentFolder,
 					element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
@@ -93,39 +75,17 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			}
 			return;
 		}
-		Dependency dependency = MavenParseUtils.parseArtifact(request.getParentElement());
-		// Clear version if defined with a property
-		if (dependency != null && dependency.getVersion() != null && dependency.getVersion().contains("$")) {
-			dependency = dependency.clone();
-			dependency.setVersion(null);
-		}
-
-        List<RemoteRepository> remoteRepositories = new ArrayList<RemoteRepository>();
-        remoteRepositories.add(RemoteCentralRepositorySearcher.CENTRAL_REPO);
+		
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
-		if (isPlugin(element)) {
-			p.getRemotePluginRepositories().stream().forEach(r -> {
-				if (!remoteRepositories.contains(r)) {
-					remoteRepositories.add(r);
-				}
-			});
-			
-		} else if (isDependency(element)) {
-			p.getRemoteArtifactRepositories().stream().forEach(ar -> {
-				RemoteRepository r = new RemoteRepository.Builder(ar.getId(), "default", ar.getUrl()).build();
-				if (!remoteRepositories.contains(r)) {
-					remoteRepositories.add(r);
-				}
-			});
-		}
+		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request);
 
 		DOMNode parentNode = DOMUtils.findClosestParentNode(request, PARENT_ELT);
 		if (parentNode != null && parentNode.isElement()) {
 			// Find in workspace
-			if (isWellDefinedDependency(dependency)) {
-				File workspaceArtifactLocation = findWorkspaceArtifact(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), isPlugin(element) ? "pom" : null, remoteRepositories);
-				if (workspaceArtifactLocation != null) {
-					LocationLink location = toLocationNoRange(workspaceArtifactLocation, element);
+			if (ParticipantUtils.isWellDefinedDependency(dependency)) {
+				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+				if (artifact != null && artifact.getFile() != null) {
+					LocationLink location = toLocationNoRange(artifact.getFile(), element);
 					if (location != null) {
 						locations.add(location);
 						return;
@@ -159,8 +119,8 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			}
 		}
 		if (dependency != null && element != null) {
-			if (!isWellDefinedDependency(dependency)) {
-				if (isPlugin(element)) {
+			if (!ParticipantUtils.isWellDefinedDependency(dependency)) {
+				if (ParticipantUtils.isPlugin(element)) {
 					try {
 						PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
 						if (pluginDescriptor != null) {
@@ -172,7 +132,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 							| InvalidPluginDescriptorException e) {
 						// Ignore
 					}
-				} else if (isDependency(element)) {
+				} else if (ParticipantUtils.isDependency(element)) {
 					if (dependency.getGroupId() == null || dependency.getVersion() == null) {
 						if (p != null) {
 							final Dependency originalDependency = dependency;
@@ -190,11 +150,10 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			}
 
 			// Find in workspace
-			if (isWellDefinedDependency(dependency)) {
-
-				File workspaceArtifactLocation = findWorkspaceArtifact(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), isPlugin(element) ? "pom" : null, remoteRepositories);
-				if (workspaceArtifactLocation != null) {
-					locations.add(toLocationNoRange(workspaceArtifactLocation, element));
+			if (ParticipantUtils.isWellDefinedDependency(dependency)) {
+				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+				if (artifact != null && artifact.getFile() != null) {
+					locations.add(toLocationNoRange(artifact.getFile(), element));
 					return;
 				}
 			}
@@ -206,47 +165,9 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			}
 		}
 	}
-
-	public File findWorkspaceArtifact(String groupId, String artifactId, String version, String extension, List<RemoteRepository> remoteRepositories) {
-		try {
-			ArtifactResult result = plugin.getPlexusContainer().lookup(ArtifactResolver.class).resolveArtifact(plugin.getMavenSession().getRepositorySession(), new ArtifactRequest(new DefaultArtifact(groupId, artifactId, extension, version), 
-					remoteRepositories, null));
-			if (result == null) {
-				return null;
-			}
-			Artifact artifact = result.getArtifact();
-			if (artifact == null) {
-				return null;
-			}
-			return artifact.getFile();
-		} catch (ArtifactResolutionException | ComponentLookupException e) {
-			// can happen
-			e.printStackTrace();
-		}
-		return null;
-	}
-	
-	private static boolean isWellDefinedDependency(Dependency dependency) {
-		try {
-			notNullNorBlank(dependency.getGroupId());
-			notNullNorBlank(dependency.getArtifactId());
-			notNullNorBlank(dependency.getVersion());
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-	
-	private static void notNullNorBlank(String str) {
-        int c = str != null && str.length() > 0 ? str.charAt( 0 ) : 0;
-        if ( ( c < '0' || c > '9' ) && ( c < 'a' || c > 'z' ) )
-        {
-            Validate.notBlank( str, "Argument can neither be null, empty nor blank" );
-        }
-    }
 	
 	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
-		Map.Entry<Range, String> mavenProperty = MavenHoverParticipant.getMavenPropertyInRequest(request);
+		Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {
 			return null;
 		}
@@ -291,14 +212,6 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 				.isPresent();
 	}
 
-	private boolean isDependency(DOMElement element) {
-		return DEPENDENCY_ELT.equals(element.getLocalName()) || DEPENDENCIES_ELT.equals(element.getLocalName());
-	}
-
-	private boolean isPlugin(DOMElement element) {
-		return PLUGIN_ELT.equals(element.getLocalName()) || PLUGINS_ELT.equals(element.getLocalName());
-	}
-	
 	private static LocationLink toLocationNoRange(File target, DOMNode originNode) {
 		if (target == null) {
 			return null;
@@ -312,30 +225,4 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		Range targetRange = XMLPositionUtility.createRange(targetNode);
 		return new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
 	}
-
-	private static DOMElement findInterestingElement(DOMNode node) {
-		if (node == null) {
-			return null;
-		}
-		if (!node.isElement()) {
-			return findInterestingElement(node.getParentElement());
-		}
-		DOMElement element = (DOMElement) node;
-		switch (node.getLocalName()) {
-		case MODULE_ELT:
-			return element;
-		case ARTIFACT_ID_ELT:
-		case GROUP_ID_ELT:
-		case VERSION_ELT:
-		case RELATIVE_PATH_ELT:
-			return node.getParentElement();
-		default:
-			// continue
-		}
-		if (DOMUtils.findChildElementText(element, ARTIFACT_ID_ELT).isPresent()) {
-			return element;
-		}
-		return null;
-	}
-
 }
