@@ -104,7 +104,7 @@ public class MavenCompletionParticipantTest {
 				te(12, 6, 12, 16, //
 						"<groupId>org.apache.maven</groupId>\n" + //
 						"      <artifactId>maven-core</artifactId>\n" + //
-										"      <version>3.0</version>"),
+						"      <version>3.0</version>"),
 						"maven-core"));
 	}
 
