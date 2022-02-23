@@ -86,7 +86,7 @@ public class MavenProjectCache {
 	 */
 	public MavenProject getLastSuccessfulMavenProject(DOMDocument document) {
 		check(document);
-		return projectCache.get(URI.create(document.getTextDocument().getUri()));
+		return projectCache.get(URI.create(document.getTextDocument().getUri()).normalize());
 	}
 
 	/**
@@ -97,18 +97,18 @@ public class MavenProjectCache {
 	 */
 	public Collection<ModelProblem> getProblemsFor(DOMDocument document) {
 		check(document);
-		return problemCache.get(URI.create(document.getTextDocument().getUri()));
+		return problemCache.get(URI.create(document.getTextDocument().getUri()).normalize());
 	}
 
 	private void check(DOMDocument document) {
-		Integer last = lastCheckedVersion.get(URI.create(document.getTextDocument().getUri()));
+		Integer last = lastCheckedVersion.get(URI.create(document.getTextDocument().getUri()).normalize());
 		if (last == null || last.intValue() < document.getTextDocument().getVersion()) {
 			parseAndCache(document);
 		}
 	}
 
 	public Optional<MavenProject> getSnapshotProject(File file) {
-		MavenProject lastKnownVersionMavenProject = projectCache.get(file.toURI());
+		MavenProject lastKnownVersionMavenProject = projectCache.get(file.toURI().normalize());
 		if (lastKnownVersionMavenProject != null) {
 			return Optional.of(lastKnownVersionMavenProject);
 		}
@@ -126,7 +126,7 @@ public class MavenProjectCache {
 	}
 
 	private void parseAndCache(DOMDocument document) {
-		URI uri = URI.create(document.getDocumentURI());
+		URI uri = URI.create(document.getDocumentURI()).normalize();
 		Collection<ModelProblem> problems = new ArrayList<>();
 		try {
 			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
