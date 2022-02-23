@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -140,6 +141,80 @@ public class MavenProjectCacheTest {
 		DOMDocument doc = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
 		List<Diagnostic> diagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {});
 		assertTrue(diagnostics.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA"))));
+	}
+	
+	@Test
+	public void testNormilizePathsAreUsedInCache()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		MavenProjectCache cache = plugin.getProjectCache();
+		
+		int initialProjectsSize = cache.getProjects().size();
+		
+		// Use URLretative to a child to access a parent pom.xml
+		// Check if the cached projects size increased by 1 project
+		DOMDocument documentByRelativeURL = getDocumentNotNormilized("/hierarchy/child/grandchild/../../pom.xml");
+		MavenProject projectByRelativeURL = cache.getLastSuccessfulMavenProject(documentByRelativeURL);
+		assertNotNull(projectByRelativeURL);
+		int projectsSize = cache.getProjects().size();
+		assertEquals(initialProjectsSize + 1, projectsSize);
+		
+		// Use yet another URLretative to a child to access a parent pom.xml
+		// Check if the cached projects size is NOT increased (the project is already cached)
+		DOMDocument documentByRelativeURL_2 = getDocumentNotNormilized("/hierarchy/child/../pom.xml");
+		MavenProject projectByRelativeURL_2 = cache.getLastSuccessfulMavenProject(documentByRelativeURL_2);
+		assertNotNull(projectByRelativeURL_2);
+		projectsSize = cache.getProjects().size();
+		assertEquals(initialProjectsSize + 1, projectsSize);
+
+		// Use direct URL  to access a parent pom.xml
+		// Check if the cached projects size is NOT increased (the project is already cached)
+		DOMDocument documentByNormilizedUURL = getDocumentNotNormilized("/hierarchy/pom.xml");
+		MavenProject projectByNormilizedURL = cache.getLastSuccessfulMavenProject(documentByNormilizedUURL);
+		assertNotNull(projectByNormilizedURL);
+		projectsSize = cache.getProjects().size();
+		assertEquals(initialProjectsSize + 1, projectsSize);
+		
+		// Check if cache returns the same project for relative and normalized URL
+		assertEquals(projectByRelativeURL, projectByNormilizedURL);
+		
+		// Try getting the snapshot project by the relative and normalized URIs - it 
+		// Should result into the same cached project 
+
+		File baseDirectory = new File(getClass().getResource("/").toURI());
+
+		// With a relative path 
+		File fileByRelativeURL = new File(baseDirectory,"/hierarchy/child/grandchild/../../pom.xml");
+		MavenProject snapshotProjectByRelativeURL = cache.getSnapshotProject(fileByRelativeURL).get();
+		assertNotNull(snapshotProjectByRelativeURL);
+		assertEquals(projectByNormilizedURL, snapshotProjectByRelativeURL);
+
+		// With yet another relative path 
+		File fileByRelativeURL_2 = new File(baseDirectory,"/hierarchy/child/../pom.xml");
+		MavenProject snapshotProjectByRelativeURL_2 = cache.getSnapshotProject(fileByRelativeURL_2).get();
+		assertNotNull(snapshotProjectByRelativeURL_2);
+		assertEquals(projectByNormilizedURL, snapshotProjectByRelativeURL_2);
+
+		// With a normalized path 
+		File fileByNormilizedURL = new File(baseDirectory,"/hierarchy/pom.xml");
+		MavenProject snapshotProjectByNormilizedURL = cache.getSnapshotProject(fileByNormilizedURL).get();
+		assertNotNull(snapshotProjectByNormilizedURL);
+		assertEquals(projectByNormilizedURL, snapshotProjectByNormilizedURL);
+	}
+	
+	/*
+	 * This method creates a DOMDocument using a not normalized URI, is to be used in Maven Project Cache 
+	 * duplication test case.
+	 * The 'normal' createDocument() method normalizes the resource URI, so it's not possible to test for duplications
+	 * using that method.
+	 */
+	private DOMDocument getDocumentNotNormilized(String resource) throws URISyntaxException, IOException {
+		URI baseUri = getClass().getResource("/").toURI();
+		File baseDirectory = new File(baseUri);
+		File pomFile = new File(baseDirectory, resource);
+		String content = FileUtils.readFileToString(pomFile, "UTF-8");
+		DOMDocument doc = new DOMDocument(new TextDocument(content, pomFile.toURI().toString()), null);
+		return doc;
 	}
 	
 	private DOMDocument getDocument(String resource) throws URISyntaxException, IOException {
