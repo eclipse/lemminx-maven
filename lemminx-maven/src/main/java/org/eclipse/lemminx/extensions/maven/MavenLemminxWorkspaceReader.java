@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -163,7 +163,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	public File findArtifact(Artifact artifact) {
 		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
 		return plugin.getProjectCache().getProjects().stream()
-				.filter(p -> projectKey.equals(ArtifactUtils.key(p.getArtifact())))
+				.filter(p -> p.getArtifact() != null && projectKey.equals(ArtifactUtils.key(p.getArtifact())))
 				.map(project -> {
 					File file = find(project, artifact);
 					if (file == null && project != project.getExecutionProject()) {
@@ -207,7 +207,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 		String key = ArtifactUtils.versionlessKey(artifact.getGroupId(), artifact.getArtifactId());
 		SortedSet<String> res = new TreeSet<>(Comparator.reverseOrder());
 		plugin.getProjectCache().getProjects().stream() //
-				.filter(p -> key.equals(ArtifactUtils.versionlessKey(p.getArtifact()))) //
+				.filter(p -> p.getArtifact() != null && key.equals(ArtifactUtils.versionlessKey(p.getArtifact()))) //
 				.filter(p -> find(p, artifact) != null) //
 				.map(MavenProject::getVersion) //
 				.forEach(res::add);
