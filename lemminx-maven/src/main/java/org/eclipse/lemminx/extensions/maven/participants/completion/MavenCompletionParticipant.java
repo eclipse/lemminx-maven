@@ -476,13 +476,27 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				if (insertVersion) {
 					Position insertionPosition;
 					try {
-						insertionPosition = request.getXMLDocument()
+						Position position = request.getXMLDocument()
 								.positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
+						insertionPosition = new Position(position.getLine() + 1, 0);
+						int insertsoinOffset = request.getXMLDocument().offsetAt(insertionPosition);
+						int end = request.getXMLDocument().getEnd();
+						
+						// In case of the current line is the last document line and
+						// it doesn't have an EOL character typed - we need to insert 
+						// such am EOL character in order to keep text formatting
+						boolean insertEOL = insertsoinOffset >= end;
+						if (insertEOL) {
+							String  lineDelimiter = request.getXMLDocument().lineDelimiter(position.getLine());
+							String text = doc.getTextDocument().getText();
+							insertEOL = !(text.substring(text.length() - lineDelimiter.length()).equals(lineDelimiter));
+						}						
 						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition),
-								request.getLineIndentInfo().getLineDelimiter()
-										+ request.getLineIndentInfo().getWhitespacesIndent()
-										+ DOMUtils.getOneLevelIndent(request) + "<version>" + artifactInfo.artifact.getVersion()
-										+ "</version>"));
+								(insertEOL ? request.getLineIndentInfo().getLineDelimiter() : "")
+										+request.getLineIndentInfo().getWhitespacesIndent()
+										+ "<version>" + artifactInfo.artifact.getVersion()
+										+ "</version>"
+										+ (!insertEOL ? request.getLineIndentInfo().getLineDelimiter() : "")));
 					} catch (BadLocationException e) {
 						// TODO Auto-generated catch block
 						LOGGER.log(Level.SEVERE, e.getMessage(), e);
