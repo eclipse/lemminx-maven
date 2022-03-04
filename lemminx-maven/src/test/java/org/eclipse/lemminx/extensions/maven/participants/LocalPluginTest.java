@@ -17,6 +17,7 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -28,6 +29,7 @@ import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
@@ -104,6 +106,16 @@ public class LocalPluginTest {
 				new Position(20, 9), new SharedSettings())
 			.getItems();
 		assertTrue(completions.stream().map(CompletionItem::getLabel).filter("failIfNoTests"::equals).count() == 1);
+	}
+
+	@Test
+	public void testCompleteConfigurationParametersInTagAlias() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/pom-plugin-config-tag-alias.xml", languageService);
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document,
+				new XMLValidationSettings(), () -> {});
+		assertEquals(Optional.empty(), diagnostics.stream().filter(diagnostic -> diagnostic.getSeverity() == DiagnosticSeverity.Warning).findAny());
+		assertTrue(languageService.doHover(document,
+				new Position(20, 11), new SharedSettings()).getContents().getRight().getValue().contains("Specify the number of spaces each tab takes up in the source"));
 	}
 
 	@Test

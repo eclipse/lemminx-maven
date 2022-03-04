@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -63,7 +64,7 @@ public class MavenPluginUtils {
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 
 		final String fromParent = toBold.apply("From parent configuration element:") + lineBreak;
-		String type = parameter.getType() != null ? parameter.getType() : "";
+		String type = parameter.type != null ? parameter.type : "";
 		String expression = parameter.getExpression() != null ? parameter.getExpression() : "(none)";
 		String defaultValue = parameter.getDefaultValue() != null ? parameter.getDefaultValue() : "(unset)";
 		String description = parameter.getDescription() != null ? parameter.getDescription() : "";
@@ -101,8 +102,9 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		return mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
+		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
 				.collect(Collectors.toSet());
+		return parameters;
 	}
 
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
@@ -127,9 +129,10 @@ public class MavenPluginUtils {
 			return Collections.emptySet();
 		}
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
-		return mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
+		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
 				.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
 				.stream()).collect(Collectors.toSet());
+		return mojoParams;
 	}
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
