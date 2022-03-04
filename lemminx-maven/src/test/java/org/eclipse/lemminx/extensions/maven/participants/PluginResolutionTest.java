@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
@@ -28,6 +30,7 @@ import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagno
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.HoverCapabilities;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
@@ -106,6 +109,19 @@ public class PluginResolutionTest {
                 () -> {});
 
         assertTrue(diagnostics.isEmpty(), "No validation error or warning found");
+    }
+
+	@Test
+    public void testPluginManagementWithoutGroupId()
+            throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+        MavenLemminxExtension plugin = new MavenLemminxExtension();
+        MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
+        languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
+        List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-pluginManagement-unresolved.xml", languageService),
+                new XMLValidationSettings(),
+                () -> {});
+
+        assertEquals(Optional.empty(), diagnostics.stream().filter(d -> d.getSeverity() == DiagnosticSeverity.Warning).findAny(), "No validation error or warning found");
     }
 
 	@Test

@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -27,6 +26,7 @@ import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Plugin;
@@ -101,9 +101,8 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
+		return mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
 				.collect(Collectors.toSet());
-		return parameters;
 	}
 
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
@@ -127,15 +126,10 @@ public class MavenPluginUtils {
 		if (project == null) {
 			return Collections.emptySet();
 		}
-		// System.out.println("plugin: " + pluginDescriptor.getPluginLookupKey());
-		// pluginDescriptor.getDependencies().forEach(dep -> System.out.println(" plugin
-		// dependency: " + dep.getArtifactId() + ":" + dep.getVersion()));
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
-		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
+		return mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
 				.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
 				.stream()).collect(Collectors.toSet());
-
-		return mojoParams;
 	}
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
@@ -220,18 +214,16 @@ public class MavenPluginUtils {
 	}
 
 	private static Plugin findPluginInProject(MavenProject project, String pluginKey, Optional<String> artifactId) {
-		Plugin plugin = project.getPlugin(pluginKey);
-		if (plugin == null && project.getPluginManagement() != null) {
-			plugin = project.getPluginManagement().getPluginsAsMap().get(pluginKey);
+		Optional<Plugin> plugin = Optional.ofNullable(project.getPlugin(pluginKey))
+				.or(() -> Optional.ofNullable(project.getPluginManagement().getPluginsAsMap().get(pluginKey)));
+		if (artifactId.isPresent()) {
+			plugin = plugin.or(() ->
+				Stream.concat(project.getBuildPlugins().stream(), project.getPluginManagement().getPlugins().stream())
+						.filter(p -> artifactId.get().equals(p.getArtifactId()))
+						.findFirst()
+			);
 		}
-		if (plugin == null && artifactId.isPresent()) {
-			for (Entry<String, org.apache.maven.artifact.Artifact> entry : project.getPluginArtifactMap().entrySet()) {
-				if (entry.getValue().getArtifactId().equals(artifactId.get())) {
-					plugin = project.getPlugin(entry.getKey());
-				}
-			}
-		}
-		return plugin;
+		return plugin.orElse(null);
 	}
 
 }
