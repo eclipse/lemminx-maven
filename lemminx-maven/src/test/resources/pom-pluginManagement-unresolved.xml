@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>plugin-resolve-warn</artifactId>
+    <groupId>com.github.runeflobakk.eclipse</groupId>
+    <version>1-SNAPSHOT</version>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <configuration></configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
