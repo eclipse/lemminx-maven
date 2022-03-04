@@ -77,7 +77,7 @@ class PluginValidator {
 			return pluginResolutionError;
 		}
 
-		Set<Parameter> parameters = new HashSet<Parameter>();
+		Set<Parameter> parameters = new HashSet<>();
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationParameters(diagnosticRequest, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
@@ -92,7 +92,7 @@ class PluginValidator {
 		if (node.isElement() && node.hasChildNodes()) {
 			for (DOMNode childNode : node.getChildren()) {
 				DiagnosticRequest childDiagnosticReq = new DiagnosticRequest(childNode, diagnosticRequest.getXMLDocument());
-				validateConfigurationElement(childDiagnosticReq, parameters).ifPresent(diagnostics::add);;
+				validateConfigurationElement(childDiagnosticReq, parameters).ifPresent(diagnostics::add);
 			}
 		}
 
@@ -147,7 +147,7 @@ class PluginValidator {
 			return Optional.empty();
 		}
 		for (Parameter parameter : parameters) {
-			if (node.getLocalName().equals(parameter.getName())) {
+			if (node.getLocalName().equals(parameter.getName()) || node.getLocalName().equals(parameter.getAlias())) {
 				return Optional.empty();
 			}
 		}

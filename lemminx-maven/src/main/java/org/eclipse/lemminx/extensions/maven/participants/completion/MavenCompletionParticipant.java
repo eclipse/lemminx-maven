@@ -138,7 +138,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
 				// The configuration element being completed is at the top level
 				return parameters.stream()
-						.map(param -> toTag(param.getName(),
+						.map(param -> toTag(param.name,
 								MavenPluginUtils.getMarkupDescription(param, null, supportsMarkdown), request))
 	 					.collect(Collectors.toList());
 	 		}
@@ -148,7 +148,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
 			if (parentParameterNode != null) {
 				List<MojoParameter> parentParameters = parameters.stream()
-						.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
+						.filter(mojoParameter -> mojoParameter.name.equals(parentParameterNode.getLocalName()))
 						.collect(Collectors.toList());
 				if (!parentParameters.isEmpty()) {
 					MojoParameter parentParameter = parentParameters.get(0);
@@ -158,7 +158,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 						Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
 						if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-							return Collections.singletonList(toTag(nestedParameter.getName(), MavenPluginUtils
+							return Collections.singletonList(toTag(nestedParameter.name, MavenPluginUtils
 									.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown), request));
 						}
 					}
@@ -167,7 +167,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
 					nestedParameters.add(parentParameter);
 					return nestedParameters.stream()
-							.map(param -> toTag(param.getName(),
+							.map(param -> toTag(param.name,
 									MavenPluginUtils.getMarkupDescription(param, parentParameter, supportsMarkdown),
 									request))
 							.collect(Collectors.toList());

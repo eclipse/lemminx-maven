@@ -277,12 +277,12 @@ public class PlexusConfigHelper {
 		Class<?> paramClass = getRawType(paramType);
 
 		if (paramClass == null || isInline(paramClass)) {
-			MojoParameter container = new MojoParameter(toSingularName(name), paramType).multiple();
+			MojoParameter container = new MojoParameter(toSingularName(name), null, paramType).multiple();
 			return Collections.singletonList(container);
 		}
 
 		if (Map.class.isAssignableFrom(paramClass) || Properties.class.isAssignableFrom(paramClass)) {
-			MojoParameter container = new MojoParameter(toSingularName(name), paramType).multiple()
+			MojoParameter container = new MojoParameter(toSingularName(name), null, paramType).multiple()
 					.map();
 			return Collections.singletonList(container);
 		}
@@ -291,7 +291,7 @@ public class PlexusConfigHelper {
 
 		if (itemType != null) {
 			List<MojoParameter> nested = getItemParameters(realm, enclosingClass, name, itemType);
-			MojoParameter container = new MojoParameter(toSingularName(name), getTypeDisplayName(paramType), nested)
+			MojoParameter container = new MojoParameter(toSingularName(name), null, getTypeDisplayName(paramType), nested)
 					.multiple();
 			return Collections.singletonList(container);
 		}
@@ -310,7 +310,7 @@ public class PlexusConfigHelper {
 			}
 
 			List<MojoParameter> nested = loadParameters(realm, paramClass);
-			MojoParameter container = new MojoParameter(paramName, getTypeDisplayName(clazz), nested).multiple();
+			MojoParameter container = new MojoParameter(paramName, null, getTypeDisplayName(clazz), nested).multiple();
 			parameters.add(container);
 		}
 
@@ -328,54 +328,35 @@ public class PlexusConfigHelper {
 
 		// inline
 		if (isInline(paramClass)) {
-			parameters.add(configure(new MojoParameter(name, paramType), required, expression,
+			parameters.add(configure(new MojoParameter(name, alias, paramType), required, expression,
 					description, defaultValue));
-			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, paramType), required, expression,
-						description, defaultValue));
-			}
 			return;
 		}
 
 		// map
 		if (Map.class.isAssignableFrom(paramClass)) {
 			// we can't do anything with maps, unfortunately
-			parameters.add(configure(new MojoParameter(name, paramType).map(), required, expression,
+			parameters.add(configure(new MojoParameter(name, alias, paramType).map(), required, expression,
 					description, defaultValue));
-			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, paramType).map(), required,
-						expression, description, defaultValue));
-			}
 			return;
 		}
 
 		// properties
 		if (Properties.class.isAssignableFrom(paramClass)) {
 
-			MojoParameter nested = new MojoParameter("property", "property",
-					Arrays.asList(new MojoParameter("name", "String"), new MojoParameter("value", "String")));
+			MojoParameter nested = new MojoParameter("property", null, "property",
+					Arrays.asList(new MojoParameter("name", null, "String"), new MojoParameter("value", null, "String")));
 
-			parameters.add(configure(new MojoParameter(name, paramType, nested), required,
+			parameters.add(configure(new MojoParameter(name, alias, paramType, nested), required,
 					expression, description, defaultValue));
-			if (alias != null) {
-				parameters.add(configure(new MojoParameter(alias, paramType, nested), required,
-						expression, description, defaultValue));
-			}
 		}
 
 		// collection/array
 		Type itemType = getItemType(paramType);
 		if (itemType != null) {
 			List<MojoParameter> nested = getItemParameters(realm, enclosingClass, name, itemType);
-
-			parameters.add(configure(new MojoParameter(name, paramType, nested), required,
+			parameters.add(configure(new MojoParameter(name, alias, paramType, nested), required,
 					expression, description, defaultValue));
-
-			if (alias != null) {
-				nested = getItemParameters(realm, enclosingClass, alias, itemType);
-				parameters.add(configure(new MojoParameter(alias, getTypeDisplayName(paramType), nested), required,
-						expression, description, defaultValue));
-			}
 			return;
 		}
 
@@ -388,12 +369,8 @@ public class PlexusConfigHelper {
 		}
 
 		List<MojoParameter> nested = loadParameters(realm, paramClass);
-		parameters.add(configure(new MojoParameter(name, getTypeDisplayName(paramType), nested), required, expression,
+		parameters.add(configure(new MojoParameter(name, alias, getTypeDisplayName(paramType), nested), required, expression,
 				description, defaultValue));
-		if (alias != null) {
-			parameters.add(configure(new MojoParameter(alias, getTypeDisplayName(paramType), nested), required,
-					expression, description, defaultValue));
-		}
 	}
 
 	public static List<MojoParameter> loadMojoParameters(PluginDescriptor descriptor, MojoDescriptor mojo,

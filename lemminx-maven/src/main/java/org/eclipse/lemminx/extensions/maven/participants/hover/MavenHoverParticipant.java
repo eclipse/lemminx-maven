@@ -231,7 +231,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
-				if (request.getNode().getLocalName().equals(parameter.getName())) {
+				if (request.getNode().getLocalName().equals(parameter.name)) {
+					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null, supportsMarkdown));
+				}
+			}
+			// not found by name, search by alias
+			for (MojoParameter parameter : parameters) {
+				if (request.getNode().getLocalName().equals(parameter.alias)) {
 					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null, supportsMarkdown));
 				}
 			}
@@ -242,7 +248,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
 		if (parentParameterNode != null) {
 			List<MojoParameter> parentParameters = parameters.stream()
-					.filter(mojoParameter -> mojoParameter.getName().equals(parentParameterNode.getLocalName()))
+					.filter(mojoParameter -> mojoParameter.name.equals(parentParameterNode.getLocalName()))
 					.collect(Collectors.toList());
 			if (!parentParameters.isEmpty()) {
 				MojoParameter parentParameter = parentParameters.get(0);
@@ -261,7 +267,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
 				nestedParameters.add(parentParameter);
 				for (MojoParameter parameter : nestedParameters) {
-					if (request.getNode().getLocalName().equals(parameter.getName())) {
+					if (request.getNode().getLocalName().equals(parameter.name)) {
 						return new Hover(
 								MavenPluginUtils.getMarkupDescription(parameter, parentParameter, supportsMarkdown));
 					}

@@ -22,53 +22,60 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.apache.maven.plugin.descriptor.Parameter;
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
 
 // TODO: Make Maven bug about moving this upstream
+/**
+ * This Mojo Parameter class differs from the {@link Parameter} class as it supports structured
+ * elements.
+ */
 public class MojoParameter {
 
-	private String name;
-
-	private String type;
+	public final String name;
+	public final String alias;
+	public final String type;
 
 	private boolean required;
-
 	private String description;
-
 	private String expression;
-
 	private String defaultValue;
-
 	private List<MojoParameter> nested;
-
 	private boolean multiple;
-
 	private boolean map;
-
 	private Type paramType;
-
-	public MojoParameter(String name, String type, List<MojoParameter> parameters) {
+	private String deprecated;
+	public MojoParameter(String name, String alias, String type, List<MojoParameter> parameters) {
 		this.name = name;
 		this.type = type;
 		nested = parameters;
+		this.alias = alias;
 	}
-	public MojoParameter(String name, Type paramType, List<MojoParameter> parameters) {
-		this(name, PlexusConfigHelper.getTypeDisplayName(paramType), parameters);
+	public MojoParameter(String name, String alias, Type paramType, List<MojoParameter> parameters) {
+		this(name, alias, PlexusConfigHelper.getTypeDisplayName(paramType), parameters);
 		this.setParamType(paramType);
 	}
 
-	public MojoParameter(String name, Type paramType, MojoParameter parameter) {
-		this(name, PlexusConfigHelper.getTypeDisplayName(paramType), Collections.singletonList(parameter));
+	public MojoParameter(String name, String alias, Type paramType, MojoParameter parameter) {
+		this(name, alias, PlexusConfigHelper.getTypeDisplayName(paramType), Collections.singletonList(parameter));
 		this.setParamType(paramType);
 	}
 
-	public MojoParameter(String name, String type) {
-		this(name, type, Collections.<MojoParameter>emptyList());
+	public MojoParameter(String name, String alias, String type) {
+		this(name, alias, type, Collections.<MojoParameter>emptyList());
 	}
 
-	public MojoParameter(String name, Type paramType) {
-		this(name, PlexusConfigHelper.getTypeDisplayName(paramType));
+	public MojoParameter(String name, String alias, Type paramType) {
+		this(name, alias, PlexusConfigHelper.getTypeDisplayName(paramType));
 		this.setParamType(paramType);
+	}
+
+	public MojoParameter(Parameter parameter, Type paramType) {
+		this(parameter.getName(), parameter.getAlias(), paramType);
+		this.defaultValue = parameter.getDefaultValue();
+		this.description = parameter.getDescription();
+		this.deprecated = parameter.getDeprecated();
+		this.expression = parameter.getExpression();
 	}
 
 	public MojoParameter multiple() {
@@ -95,7 +102,7 @@ public class MojoParameter {
 	
 	public List<MojoParameter> getFlattenedNestedParameters(){
 		Deque<MojoParameter> parametersToCheck = new ArrayDeque<>();
-		List<MojoParameter> nestedParameters = new ArrayList<MojoParameter>();
+		List<MojoParameter> nestedParameters = new ArrayList<>();
 		for (MojoParameter node : getNestedParameters()) {
 			parametersToCheck.push(node);
 		}
@@ -109,14 +116,6 @@ public class MojoParameter {
 			nestedParameters.add(parameter);
 		}
 		return nestedParameters;
-	}
-
-	public String getName() {
-		return this.name;
-	}
-
-	public String getType() {
-		return this.type;
 	}
 
 	public boolean isRequired() {
@@ -169,7 +168,7 @@ public class MojoParameter {
 		}
 
 		for (MojoParameter p : params) {
-			if (p.getName().equals(name)) {
+			if (p.name.equals(name)) {
 				return p;
 			}
 		}
@@ -203,6 +202,10 @@ public class MojoParameter {
 		this.paramType = paramType;
 	}
 
+	public String getDeprecatedNotice() {
+		return this.deprecated;
+	}
+
 	@Override
 	public int hashCode() {
 		return Objects.hash(required, map, multiple, type, getNestedParameters().size(), name, expression, description,
@@ -211,18 +214,21 @@ public class MojoParameter {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj == null || !(obj instanceof MojoParameter)) {
+		if (!(obj instanceof MojoParameter)) {
 			return false;
 		}
 		MojoParameter otherMojo = (MojoParameter) obj;
 
-		return (this.isRequired() == otherMojo.isRequired()) && (this.isMap() == otherMojo.isMap())
-				&& (this.isMultiple() == otherMojo.isMultiple()) && (Objects.equals(this.getType(), otherMojo.getType()))
-				&& (Objects.equals(this.getNestedParameters(), otherMojo.getNestedParameters()))
-				&& (Objects.equals(this.getName(), otherMojo.getName())
-						&& (Objects.equals(this.getExpression(), otherMojo.getExpression())
-								&& (Objects.equals(this.getDescription(), otherMojo.getDescription()))))
-				&& (Objects.equals(this.getDefaultValue(), otherMojo.getDefaultValue()));
+		return this.isRequired() == otherMojo.isRequired() //
+				&& this.isMap() == otherMojo.isMap() //
+				&& this.isMultiple() == otherMojo.isMultiple() //
+				&& Objects.equals(this.type, otherMojo.type) //
+				&& Objects.equals(this.getNestedParameters(), otherMojo.getNestedParameters()) //
+				&& Objects.equals(this.name, otherMojo.name) //
+				&& Objects.equals(this.getExpression(), otherMojo.getExpression()) //
+				&& Objects.equals(this.getDescription(), otherMojo.getDescription()) //
+				&& Objects.equals(this.getDefaultValue(), otherMojo.getDefaultValue()) //
+				&& Objects.equals(this.getDeprecatedNotice(), otherMojo.getDeprecatedNotice());
 	}
 
 }
