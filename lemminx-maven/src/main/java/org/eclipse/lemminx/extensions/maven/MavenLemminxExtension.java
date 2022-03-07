@@ -170,7 +170,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		try {
 			this.container = newPlexusContainer();
-			this.container.addComponent(new ModelValidatorMNG7170(), ModelValidator.class, "workaround-MNG7170");
 			mavenRequest = initMavenRequest(container, settings);
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
 			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
