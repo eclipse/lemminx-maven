@@ -23,7 +23,7 @@
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.8.2</junit-jupiter.version>
 		<lemminx.version>0.19.1</lemminx.version>
-		<maven.version>3.8.4</maven.version>
+		<maven.version>3.8.5</maven.version>
 	</properties>
 
 	<dependencies>
@@ -193,6 +193,11 @@
 			<releases>
 				<enabled>true</enabled>
 			</releases>
+		</repository>
+		<repository>
+			<id>maven-3.8.5-staging</id>
+			<url>https://repository.apache.org/content/repositories/maven-1724/</url>
+			<snapshots><enabled>true</enabled></snapshots>
 		</repository>
 	</repositories>
 
