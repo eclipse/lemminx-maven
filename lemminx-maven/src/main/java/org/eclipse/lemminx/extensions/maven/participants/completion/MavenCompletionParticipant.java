@@ -432,6 +432,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			GAVInsertionStrategy strategy) {
 		boolean hasGroupIdSet = DOMUtils.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent() 
 						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
+		boolean insertArtifactIsEnd = !request.getParentElement().hasEndTag();
 		boolean insertGroupId = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !hasGroupIdSet;
 		boolean isExclusion = DOMUtils.findClosestParentNode(request, DOMConstants.EXCLUSIONS_ELT) != null;
 		boolean insertVersion = !isExclusion && (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
@@ -456,7 +457,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 								? " - " + artifactInfo.artifact.getGroupId() + ":" + artifactInfo.artifact.getArtifactId() + ":"
 										+ artifactInfo.artifact.getVersion()
 								: ""));
-				textEdit.setNewText(artifactInfo.artifact.getArtifactId());
+				textEdit.setNewText(artifactInfo.artifact.getArtifactId()
+						+ (insertArtifactIsEnd ? "</artifactId>" : ""));
 				item.setFilterText(artifactInfo.artifact.getArtifactId());
 				List<TextEdit> additionalEdits = new ArrayList<>(2);
 				if (insertGroupId) {
@@ -476,12 +478,13 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				if (insertVersion) {
 					Position insertionPosition;
 					try {
-						insertionPosition = request.getXMLDocument()
-								.positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
+						insertionPosition = insertArtifactIsEnd ? replaceRange.getEnd() :
+								request.getXMLDocument().positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
+						
 						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition),
 								request.getLineIndentInfo().getLineDelimiter()
-										+ request.getLineIndentInfo().getWhitespacesIndent()
-										+ DOMUtils.getOneLevelIndent(request) + "<version>" + artifactInfo.artifact.getVersion()
+										+ request.getLineIndentInfo().getWhitespacesIndent() + "<version>"
+										+ artifactInfo.artifact.getVersion()
 										+ "</version>"));
 					} catch (BadLocationException e) {
 						// TODO Auto-generated catch block
