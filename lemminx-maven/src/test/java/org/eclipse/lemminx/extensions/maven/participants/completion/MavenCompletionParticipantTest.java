@@ -12,6 +12,8 @@ import static org.eclipse.lemminx.XMLAssert.c;
 import static org.eclipse.lemminx.XMLAssert.te;
 import static org.eclipse.lemminx.XMLAssert.testCompletionFor;
 
+import java.util.Arrays;
+
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -164,4 +166,106 @@ public class MavenCompletionParticipantTest {
 						"maven-surefire-plugin"));
 	}
 
+	@Test
+	public void testInsertionDependencyWithPartiallyTypedInArtifactId() throws Exception {
+		String pom = //
+				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
+				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+				+ "  <modelVersion>4.0.0</modelVersion>\n"
+				+ "  <groupId>org.test</groupId>\n"
+				+ "  <artifactId>test</artifactId>\n"
+				+ "  <version>0.0.1-SNAPSHOT</version>\n"
+				+ "  <dependencies>\n"
+				+ "    <dependency>\n"
+				+ "      <artifactId>maven-surefire-plu|</artifactId>\n"
+				+ "    </dependency>\n"
+				+ "  </dependencies>\n"
+				+ "</project>";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
+					te(9, 18, 9, 36, //
+							"maven-surefire-plugin"),
+					Arrays.asList(
+							te(8, 16, 8, 16, 
+								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+							te(9, 49, 9, 49, 
+								"\n      <version>2.22.2</version>")),
+					"maven-surefire-plugin"));
+	}
+
+	@Test
+	public void testInsertionDependencyWithPartiallyTypedInArtifactIdNotWellFormed() throws Exception {
+		String pom = //
+				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
+				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+				+ "  <modelVersion>4.0.0</modelVersion>\n"
+				+ "  <groupId>org.test</groupId>\n"
+				+ "  <artifactId>test</artifactId>\n"
+				+ "  <version>0.0.1-SNAPSHOT</version>\n"
+				+ "  <dependencies>\n"
+				+ "    <dependency>\n"
+				+ "      <artifactId>maven-surefire-plu|</artifactId>\n";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+			c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
+					te(9, 18, 9, 36, //
+							"maven-surefire-plugin"),
+					Arrays.asList(
+							te(8, 16, 8, 16, 
+								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+							te(9, 49, 9, 49, 
+								"\n      <version>2.22.2</version>")),
+					"maven-surefire-plugin"));
+	}
+
+	@Test
+	public void testInsertionDependencyWithPartiallyTypedInArtifactIdNotWellFormedNoEOL() throws Exception {
+		String pom = //
+				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
+				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+				+ "  <modelVersion>4.0.0</modelVersion>\n"
+				+ "  <groupId>org.test</groupId>\n"
+				+ "  <artifactId>test</artifactId>\n"
+				+ "  <version>0.0.1-SNAPSHOT</version>\n"
+				+ "  <dependencies>\n"
+				+ "    <dependency>\n"
+				+ "      <artifactId>maven-surefire-plu|</artifactId>";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
+					te(9, 18, 9, 36, //
+						"maven-surefire-plugin"),
+					Arrays.asList(
+							te(8, 16, 8, 16, 
+								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+							te(9, 49, 9, 49, 
+								"\n      <version>2.22.2</version>")),
+					"maven-surefire-plugin"));
+	}
+
+	@Test
+	public void testInsertionDependencyWithPartiallyTypedInArtifactIdBrokenEnd() throws Exception {
+		String pom = //
+				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
+				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+				+ "  <modelVersion>4.0.0</modelVersion>\n"
+				+ "  <groupId>org.test</groupId>\n"
+				+ "  <artifactId>test</artifactId>\n"
+				+ "  <version>0.0.1-SNAPSHOT</version>\n"
+				+ "  <dependencies>\n"
+				+ "    <dependency>\n"
+				+ "      <artifactId>maven-surefire-plu|";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
+					te(9, 18, 9, 36, //
+						"maven-surefire-plugin</artifactId>"),
+					Arrays.asList(
+							te(8, 16, 8, 16, 
+								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+							te(9, 36, 9, 36, 
+								"\n      <version>2.22.2</version>")),
+					"maven-surefire-plugin"));
+	}
 }
