@@ -1,5 +1,22 @@
 # LemMinx-Maven Releases
 
+### 0.5.2
+
+* 📅 Release Date: May 18th, 2022
+* All changes: https://github.com/eclipse/lemminx-maven/compare/0.5.1...0.5.2
+
+Bugfixes
+
+* Fix plugin resolution on definition if no version is set
+* Fix hovering on a dependency if version is a property
+* Fix content-assist overriding some elements
+* Fix plugin resolution in pluginManagement
+* Fix issue in project build invalidating whole LemMinX-Maven in some cases
+
+
+* Improve support for alias in plugin configuration
+* Updates to latest Maven and latest Lemminx
+
 ### 0.5.1
 
 * 📅 Release Date: January 27th, 2022
