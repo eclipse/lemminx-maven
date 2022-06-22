@@ -1,0 +1,9 @@
+<directory></directory>
+<sourceDirectory></sourceDirectory>
+<scriptSourceDirectory></scriptSourceDirectory>
+<testSourceDirectory></testSourceDirectory>
+<outputDirectory></outputDirectory>
+<testOutputDirectory></testOutputDirectory>
+<filters><filter></filter></filters>
+<file><exists></exists></file>
+<file><missing></missing></file>
