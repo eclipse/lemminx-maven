@@ -283,6 +283,26 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case MODULE_ELT:
 			collectSubModuleCompletion(request).forEach(response::addCompletionItem);
 			break;
+		case TARGET_PATH_ELT:
+		case DIRECTORY_ELT:
+		case SOURCE_DIRECTORY_ELT:
+		case SCRIPT_SOURCE_DIRECTORY_ELT:
+		case TEST_SOURCE_DIRECTORY_ELT:
+		case OUTPUT_DIRECTORY_ELT:
+		case TEST_OUTPUT_DIRECTORY_ELT:
+			collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+			break;
+		case FILTER_ELT:
+			if (FILTERS_ELT.equals(grandParent.getLocalName())) {
+				collectRelativeFilterPathCompletion(request).forEach(response::addCompletionItem);
+			}
+			break;
+		case EXISTS_ELT:
+		case MISSING_ELT:
+			if (FILE_ELT.equals(grandParent.getLocalName())) {
+				collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+			}
+			break;
 		case RELATIVE_PATH_ELT:
 			collectRelativePathCompletion(request).forEach(response::addCompletionItem);
 			break;
@@ -733,6 +753,122 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 																									// before...
 						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings
 																														// before...
+						.reversed().thenComparing(Function.identity())// other folders and files
+				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+	}
+
+	private Collection<CompletionItem> collectRelativeAnyPathCompletion(ICompletionRequest request) {
+		DOMDocument doc = request.getXMLDocument();
+		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
+		File docFolder = docFile.getParentFile();
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
+		File prefixFile = new File(docFolder, prefix);
+		List<File> files = new ArrayList<>();
+		if (prefix.isEmpty()) {
+			files.add(docFolder.getParentFile());
+		} else {
+			try {
+				prefixFile = prefixFile.getCanonicalFile();
+			} catch (IOException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			}
+			if (!prefix.endsWith("/")) {
+				final File thePrefixFile = prefixFile;
+				files.addAll(Arrays.asList(prefixFile.getParentFile()
+						.listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
+			}
+		}
+		if (prefixFile.isDirectory()) {
+			files.addAll(Arrays.asList(prefixFile.listFiles()));
+		}
+		return files.stream().filter(file -> file.isFile() || file.isDirectory())
+					.sorted(Comparator.comparing(File::isFile) // files before folders
+						.thenComparing(
+								file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath()))
+										|| (file.isDirectory() && file.equals(docFolder.getParentFile()))) // `files before
+						.thenComparing(file -> file.getParentFile().getName().contains(PARENT_ELT)) // folders
+																									// containing
+																									// "parent"
+																									// before...
+						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings
+																														// before...
+						.reversed().thenComparing(Function.identity())// other folders and files
+				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+	}
+	
+	private Collection<CompletionItem> collectRelativeDirectoryPathCompletion(ICompletionRequest request) {
+		DOMDocument doc = request.getXMLDocument();
+		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
+		File docFolder = docFile.getParentFile();
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
+		File prefixFile = new File(docFolder, prefix);
+		List<File> files = new ArrayList<>();
+		if (prefix.isEmpty()) {
+			files.add(docFolder.getParentFile());
+		} else {
+			try {
+				prefixFile = prefixFile.getCanonicalFile();
+			} catch (IOException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			}
+			if (!prefix.endsWith("/")) {
+				final File thePrefixFile = prefixFile;
+				files.addAll(Arrays.asList(prefixFile.getParentFile()
+						.listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
+			}
+		}
+		if (prefixFile.isDirectory()) {
+			files.addAll(Arrays.asList(prefixFile.listFiles()));
+		}
+		return files.stream().filter(file -> file.isDirectory())
+				.filter( file -> !file.equals(docFolder))
+				.sorted(Comparator.comparing(File::isDirectory) // only folders
+						.thenComparing(file -> (file.isDirectory() && file.equals(docFolder.getParentFile())))
+						.thenComparing(file -> file.getParentFile().getName().contains(PARENT_ELT)) // folders containing
+																									// "parent" before...
+						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings before...
+						.reversed().thenComparing(Function.identity())// other folders and files
+				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+	}
+
+	private List<File> collectRelativePropertiesFiles(File parent) {
+		List<File> result = new ArrayList<>();
+		List<File> parentFiles = Arrays.asList(parent.listFiles());
+		
+		parentFiles.stream().filter(file -> (file.isFile() && file.getName().endsWith(".properties")))
+			.forEach(file -> result.add(file));
+		parentFiles.stream().filter(file -> (file.isDirectory()))
+			.forEach(file -> result.addAll(collectRelativePropertiesFiles(file)));
+		return result;
+	}
+	
+	private Collection<CompletionItem> collectRelativeFilterPathCompletion(ICompletionRequest request) {
+		DOMDocument doc = request.getXMLDocument();
+		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
+		File docFolder = docFile.getParentFile();
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
+		File prefixFile = new File(docFolder, prefix);
+		List<File> files = new ArrayList<>();
+		if (!prefix.isEmpty()) {
+			try {
+				prefixFile = prefixFile.getCanonicalFile();
+			} catch (IOException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			}
+			if (!prefix.endsWith("/")) {
+				final File thePrefixFile = prefixFile;
+				files.addAll(Arrays.asList(prefixFile.getParentFile()
+						.listFiles(file -> (file.getName().startsWith(thePrefixFile.getName())
+								&& file.getName().endsWith(".properties")))));
+			}
+		}
+		if (prefixFile.isDirectory()) {
+			files.addAll(collectRelativePropertiesFiles(prefixFile));
+		}
+		return files.stream()
+				.sorted(Comparator.comparing(File::isFile) // pom files before folders
+						.thenComparing(
+								file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath())))
 						.reversed().thenComparing(Function.identity())// other folders and files
 				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
 	}

@@ -40,4 +40,19 @@ public class DOMConstants {
 	public static final String CLASSIFIER_ELT = "classifier";
 	public static final String EXCLUSION_ELT = "exclusion";
 	public static final String EXCLUSIONS_ELT = "exclusions";
+	
+	public static final String TARGET_PATH_ELT = "targetPath";
+	public static final String DIRECTORY_ELT = "directory";
+	public static final String SOURCE_DIRECTORY_ELT = "sourceDirectory";
+	public static final String SCRIPT_SOURCE_DIRECTORY_ELT = "scriptSourceDirectory";
+	public static final String TEST_SOURCE_DIRECTORY_ELT = "testSourceDirectory";
+	public static final String OUTPUT_DIRECTORY_ELT = "outputDirectory";
+	public static final String TEST_OUTPUT_DIRECTORY_ELT = "testOutputDirectory";
+	
+	public static final String FILTERS_ELT = "filters";
+	public static final String FILTER_ELT = "filter";
+	public static final String SYSTEM_PATH_ELT = "systemPath";
+	public static final String FILE_ELT = "file";
+	public static final String EXISTS_ELT = "exists";
+	public static final String MISSING_ELT = "missing";
 }
