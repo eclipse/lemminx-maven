@@ -21,6 +21,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
@@ -107,7 +108,7 @@ public class MavenProjectCacheTest {
 		// error messages should appear.
 		//
 		DOMDocument doc = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {});
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnostics.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA"))));
 	}
 	
@@ -139,7 +140,7 @@ public class MavenProjectCacheTest {
 		// error message should appear.
 		//
 		DOMDocument doc = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {});
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), Map.of(), () -> {});
 		assertTrue(diagnostics.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA"))));
 	}
 	

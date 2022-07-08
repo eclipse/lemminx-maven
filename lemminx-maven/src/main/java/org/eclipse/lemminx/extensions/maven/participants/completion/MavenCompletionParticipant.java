@@ -8,7 +8,32 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.completion;
 
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.*;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.EXISTS_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.FILE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.FILTERS_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.FILTER_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.MISSING_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.OUTPUT_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PHASE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.SCOPE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.SCRIPT_SOURCE_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.SOURCE_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.TARGET_PATH_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_OUTPUT_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_SOURCE_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -67,9 +92,9 @@ import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
-import org.eclipse.lemminx.services.extensions.CompletionParticipantAdapter;
-import org.eclipse.lemminx.services.extensions.ICompletionRequest;
-import org.eclipse.lemminx.services.extensions.ICompletionResponse;
+import org.eclipse.lemminx.services.extensions.completion.CompletionParticipantAdapter;
+import org.eclipse.lemminx.services.extensions.completion.ICompletionRequest;
+import org.eclipse.lemminx.services.extensions.completion.ICompletionResponse;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;

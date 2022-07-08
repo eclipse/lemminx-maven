@@ -5,7 +5,7 @@
 
 	<groupId>org.eclipse.lemminx</groupId>
 	<artifactId>lemminx-maven</artifactId>
-	<version>0.5.2</version>
+	<version>0.6.0-SNAPSHOT</version>
 
 	<licenses>
 		<license>
@@ -22,7 +22,7 @@
 		<lemminx.maven.indexDirectory>${project.build.directory}/test-index</lemminx.maven.indexDirectory>
 		<maven.repo.local>${settings.localRepository}</maven.repo.local>
 		<junit-jupiter.version>5.8.2</junit-jupiter.version>
-		<lemminx.version>0.19.1</lemminx.version>
+		<lemminx.version>0.21.0</lemminx.version>
 		<maven.version>3.8.5</maven.version>
 	</properties>
 

@@ -22,6 +22,7 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -124,21 +125,21 @@ public class SimpleModelTest {
 	public void testMissingArtifactIdError()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-without-artifactId.xml", languageService);
-		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().map(Diagnostic::getMessage)
+		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}).stream().map(Diagnostic::getMessage)
 				.anyMatch(message -> message.contains("artifactId")));
 		// simulate an edit
 		TextDocument textDocument = document.getTextDocument();
 		textDocument.setText(textDocument.getText().replace("</project>", "<artifactId>a</artifactId></project>"));
 		textDocument.setVersion(textDocument.getVersion() + 1);
 		document = DOMParser.getInstance().parse(textDocument, languageService.getResolverExtensionManager());
-		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}));
 	}
 
 	@Test
 	public void testSystemPathDiagnosticBug()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-environment-variable-property.xml", languageService);
-		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {});
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("${env")));
 	}
 
@@ -298,13 +299,13 @@ public class SimpleModelTest {
 	public void testModules() throws IOException, URISyntaxException {
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
 				createDOMDocument("/modules/module-a-pom.xml", languageService), 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
 		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
 				document, 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(),  () -> {});
 		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 	}
 	
@@ -312,13 +313,13 @@ public class SimpleModelTest {
 	public void testModulesCompletionInDependency() throws IOException, URISyntaxException {
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
 				createDOMDocument("/modules/module-a-pom.xml", languageService), 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
 		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
 				document, 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		// in <dependency />
@@ -342,13 +343,13 @@ public class SimpleModelTest {
 	public void testModulesCompletionInParent() throws IOException, URISyntaxException {
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
 				createDOMDocument("/modules/module-a-pom.xml", languageService), 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		DOMDocument document = createDOMDocument("/modules/dependent/module-c-pom.xml", languageService);
 		List<Diagnostic> diagnosticsC = languageService.doDiagnostics(
 				document, 
-				new XMLValidationSettings(), () -> {});
+				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsC.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		// in <parent />
@@ -521,7 +522,7 @@ public class SimpleModelTest {
 	@Test
 	public void testBOMDependency() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-bom.xml", languageService);
-		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}));
+		assertEquals(Collections.emptyList(), languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}));
 	}
 
 	@Test
@@ -536,21 +537,21 @@ public class SimpleModelTest {
 	@Test
 	public void testResolveParentFromCentralWhenAnotherRepoIsDeclared() throws Exception {
 		DOMDocument document = createDOMDocument("/it1/pom.xml", languageService);
-		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
 	}
 
 	@Test
 	public void testSystemPath() throws Exception {
 		DOMDocument document = createDOMDocument("/pom-systemPath.xml", languageService);
 		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(
-				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+				document, new XMLValidationSettings(), Map.of(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
 	}
 
 	@Test
 	public void testPluginInProfileOnly() throws Exception {
 		DOMDocument document = createDOMDocument("/pom-gpg.xml", languageService);
 		Optional<Diagnostic> diagnostics = languageService.doDiagnostics(
-				document, new XMLValidationSettings(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Warning).findAny();
+				document, new XMLValidationSettings(), Map.of(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Warning).findAny();
 		assertTrue(diagnostics.isEmpty(), () -> diagnostics.map(Object::toString).get());
 	}
 
@@ -564,7 +565,7 @@ public class SimpleModelTest {
 		languageService.initializeParams(params);
 		DOMDocument document = createDOMDocument(childFolder + "/pom.xml", languageService);
 		Optional<Diagnostic> diagnostics = languageService.doDiagnostics(
-				document, new XMLValidationSettings(), () -> {}).stream().findAny();
+				document, new XMLValidationSettings(), Map.of(), () -> {}).stream().findAny();
 		assertTrue(diagnostics.isEmpty(), () -> diagnostics.map(Object::toString).get());
 	}
 }

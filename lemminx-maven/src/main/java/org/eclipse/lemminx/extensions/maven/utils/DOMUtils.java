@@ -18,8 +18,8 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.services.extensions.ICompletionRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lemminx.services.extensions.completion.ICompletionRequest;
 import org.w3c.dom.Text;
 
 public class DOMUtils {
