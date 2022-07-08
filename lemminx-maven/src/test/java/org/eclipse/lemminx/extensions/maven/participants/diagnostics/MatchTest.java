@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMParser;
@@ -28,7 +29,7 @@ public class MatchTest {
 		XMLLanguageService languageService = new XMLLanguageService();
 		DOMDocument doc = DOMParser.getInstance().parse("blah", "untitled:Untitled-1",
 				new URIResolverExtensionManager());
-		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), () -> {
+		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), Map.of(), () -> {
 		});
 	}
 

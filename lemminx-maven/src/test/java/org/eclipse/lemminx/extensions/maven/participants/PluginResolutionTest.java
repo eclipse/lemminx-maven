@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -105,7 +106,7 @@ public class PluginResolutionTest {
         MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
         languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
         List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-plugin-goal-resolution.xml", languageService),
-                new XMLValidationSettings(),
+                new XMLValidationSettings(), Map.of(),
                 () -> {});
 
         assertTrue(diagnostics.isEmpty(), "No validation error or warning found");
@@ -118,7 +119,7 @@ public class PluginResolutionTest {
         MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
         languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
         List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-pluginManagement-unresolved.xml", languageService),
-                new XMLValidationSettings(),
+                new XMLValidationSettings(), Map.of(),
                 () -> {});
 
         assertEquals(Optional.empty(), diagnostics.stream().filter(d -> d.getSeverity() == DiagnosticSeverity.Warning).findAny(), "No validation error or warning found");
