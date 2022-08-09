@@ -59,7 +59,7 @@ public class PathWebResourcesTest {
 	@Test
 	public void testWebResourcesTargetPath() throws Exception {
 		DOMDocument document = createDOMDocument("/local-path/pom-webresource.xml", languageService);
-		List<CompletionItem> doComplete = languageService.doComplete(document, new Position(0, 11), new SharedSettings()).getItems();
+		List<CompletionItem> doComplete = languageService.doComplete(document, new Position(9, 12), new SharedSettings()).getItems();
 
 		// parent folder, then direct children
 		assertEquals("..", doComplete.get(0).getLabel());
@@ -156,14 +156,15 @@ public class PathWebResourcesTest {
 
 		// files
 		assertEquals("filter.properties", doComplete.get(0).getLabel());
-		assertEquals("pom-webresource.xml", doComplete.get(1).getLabel());
-		assertEquals("pom.xml", doComplete.get(2).getLabel());
+		assertEquals("pom-pluginManagement-configuration.xml", doComplete.get(1).getLabel());
+		assertEquals("pom-webresource.xml", doComplete.get(2).getLabel());
+		assertEquals("pom.xml", doComplete.get(3).getLabel());
 
 		// parent folder, then direct children
-		assertEquals("..", doComplete.get(3).getLabel());
-		assertEquals("child-parent", doComplete.get(4).getLabel());
-		assertEquals("folder1", doComplete.get(5).getLabel());
-		assertEquals("folder2", doComplete.get(6).getLabel());
+		assertEquals("..", doComplete.get(4).getLabel());
+		assertEquals("child-parent", doComplete.get(5).getLabel());
+		assertEquals("folder1", doComplete.get(6).getLabel());
+		assertEquals("folder2", doComplete.get(7).getLabel());
 	}
 
 //	public static final String FILE_ELT = "file";
@@ -175,14 +176,48 @@ public class PathWebResourcesTest {
 
 		// files
 		assertEquals("filter.properties", doComplete.get(0).getLabel());
-		assertEquals("pom-webresource.xml", doComplete.get(1).getLabel());
-		assertEquals("pom.xml", doComplete.get(2).getLabel());
+		assertEquals("pom-pluginManagement-configuration.xml", doComplete.get(1).getLabel());
+		assertEquals("pom-webresource.xml", doComplete.get(2).getLabel());
+		assertEquals("pom.xml", doComplete.get(3).getLabel());
 
 		// parent folder, then direct children
-		assertEquals("..", doComplete.get(3).getLabel());
-		assertEquals("child-parent", doComplete.get(4).getLabel());
-		assertEquals("folder1", doComplete.get(5).getLabel());
-		assertEquals("folder2", doComplete.get(6).getLabel());
+		assertEquals("..", doComplete.get(4).getLabel());
+		assertEquals("child-parent", doComplete.get(5).getLabel());
+		assertEquals("folder1", doComplete.get(6).getLabel());
+		assertEquals("folder2", doComplete.get(7).getLabel());
+	}
+
+	@Test
+	public void testMojoParametersDirectories() throws Exception {
+		DOMDocument document = createDOMDocument("/local-path/pom-pluginManagement-configuration.xml", languageService);
+		List<CompletionItem> doComplete = languageService.doComplete(document, new Position(18, 42), new SharedSettings()).getItems();
+
+		// Some typical conventions for directories
+		// Default values
+		assertEquals("${project.build.outputDirectory}", doComplete.get(0).getLabel());
+		// parent
+		assertEquals("..", doComplete.get(1).getLabel());
+		// then child folders
+		assertEquals("child-parent", doComplete.get(2).getLabel());
+		assertEquals("folder1", doComplete.get(3).getLabel());
+		assertEquals("folder2", doComplete.get(4).getLabel());
+	}
+
+	@Test
+	public void testMojoParametersFiles() throws Exception {
+		DOMDocument document = createDOMDocument("/local-path/pom-pluginManagement-configuration.xml", languageService);
+		List<CompletionItem> doComplete = languageService.doComplete(document, new Position(19, 39), new SharedSettings()).getItems();
+
+		// Some typical conventions
+		assertEquals("filter.properties", doComplete.get(0).getLabel());
+		assertEquals("pom-pluginManagement-configuration.xml", doComplete.get(1).getLabel());
+		assertEquals("pom-webresource.xml", doComplete.get(2).getLabel());
+		assertEquals("pom.xml", doComplete.get(3).getLabel());
+		// parent folder, then direct children
+		assertEquals("..", doComplete.get(4).getLabel());
+		assertEquals("child-parent", doComplete.get(5).getLabel());
+		assertEquals("folder1", doComplete.get(6).getLabel());
+		assertEquals("folder2", doComplete.get(7).getLabel());
 	}
 
 }

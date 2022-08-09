@@ -114,6 +114,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private static final Logger LOGGER = Logger.getLogger(MavenCompletionParticipant.class.getName());
 	private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("[-.a-zA-Z0-9]+");
 
+	private static final String FILE_TYPE = "File";
+	private static final String STRING_TYPE = "File";
+	private static final String DIRECTORY_STRING_LC = "directory";
+	
 	static interface GAVInsertionStrategy {
 		/**
 		 * set current element value and add siblings as addition textEdits
@@ -357,7 +361,25 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case GOAL_ELT:
 			collectGoals(request).forEach(response::addCompletionItem);
 			break;
-		}
+		default:
+			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin)
+					.stream().filter(p -> p.name.equals(parent.getLocalName()))
+					.filter(p -> (p.type.startsWith(FILE_TYPE)) || 
+							(p.type.startsWith(STRING_TYPE) && p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC)))
+					.collect(Collectors.toSet());
+			if (parameters != null && parameters.size() > 0) {
+				collectMojoParametersDefaultCompletion(request, parameters)
+				.forEach(response::addCompletionItem);
+				if (parameters.stream()
+						.anyMatch(p -> !p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC))) {
+					// Show all files
+					collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+				} else {
+					// Show only directories
+					collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+				}
+			}
+		}				
 		if (!allArtifactInfos.isEmpty()) {
 			Comparator<ArtifactWithDescription> artifactInfoComparator = Comparator
 					.comparing(artifact -> new DefaultArtifactVersion(artifact.artifact.getVersion()));
@@ -376,7 +398,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			completeProperties(request).forEach(response::addCompletionAttribute);
 		}
 	}
-
+	
 	private CompletionItem toTextCompletionItem(ICompletionRequest request, String text) throws BadLocationException {
 		CompletionItem res = new CompletionItem(text);
 		res.setFilterText(text);
@@ -731,6 +753,22 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return files.stream().map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
 	}
 
+	private Collection<CompletionItem> collectMojoParametersDefaultCompletion(ICompletionRequest request, Set<MojoParameter> parameters) {
+		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
+		List<String> defaultValues = parameters.stream().filter(p -> (p.getDefaultValue() != null))
+				.map(p -> p.getDefaultValue())
+				.collect(Collectors.toList());
+
+		if (!prefix.isEmpty()) {
+			defaultValues = defaultValues.stream().filter(v -> v.startsWith(prefix))
+					.collect(Collectors.toList());
+		}					
+		return	defaultValues.stream()
+			 	.sorted(String.CASE_INSENSITIVE_ORDER)
+				.map(defaultValue -> toCompletionItem(defaultValue.toString(), null, request.getReplaceRange()))
+				.collect(Collectors.toList());
+	}
+	
 	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
