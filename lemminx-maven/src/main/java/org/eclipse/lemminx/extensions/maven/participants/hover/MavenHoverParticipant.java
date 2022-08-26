@@ -12,8 +12,18 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
+import java.io.File;
+import java.net.URI;
+import java.text.MessageFormat;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +35,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import org.apache.maven.Maven;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.InputLocation;
+import org.apache.maven.model.InputSource;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Parent;
 import org.apache.maven.model.building.ModelBuilder;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -100,7 +115,6 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		DOMNode tag = request.getNode();
 		DOMElement parent = tag.getParentElement();
 
-		boolean isPlugin = ParticipantUtils.isPlugin(parent);
 		boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
 
 		Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
@@ -115,16 +129,19 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		case GROUP_ID_ELT:
 		case ARTIFACT_ID_ELT:
 		case VERSION_ELT:
-			Hover hover = isParentDeclaration && p != null && p.getParent() != null ? 
-					hoverForProject(request.canSupportMarkupKind(MarkupKind.MARKDOWN), p.getParent()) : null;
+			Hover hover = isParentDeclaration && p != null && p.getParent() != null ? hoverForProject(request,
+					p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch)) : null;
 			if (hover == null) {
 				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, artifactToSearch);
-		        if (artifact != null && artifact.getFile() != null) {
-					return hoverForProject(request.canSupportMarkupKind(MarkupKind.MARKDOWN), plugin.getProjectCache().getSnapshotProject(artifact.getFile()).orElse(null));
+				if (artifact != null && artifact.getFile() != null) {
+					return hoverForProject(request,
+							plugin.getProjectCache().getSnapshotProject(artifact.getFile()).orElse(null),
+							ParticipantUtils.isWellDefinedDependency(artifactToSearch));
 				}
 			}
+
 			if (hover == null) {
-				hover = collectArtifactDescription(request, isPlugin);
+				hover = collectArtifactDescription(request);
 			}
 			return hover;
 		case GOAL_ELT:
@@ -136,8 +153,160 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 		return null;
 	}
+
+	private static final String PomTextHover_managed_version = "The managed version is {0}.";
+	private static final String PomTextHover_managed_version_missing = "The managed version could not be determined.";
+	private static final String PomTextHover_managed_location = "The artifact is managed in {0}";
+	private static final String PomTextHover_managed_location_missing = "The managed definition location could not be determined, probably defined by \"import\" scoped dependencies.";
+
+	private static String getActualVersionText(boolean supportsMarkdown, MavenProject project) {
+		if (project == null) {
+			return null;
+		}
+
+		String sourceModelId = project.getGroupId() + ':' + project.getArtifactId() + ':' + project.getVersion();
+		File locacion = project.getFile();
+		return createVersionMessage(supportsMarkdown, project.getVersion(), (locacion != null && locacion.exists() ? sourceModelId : null), locacion.toURI().toString());
+	}
 	
-	private Hover hoverForProject(boolean supportsMarkdown, MavenProject p) {
+	private static String getActualVersionText(boolean supportsMarkdown, Model model) {
+		if (model == null) {
+			return null;
+		}
+
+		Parent parent = model.getParent();
+		String version = model.getVersion();
+		if (version == null && parent != null) {
+			version = parent.getVersion();
+		}
+
+		InputLocation location =  model.getLocation(ARTIFACT_ID_ELT);
+		if (location == null && parent != null) {
+			location = parent.getLocation(ARTIFACT_ID_ELT);
+		}
+
+		return createVersionMessage(supportsMarkdown, version, location);
+	}
+	
+	private String getManagedVersionText(IHoverRequest request) {
+		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
+			return null;
+		}
+
+		// make sure model is resolved and up-to-date
+		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
+		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
+		if (element == null || (!DEPENDENCY_ELT.equals(element.getLocalName()) && !PLUGIN_ELT.equals(element.getLocalName()))) {
+			return null;
+		}
+		
+		boolean isPlugin = PLUGIN_ELT.equals(element.getLocalName());
+		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
+		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request);
+
+		// Search for DEPENDENCY/PLUGIN through the parents pom's
+		File parentPomFile = getParentPomFile(p, currentFolder, request.getXMLDocument());
+
+		while (parentPomFile != null && parentPomFile.exists()) {
+			DOMDocument parentXmlDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
+					parentPomFile.toURI().toString(),
+					request.getNode().getOwnerDocument().getResolverExtensionManager());
+			if (parentXmlDocument == null) {
+				return null; // An error occurred while loading the document
+			}
+
+			MavenProject parentMavenProject = plugin.getProjectCache().getLastSuccessfulMavenProject(parentXmlDocument);
+			
+			List<DOMElement> elements = findDependencyOrPluginElement(parentXmlDocument, isPlugin, dependency.getGroupId(), dependency.getArtifactId());
+			for (DOMElement e : elements) {
+				Optional<String> version = DOMUtils.findChildElementText(e, VERSION_ELT);
+				if (version.isPresent()) {
+					String sourceModelId = parentMavenProject.getGroupId() + ':' + parentMavenProject.getArtifactId() + ':' + parentMavenProject.getVersion();
+					return createVersionMessage(request.canSupportMarkupKind(MarkupKind.MARKDOWN), version.get(), sourceModelId, parentPomFile.toURI().toString());
+				}
+			}
+				
+			// Else proceed with the next parent
+			parentPomFile = getParentPomFile(parentMavenProject, currentFolder, parentXmlDocument);
+		}
+		return null;
+	}
+
+	List<DOMElement> findDependencyOrPluginElement(DOMDocument document, boolean isPlugin, String groupId, String artifactId) {
+		return DOMUtils.findNodesByLocalName(document, isPlugin ? PLUGIN_ELT : DEPENDENCY_ELT)
+		.stream().filter(d -> {
+			if (!DOMUtils.isADescendantOf(d, isPlugin ? PLUGINS_ELT : DEPENDENCIES_ELT)) {
+				return false;
+			}
+			Optional<String> g = DOMUtils.findChildElementText(d, GROUP_ID_ELT);
+			Optional<String> a = DOMUtils.findChildElementText(d, ARTIFACT_ID_ELT);
+			return (g.isPresent() && g.get().equals(groupId) && a.isPresent() && a.get().equals(artifactId));
+		}).filter(DOMElement.class::isInstance).map(DOMElement.class::cast).collect(Collectors.toList());
+	}
+
+	private File getParentPomFile (MavenProject project, File currentFolder, DOMDocument document) {
+		Optional<DOMElement> projectElement = DOMUtils.findChildElement(document, PROJECT_ELT);
+		Optional<DOMElement> parentElement = projectElement.isPresent() ? DOMUtils.findChildElement(projectElement.get(), PARENT_ELT) : Optional.empty();
+		Optional<String> relativePath = parentElement.isPresent() ? DOMUtils.findChildElementText(parentElement.get(), RELATIVE_PATH_ELT) : Optional.empty();
+		if (relativePath.isPresent()) {
+			File relativeFile = new File(currentFolder, relativePath.get());
+			if (relativeFile.isDirectory()) {
+				relativeFile = new File(relativeFile, Maven.POMv4);
+			}
+			if (relativeFile.isFile()) {
+				return relativeFile;
+			}
+		} else {
+			File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
+			if (relativeFile.isFile()) {
+				return relativeFile;
+			} else {
+				// those next lines may actually be more generic and suit parent definition in any case
+				if (project != null && project.getParentFile() != null) {
+					return project.getParentFile();
+				}
+			}
+		}
+		return null;
+	}
+	
+	
+	private static String createVersionMessage(boolean supportsMarkdown, String version, InputLocation location) {
+		String sourceModelId = null;
+		String uri = null;
+		if (location != null) {
+			InputSource source = location.getSource();
+			if (source != null) {
+				sourceModelId = source.getModelId();
+				uri = source.getLocation();
+			}
+		}
+		
+		return createVersionMessage(supportsMarkdown, version, sourceModelId, uri);
+	}
+	
+	private static String createVersionMessage(boolean supportsMarkdown, String version, String sourceModelId, String uri) {
+		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+
+		String message = null;
+		if (version != null) {
+			message = toBold.apply(MessageFormat.format(PomTextHover_managed_version, version));
+		} else {
+			message = toBold.apply(PomTextHover_managed_version_missing);
+		}
+
+		if (sourceModelId != null) {
+			message += ' ' + toBold.apply(MessageFormat.format(PomTextHover_managed_location, 
+					supportsMarkdown ? MarkdownUtils.toLink(uri, sourceModelId, null) : sourceModelId));
+		} else {
+			message += ' ' + toBold.apply(PomTextHover_managed_location_missing);
+		}
+
+		return message;
+	}
+
+	private Hover hoverForProject(IHoverRequest request, MavenProject p, boolean isWellDefined) {
+		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
 				: UnaryOperator.identity();
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
@@ -150,6 +319,17 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		if (p.getDescription() != null) {
 			message += lineBreak + p.getDescription();
 		}
+
+		if (!isWellDefined) {
+			String managedVersion = getManagedVersionText(request);
+			if (managedVersion == null) {
+				managedVersion = getActualVersionText(supportsMarkdown, p);
+			}
+			if (managedVersion != null) {
+				message += lineBreak + managedVersion;
+			}
+		}
+
 		if (message.isBlank()) {
 			return null;
 		}
@@ -157,11 +337,12 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				message));
 	}
 	
-	private Hover collectArtifactDescription(IHoverRequest request, boolean isPlugin) {
+	private Hover collectArtifactDescription(IHoverRequest request) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, request);
+		boolean wellDefined = ParticipantUtils.isWellDefinedDependency(artifactToSearch);
 		try {
 			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
 			Optional<String> localDescription = plugin.getLocalRepositorySearcher()
@@ -173,8 +354,8 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 							&& (artifactToSearch.getVersion() == null
 									|| artifactToSearch.getVersion().equals(gav.getVersion())))
 					.sorted(Comparator.comparing((Artifact artifact) -> new DefaultArtifactVersion(artifact.getVersion())).reversed())
-					.findFirst().map(plugin.getLocalRepositorySearcher()::findLocalFile).map(file -> builder
-							.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get())
+					.findFirst().map(plugin.getLocalRepositorySearcher()::findLocalFile).map(file -> 
+							builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, true).get())
 					.map(model -> {
 						UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
 								: UnaryOperator.identity();
@@ -189,6 +370,16 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 							message += lineBreak + model.getDescription();
 						}
 
+						if (!wellDefined) {
+							String managedVersion = getManagedVersionText(request);
+							if (managedVersion == null) {
+								managedVersion = getActualVersionText(supportsMarkdown, model);
+							}
+							if (managedVersion != null) {
+								message += lineBreak + managedVersion;
+							}
+						}
+						
 						return message;
 					}).map(message -> (message.length() > 2 ? message : null));
 			if (localDescription.isPresent()) {

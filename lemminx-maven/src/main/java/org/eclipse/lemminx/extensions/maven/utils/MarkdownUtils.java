@@ -8,6 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
+import java.io.File;
+
 public class MarkdownUtils {
 	public static final String LINE_BREAK = "\n\n";
 
@@ -42,5 +44,20 @@ public class MarkdownUtils {
 			description = description + LINE_BREAK + xmlContent;
 		}
 		return description;
+	}
+	
+	public static String toLink(String uri, String message, String title) {
+		StringBuilder link = new StringBuilder();
+		
+		// [Message](http://example.com/ "Title")
+		link.append('[').append(message != null ? message : "This link").append(']');   
+		if (uri != null) {
+			link.append('(').append(uri);
+			if (title != null && title.trim().length() > 0) {
+				link.append(' ').append('"').append(title.trim()).append('"');
+			}
+			link.append(')');
+		}
+		return link.toString();
 	}
 }
