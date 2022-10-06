@@ -207,7 +207,7 @@ public class RemoteCentralRepositorySearcher {
 		try {
 			Response response = client.newCall(request).execute();
 			if (response.isSuccessful()) {
-				JsonObject bodyObject = new JsonParser().parse(response.body().charStream()).getAsJsonObject();
+				JsonObject bodyObject = JsonParser.parseReader(response.body().charStream()).getAsJsonObject();
 				if (bodyObject.has("response")) {
 					JsonObject responseObject = bodyObject.get("response").getAsJsonObject();
 					if (responseObject.has("numFound") &&
