@@ -101,8 +101,26 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-api</artifactId>
+			<version>1.8.2</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-spi</artifactId>
+			<version>1.8.2</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-util</artifactId>
+			<version>1.8.2</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-impl</artifactId>
-			<version>1.6.3</version>
+			<version>1.8.2</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
