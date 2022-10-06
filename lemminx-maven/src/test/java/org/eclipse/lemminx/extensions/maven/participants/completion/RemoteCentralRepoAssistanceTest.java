@@ -22,8 +22,6 @@ import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -31,12 +29,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-public class RemoteCentralRepoAssistanceTest {
+class RemoteCentralRepoAssistanceTest {
 
 	private XMLLanguageService languageService;
 
 	@BeforeAll
-	private static void setup() {
+	static void setup() {
 		RemoteCentralRepositorySearcher.disableCentralSearch = false;
 	}	
 	
@@ -77,7 +75,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralGroupIdCompletion()
+	void testRemoteCentralGroupIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-groupId-complete.xml"), //
 				new Position(11, 33), "org.fujion.webjars");
@@ -86,7 +84,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralArtifactIdCompletion()
+	void testRemoteCentralArtifactIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-artifactId-complete.xml"), //
 				new Position(12, 24), "webjar-angular - org.fujion.webjars:webjar-angular:");
@@ -95,7 +93,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralVersionCompletion()
+	void testRemoteCentralVersionCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-version-complete.xml"), //
 				new Position(13, 21), "13.1.1-1");
@@ -104,7 +102,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralPluginGroupIdCompletion()
+	void testRemoteCentralPluginGroupIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-groupId-complete.xml"), //
 				new Position(12, 45), "com.github.gianttreelp.proguardservicesmapper");
@@ -113,7 +111,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralPluginArtifactIdCompletion()
+	void testRemoteCentralPluginArtifactIdCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-artifactId-complete.xml"), //
 				new Position(13, 24), "proguard-services-mapper-maven - com.github.gianttreelp.proguardservicesmapper:proguard-services-mapper-maven:");
@@ -122,7 +120,7 @@ public class RemoteCentralRepoAssistanceTest {
 
 	@Test
 	@Timeout(value = 15000, unit = TimeUnit.MILLISECONDS)
-	public void testRemoteCentralPluginVersionCompletion()
+	void testRemoteCentralPluginVersionCompletion()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		loopUntilCompletionItemFound(createDOMDocument("/pom-remote-central-plugin-version-complete.xml"), //
 				new Position(14, 21), "1.0");

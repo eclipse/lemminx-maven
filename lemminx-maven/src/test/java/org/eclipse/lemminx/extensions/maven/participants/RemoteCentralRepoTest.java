@@ -22,16 +22,16 @@ import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySear
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class RemoteCentralRepoTest {
+class RemoteCentralRepoTest {
 	private static RemoteCentralRepositorySearcher repoSearcher = new RemoteCentralRepositorySearcher(null);
 	
 	@BeforeAll
-	private static void setup() {
+	static void setup() {
 		RemoteCentralRepositorySearcher.disableCentralSearch = false;
 	}	
 	
 	@Test
-	public void testGetArtifacts() {
+	void testGetArtifacts() {
 		String G = null;
 		String A = null;
 		String V = null;
@@ -66,7 +66,7 @@ public class RemoteCentralRepoTest {
 	}
 	
 	@Test
-	public void testGetArtifactVersionss() {
+	void testGetArtifactVersionss() {
 
 		String G = "org.fujion.webjars";
 		String A = "webjar-angular";
@@ -87,7 +87,7 @@ public class RemoteCentralRepoTest {
 	}	
 	
 	@Test
-	public void testGetGroupIdss() {
+	void testGetGroupIdss() {
 
 		String G = "org.fujion";
 		
@@ -115,7 +115,7 @@ public class RemoteCentralRepoTest {
 	}	
 		
 	@Test
-	public void testGetPlugiArtifacts() {
+	void testGetPlugiArtifacts() {
 
 		String G = null;
 		String A = null;
@@ -151,7 +151,7 @@ public class RemoteCentralRepoTest {
 	}
 	
 	@Test
-	public void testGetPluginArtifactVersionss() {
+	void testGetPluginArtifactVersionss() {
 
 		String G = "com.github.gianttreelp.proguardservicesmapper";
 		String A = "proguard-services-mapper-maven";
@@ -172,7 +172,7 @@ public class RemoteCentralRepoTest {
 	}	
 	
 	@Test
-	public void testGetPluginGroupIdss() {
+	void testGetPluginGroupIdss() {
 
 		String G = "com.github.gianttreelp.proguardservicesmapper";
 		
