@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2021 Red Hat Inc. and others.
+ * Copyright (c) 2020-2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -121,6 +121,10 @@ public class MavenProjectCache {
 				MavenProject project = result.get(0).getProject();
 				return Optional.of(project);
 			}
+		} catch (Exception e) {
+			// Some other kinds of exceptions may be thrown, for instance,
+			// an IllegalStateException in case of fail to acquire write lock for an artifact
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return Optional.empty();
 	}
