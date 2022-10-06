@@ -16,17 +16,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
-import org.eclipse.lemminx.settings.XMLHoverSettings;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverCapabilities;
-import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.AfterEach;
@@ -36,7 +33,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
-public class ManagedVersionHoverTest {
+class ManagedVersionHoverTest {
 
 	private XMLLanguageService languageService;
 
@@ -53,10 +50,10 @@ public class ManagedVersionHoverTest {
 
 	@Test
 	@Timeout(90000)
-	public void testManagedVersionHoverInDependencyChild() throws IOException, URISyntaxException {
+	void testManagedVersionHoverInDependencyChild() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-dependencyManagement-child.xml", languageService);
 		Hover hover = languageService.doHover(document, new Position(15, 25), createSharedSettings());
-		String value = ((MarkupContent) hover.getContents().getRight()).getValue();
+		String value = hover.getContents().getRight().getValue();
 		System.out.println("testManagedVersionHoverInDependencyChild: [" + value + "]");
 		assertNotNull(value);
 		assertTrue(value.contains("The managed version is"));
@@ -68,10 +65,10 @@ public class ManagedVersionHoverTest {
 
 	@Test
 	@Timeout(90000)
-	public void testManagedVersionHoverInDependencyParent() throws IOException, URISyntaxException {
+	void testManagedVersionHoverInDependencyParent() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-dependencyManagement-parent.xml", languageService);
 		Hover hover = languageService.doHover(document, new Position(13, 29), createSharedSettings());
-		String value = ((MarkupContent) hover.getContents().getRight()).getValue();
+		String value = hover.getContents().getRight().getValue();
 		System.out.println("testManagedVersionHoverInDependencyParent: [" + value + "]");
 		assertNotNull(value);
 		assertFalse(value.contains("The managed version is"));
@@ -80,10 +77,10 @@ public class ManagedVersionHoverTest {
 
 	@Test
 	@Timeout(90000)
-	public void testManagedVersionHoverInPluginChild() throws IOException, URISyntaxException {
+	void testManagedVersionHoverInPluginChild() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-pluginManagement-child.xml", languageService);
 		Hover hover = languageService.doHover(document, new Position(18, 33), createSharedSettings());
-		String value = ((MarkupContent) hover.getContents().getRight()).getValue();
+		String value = hover.getContents().getRight().getValue();
 		System.out.println("testManagedVersionHoverInPluginChild: [" + value + "]");
 		assertNotNull(value);
 		assertTrue(value.contains("The managed version is"));
@@ -95,10 +92,10 @@ public class ManagedVersionHoverTest {
 
 	@Test
 	@Timeout(90000)
-	public void testManagedVersionHoverInPluginParent() throws IOException, URISyntaxException {
+	void testManagedVersionHoverInPluginParent() throws IOException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-pluginManagement-parent.xml", languageService);
 		Hover hover = languageService.doHover(document, new Position(14, 33), createSharedSettings());
-		String value = ((MarkupContent) hover.getContents().getRight()).getValue();
+		String value = hover.getContents().getRight().getValue();
 		System.out.println("testManagedVersionHoverInPluginParent: [" + value + "]");
 		assertNotNull(value);
 		assertFalse(value.contains("The managed version is"));

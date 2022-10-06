@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2022 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -102,9 +101,8 @@ public class MavenPluginUtils {
 			mojosToConsiderList = mojosToConsiderList.stream().filter(mojo -> interestingMojos.contains(mojo.getGoal()))
 					.collect(Collectors.toList());
 		}
-		Set<Parameter> parameters = mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
+		return mojosToConsiderList.stream().flatMap(mojo -> mojo.getParameters().stream())
 				.collect(Collectors.toSet());
-		return parameters;
 	}
 
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
@@ -129,10 +127,9 @@ public class MavenPluginUtils {
 			return Collections.emptySet();
 		}
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
-		Set<MojoParameter> mojoParams = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
+		return mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
 				.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
 				.stream()).collect(Collectors.toSet());
-		return mojoParams;
 	}
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {
