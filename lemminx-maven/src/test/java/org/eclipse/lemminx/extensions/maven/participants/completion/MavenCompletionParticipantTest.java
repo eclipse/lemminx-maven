@@ -20,6 +20,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenCompletionParticipantTest {
+	
+	// We must use this System.lineSeparator() as line delimiter only for those cases,
+	// where a text editor line doesn't have a line ending separator set
+	private static String LINE_DELIMTER = System.lineSeparator();
 
 	@Test
 	public void testOneExistingDependencyDependenciesCompletion() throws Exception {
@@ -238,9 +242,9 @@ public class MavenCompletionParticipantTest {
 						"maven-surefire-plugin"),
 					Arrays.asList(
 							te(8, 16, 8, 16, 
-								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+								LINE_DELIMTER + "      <groupId>org.apache.maven.plugins</groupId>"),
 							te(9, 49, 9, 49, 
-								"\n      <version>2.22.2</version>")),
+								LINE_DELIMTER + "      <version>2.22.2</version>")),
 					"maven-surefire-plugin"));
 	}
 
@@ -263,9 +267,9 @@ public class MavenCompletionParticipantTest {
 						"maven-surefire-plugin</artifactId>"),
 					Arrays.asList(
 							te(8, 16, 8, 16, 
-								"\n      <groupId>org.apache.maven.plugins</groupId>"),
+								LINE_DELIMTER + "      <groupId>org.apache.maven.plugins</groupId>"),
 							te(9, 36, 9, 36, 
-								"\n      <version>2.22.2</version>")),
+									LINE_DELIMTER + "      <version>2.22.2</version>")),
 					"maven-surefire-plugin"));
 	}
 }
