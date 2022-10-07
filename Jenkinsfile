@@ -2,7 +2,7 @@ pipeline{
 	agent any
 	tools {
 		maven 'apache-maven-latest'
-		jdk 'openjdk-jdk11-latest'
+		jdk 'openjdk-jdk17-latest'
 	}
 	environment {
 		MAVEN_HOME = "$WORKSPACE/.m2/"
@@ -11,7 +11,7 @@ pipeline{
 	stages{
 		stage("Maven Build"){
 			steps {
-				sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
+				sh 'mvn -B verify -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
 			}
 			post {
 				always {
@@ -25,7 +25,7 @@ pipeline{
 				branch 'master'
 			}
 			steps {
-				sh 'mvn -B deploy  --file lemminx-maven/pom.xml -DskipTests -Dcbi.jarsigner.skip=false'
+				sh 'mvn -B deploy -DskipTests -Dcbi.jarsigner.skip=false'
 			}
 		}
 	}
