@@ -107,14 +107,11 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 	}
 
 	private DiagnosticSeverity toDiagnosticSeverity(Severity severity) {
-		switch (severity) {
-		case ERROR:
-		case FATAL:
-			return DiagnosticSeverity.Error;
-		case WARNING:
-			return DiagnosticSeverity.Warning;
-		}
-		return DiagnosticSeverity.Information;
+		return switch (severity) {
+			case ERROR, FATAL -> DiagnosticSeverity.Error;
+			case WARNING -> DiagnosticSeverity.Warning;
+			default -> DiagnosticSeverity.Information;
+		};
 	}
 
 }

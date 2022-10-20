@@ -1,5 +1,7 @@
 # LemMinx-Maven Releases
 
+Starting from 0.6.0, the release notes are visible at https://github.com/eclipse/lemminx-maven/releases
+
 ### 0.5.2
 
 * 📅 Release Date: May 18th, 2022

@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 
 import org.eclipse.lemminx.commons.BadLocationException;
+import org.eclipse.lemminx.dom.DOMAttr;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -88,6 +89,11 @@ public class DiagnosticRequest implements IPositionRequest {
 	public <T> T getComponent(Class clazz) {
 		// TODO: Not sure how to implement this..
 		return null;
+	}
+
+	@Override
+	public DOMAttr getCurrentAttribute() {
+		return node instanceof DOMAttr attr ? attr : null;
 	}
 
 }

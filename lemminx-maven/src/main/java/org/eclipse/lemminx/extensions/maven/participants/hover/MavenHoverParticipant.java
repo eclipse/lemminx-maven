@@ -96,14 +96,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 
 		// TODO: Get rid of this?
-		switch (parent.getLocalName()) {
-		case CONFIGURATION_ELT:
-			return collectPluginConfiguration(request);
-		default:
-			break;
-		}
-
-		return null;
+		return CONFIGURATION_ELT.equals(parent.getLocalName()) ? collectPluginConfiguration(request) : null;
 	}
 
 	@Override
@@ -125,16 +118,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, request);
 
-		switch (parent.getLocalName()) {
-		case GROUP_ID_ELT:
-		case ARTIFACT_ID_ELT:
-		case VERSION_ELT:
+		return switch (parent.getLocalName()) {
+		case GROUP_ID_ELT, ARTIFACT_ID_ELT, VERSION_ELT -> {
 			Hover hover = isParentDeclaration && p != null && p.getParent() != null ? hoverForProject(request,
 					p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch)) : null;
 			if (hover == null) {
 				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, artifactToSearch);
 				if (artifact != null && artifact.getFile() != null) {
-					return hoverForProject(request,
+					yield hoverForProject(request,
 							plugin.getProjectCache().getSnapshotProject(artifact.getFile()).orElse(null),
 							ParticipantUtils.isWellDefinedDependency(artifactToSearch));
 				}
@@ -143,15 +134,12 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			if (hover == null) {
 				hover = collectArtifactDescription(request);
 			}
-			return hover;
-		case GOAL_ELT:
-			return collectGoal(request);
-		default:
-			break;
+			yield hover;
 		}
+		case GOAL_ELT -> collectGoal(request);
 		// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
-
-		return null;
+		default -> null;
+		};
 	}
 
 	private static final String PomTextHover_managed_version = "The managed version is {0}.";

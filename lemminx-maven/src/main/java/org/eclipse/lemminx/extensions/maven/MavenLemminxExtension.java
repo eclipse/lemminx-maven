@@ -419,8 +419,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		initialize();
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
-		if (workspaceReader instanceof MavenLemminxWorkspaceReader) {
-			MavenLemminxWorkspaceReader reader = (MavenLemminxWorkspaceReader)workspaceReader;
+		if (workspaceReader instanceof MavenLemminxWorkspaceReader reader) {
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
