@@ -104,11 +104,11 @@ public class PlexusConfigHelper {
 	}
 
 	public static Class<?> getRawType(Type type) {
-		if (type instanceof Class) {
-			return (Class<?>) type;
+		if (type instanceof Class<?> t) {
+			return t;
 		}
-		if (type instanceof ParameterizedType) {
-			return (Class<?>) ((ParameterizedType) type).getRawType();
+		if (type instanceof ParameterizedType paramedType) {
+			return (Class<?>) paramedType.getRawType();
 		}
 		return null;
 	}
@@ -126,9 +126,7 @@ public class PlexusConfigHelper {
 			return null;
 		}
 
-		if (paramType instanceof ParameterizedType) {
-			ParameterizedType pt = (ParameterizedType) paramType;
-
+		if (paramType instanceof ParameterizedType pt) {
 			Type[] args = pt.getActualTypeArguments();
 			if (args.length > 0) {
 				return args[0];
@@ -157,8 +155,7 @@ public class PlexusConfigHelper {
 			return getTypeDisplayName(clazz.getComponentType()) + "[]"; //$NON-NLS-1$
 		}
 
-		if (type instanceof ParameterizedType) {
-			ParameterizedType ptype = (ParameterizedType) type;
+		if (type instanceof ParameterizedType ptype) {
 			StringBuilder sb = new StringBuilder();
 			sb.append(getTypeDisplayName(clazz)).append("&lt;"); //$NON-NLS-1$
 

@@ -149,10 +149,9 @@ public class MavenProjectCache {
 			}
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
-				if (e.getCause() instanceof ModelBuildingException) {
+				if (e.getCause() instanceof ModelBuildingException modelBuildingException) {
 					// Try to manually build a minimal project from the document to collect lower-level
 					// errors and to have something usable in cache for most basic operations
-					ModelBuildingException modelBuildingException = (ModelBuildingException) e.getCause();
 					problems.addAll(modelBuildingException.getProblems());
 					File file = new File(uri);
 					try (ByteArrayInputStream documentStream = new ByteArrayInputStream(

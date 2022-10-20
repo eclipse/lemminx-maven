@@ -214,12 +214,8 @@ public class MojoParameter {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (!(obj instanceof MojoParameter)) {
-			return false;
-		}
-		MojoParameter otherMojo = (MojoParameter) obj;
-
-		return this.isRequired() == otherMojo.isRequired() //
+		return obj instanceof MojoParameter otherMojo //
+				&& this.isRequired() == otherMojo.isRequired() //
 				&& this.isMap() == otherMojo.isMap() //
 				&& this.isMultiple() == otherMojo.isMultiple() //
 				&& Objects.equals(this.type, otherMojo.type) //

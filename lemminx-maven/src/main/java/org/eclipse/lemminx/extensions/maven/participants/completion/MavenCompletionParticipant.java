@@ -422,21 +422,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		if (request.getParentElement() == null) {
 			return null;
 		}
-		switch (request.getParentElement().getLocalName()) {
-		case DEPENDENCIES_ELT:
-			return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy(DEPENDENCY_ELT);
-		case DEPENDENCY_ELT:
-			return GAVInsertionStrategy.CHILDREN_ELEMENTS;
-		case PLUGINS_ELT:
-			return new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy(PLUGIN_ELT);
-		case PLUGIN_ELT:
-			return GAVInsertionStrategy.CHILDREN_ELEMENTS;
-		case ARTIFACT_ID_ELT:
-			return GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
-		case PARENT_ELT:
-			return GAVInsertionStrategy.CHILDREN_ELEMENTS;
-		}
-		return GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
+		return switch (request.getParentElement().getLocalName()) {
+			case DEPENDENCIES_ELT -> new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy(DEPENDENCY_ELT);
+			case DEPENDENCY_ELT -> GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			case PLUGINS_ELT -> new GAVInsertionStrategy.NodeWithChildrenInsertionStrategy(PLUGIN_ELT);
+			case PLUGIN_ELT ->  GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			case ARTIFACT_ID_ELT -> GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
+			case PARENT_ELT -> GAVInsertionStrategy.CHILDREN_ELEMENTS;
+			default -> GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING;
+		};
 	}
 
 	private Optional<MavenProject> computeFilesystemParent(ICompletionRequest request) {
@@ -581,8 +575,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				String newText = "";
 				String suffix = "";
 				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
-				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy) {
-					String elementName = ((GAVInsertionStrategy.NodeWithChildrenInsertionStrategy) strategy).elementName;
+				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy nodeWithChildren) {
+					String elementName = nodeWithChildren.elementName;
 					gavElementsIndent += DOMUtils.getOneLevelIndent(request);
 					newText += "<" + elementName + ">" + request.getLineIndentInfo().getLineDelimiter()
 							+ gavElementsIndent;
@@ -1071,8 +1065,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				.map(ArtifactWithDescription::new) //
 				.forEach(artifactInfosCollector::add);
 			break;
-		case GROUP_ID_ELT:
-		case VERSION_ELT:
+		case GROUP_ID_ELT, VERSION_ELT:
 			plugin.getProjectCache().getProjects().stream() //
 				.filter(a -> artifactIdFilter == null || artifactIdFilter.equals(a.getArtifactId())) //
 				.map(ArtifactWithDescription::new) //
