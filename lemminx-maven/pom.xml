@@ -26,6 +26,7 @@
 		<junit-jupiter.version>5.9.1</junit-jupiter.version>
 		<lemminx.version>0.22.0</lemminx.version>
 		<maven.version>3.8.6</maven.version>
+		<maven-resolver.version>1.9.1</maven-resolver.version>
 	</properties>
 
 	<dependencies>
@@ -102,25 +103,25 @@
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-api</artifactId>
-			<version>1.8.2</version>
+			<version>${maven-resolver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-spi</artifactId>
-			<version>1.8.2</version>
+			<version>${maven-resolver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-util</artifactId>
-			<version>1.8.2</version>
+			<version>${maven-resolver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-impl</artifactId>
-			<version>1.8.2</version>
+			<version>${maven-resolver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
