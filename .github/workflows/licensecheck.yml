@@ -19,4 +19,4 @@ jobs:
       projectId: technology.lemminx
       submodules: recursive
     secrets:
-      gitlabAPIToken: ${{ secrets.ECLIPSE_GITLAB_API_TOKEN }}
+      gitlabAPIToken: ${{ secrets.GITLAB_API_TOKEN }}
