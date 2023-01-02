@@ -18,13 +18,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -44,7 +44,7 @@ public class MavenProjectCacheTest {
 	@Test
 	public void testSimpleProjectIsParsed() throws Exception {
 		URI uri = getClass().getResource("/pom-with-properties.xml").toURI();
-		String content = FileUtils.readFileToString(new File(uri), "UTF-8");
+		String content = Files.readString(new File(uri).toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
 		MavenProjectCache cache = plugin.getProjectCache();
@@ -56,7 +56,7 @@ public class MavenProjectCacheTest {
 	public void testOnBuildError_ResolveProjectFromDocumentBytes() throws Exception {
 		URI uri = getClass().getResource("/pom-with-module-error.xml").toURI();
 		File pomFile = new File(uri);
-		String content = FileUtils.readFileToString(pomFile, "UTF-8");
+		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
 		MavenProjectCache cache = plugin.getProjectCache();
@@ -74,7 +74,7 @@ public class MavenProjectCacheTest {
 		assertTrue(project.getProperties().containsKey("myProperty"), project.getProperties().toString());
 		URI parentUri = getClass().getResource("/pom-with-properties.xml").toURI();
 		File parentPomFile = new File(parentUri);
-		String initialContent = FileUtils.readFileToString(parentPomFile, "UTF-8");
+		String initialContent = Files.readString(parentPomFile.toPath(), StandardCharsets.UTF_8);
 		try {
 			String content = initialContent.replaceAll("myProperty", "modifiedProperty");
 			Files.writeString(parentPomFile.toPath(), content);
@@ -213,7 +213,7 @@ public class MavenProjectCacheTest {
 		URI baseUri = getClass().getResource("/").toURI();
 		File baseDirectory = new File(baseUri);
 		File pomFile = new File(baseDirectory, resource);
-		String content = FileUtils.readFileToString(pomFile, "UTF-8");
+		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, pomFile.toURI().toString()), null);
 		return doc;
 	}
@@ -221,7 +221,7 @@ public class MavenProjectCacheTest {
 	private DOMDocument getDocument(String resource) throws URISyntaxException, IOException {
 		URI uri = getClass().getResource(resource).toURI();
 		File pomFile = new File(uri);
-		String content = FileUtils.readFileToString(pomFile, "UTF-8");
+		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		return doc;
 	}
