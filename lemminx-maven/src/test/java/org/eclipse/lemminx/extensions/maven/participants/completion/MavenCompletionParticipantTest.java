@@ -281,4 +281,34 @@ public class MavenCompletionParticipantTest {
 									LINE_DELIMTER + "      <version>2.22.2</version>")),
 					"maven-surefire-plugin"));
 	}
+
+	@Test
+	public void testPluginParameterCompletion() throws Exception {
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <groupId>org.test</groupId>
+			  <artifactId>test</artifactId>
+			  <version>0.0.1-SNAPSHOT</version>
+			  <build>
+			    <plugins>
+			      <plugin>
+				      <groupId>org.eclipse.tycho</groupId>
+				      <artifactId>target-platform-configuration</artifactId>
+				      <version>3.0.0</version>
+				      <configuration>
+				        |
+				      </configuration>
+			      </plugin>
+			    </plugins>
+			  </build>
+			</project>""";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("target", //
+					te(14, 9, 14, 9, //
+							"<target>$0</target>"),
+					"<target>$0</target>", null));
+	}
 }
