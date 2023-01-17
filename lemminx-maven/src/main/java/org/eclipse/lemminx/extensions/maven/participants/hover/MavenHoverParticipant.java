@@ -384,9 +384,11 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 	private Hover collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
-		PluginDescriptor pluginDescriptor;
 		try {
-			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+			PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+			if (pluginDescriptor == null) { // probable incorrect pom file at this moment
+				return null;
+			}
 			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
 				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
 					return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
