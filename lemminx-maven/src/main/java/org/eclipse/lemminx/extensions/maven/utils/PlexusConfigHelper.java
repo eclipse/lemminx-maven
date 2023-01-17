@@ -261,7 +261,7 @@ public class PlexusConfigHelper {
 
 			Map<String, Type> properties = getClassProperties(paramClass);
 			for (Map.Entry<String, Type> e : properties.entrySet()) {
-				addParameter(realm, paramClass, e.getValue(), e.getKey(), null, parameters, false, null, null, null);
+				parameters.add(toMojoParameter(realm, paramClass, e.getValue(), e.getKey(), null, false, null, null, null));
 			}
 		}
 
@@ -314,28 +314,31 @@ public class PlexusConfigHelper {
 		return parameters;
 	}
 
-	public static void addParameter(ClassRealm realm, Class<?> enclosingClass, Type paramType, String name,
-									String alias, List<MojoParameter> parameters, boolean required, String expression, String description,
+	public static MojoParameter toMojoParameter(ClassRealm realm, Class<?> enclosingClass, Type paramType, String name,
+									String alias, boolean required, String expression, String description,
 									String defaultValue) {
 
+		if (paramType == null) {
+			return configure(new MojoParameter(name, alias, ""), required, expression,
+					description, defaultValue);
+		}
 		Class<?> paramClass = getRawType(paramType);
 		if (paramClass == null) {
-			return;
+			return configure(new MojoParameter(name, alias, ""), required, expression,
+					description, defaultValue);
 		}
 
 		// inline
 		if (isInline(paramClass)) {
-			parameters.add(configure(new MojoParameter(name, alias, paramType), required, expression,
-					description, defaultValue));
-			return;
+			return configure(new MojoParameter(name, alias, paramType), required, expression,
+					description, defaultValue);
 		}
 
 		// map
 		if (Map.class.isAssignableFrom(paramClass)) {
 			// we can't do anything with maps, unfortunately
-			parameters.add(configure(new MojoParameter(name, alias, paramType).map(), required, expression,
-					description, defaultValue));
-			return;
+			return configure(new MojoParameter(name, alias, paramType).map(), required, expression,
+					description, defaultValue);
 		}
 
 		// properties
@@ -344,17 +347,16 @@ public class PlexusConfigHelper {
 			MojoParameter nested = new MojoParameter("property", null, "property",
 					Arrays.asList(new MojoParameter("name", null, "String"), new MojoParameter("value", null, "String")));
 
-			parameters.add(configure(new MojoParameter(name, alias, paramType, nested), required,
-					expression, description, defaultValue));
+			return configure(new MojoParameter(name, alias, paramType, nested), required,
+					expression, description, defaultValue);
 		}
 
 		// collection/array
 		Type itemType = getItemType(paramType);
 		if (itemType != null) {
 			List<MojoParameter> nested = getItemParameters(realm, enclosingClass, name, itemType);
-			parameters.add(configure(new MojoParameter(name, alias, paramType, nested), required,
-					expression, description, defaultValue));
-			return;
+			return configure(new MojoParameter(name, alias, paramType, nested), required,
+					expression, description, defaultValue);
 		}
 
 		// pojo
@@ -362,13 +364,16 @@ public class PlexusConfigHelper {
 		try {
 			paramClass.getConstructor();
 		} catch (NoSuchMethodException ex) {
-			return;
+			return configure(new MojoParameter(name, alias, paramClass.getSimpleName()), required, expression,
+					description, defaultValue);
 		}
 
 		List<MojoParameter> nested = loadParameters(realm, paramClass);
-		parameters.add(configure(new MojoParameter(name, alias, getTypeDisplayName(paramType), nested), required, expression,
-				description, defaultValue));
+		return configure(new MojoParameter(name, alias, getTypeDisplayName(paramType), nested), required, expression,
+				description, defaultValue);
 	}
+
+	
 
 	public static List<MojoParameter> loadMojoParameters(PluginDescriptor descriptor, MojoDescriptor mojo,
 														 MavenSession mavenSession, BuildPluginManager buildPluginManager) {
@@ -400,14 +405,8 @@ public class PlexusConfigHelper {
 					continue;
 				}
 
-				Type type = properties.get(p.getName());
-				if (type == null) {
-					continue;
-				}
-
-				// TODO: This shouldn't use side effects on parameters...
-				addParameter(descriptor.getClassRealm(), clazz, type, p.getName(), p.getAlias(), parameters,
-						p.isRequired(), p.getExpression(), p.getDescription(), p.getDefaultValue());
+				parameters.add(toMojoParameter(descriptor.getClassRealm(), clazz, properties.get(p.getName()), p.getName(), p.getAlias(),
+						p.isRequired(), p.getExpression(), p.getDescription(), p.getDefaultValue()));
 			}
 		}
 		return parameters;
