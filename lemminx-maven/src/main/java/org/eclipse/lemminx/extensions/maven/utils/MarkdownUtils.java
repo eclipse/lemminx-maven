@@ -32,10 +32,12 @@ public class MarkdownUtils {
 	}
 
 	public static String htmlXMLToMarkdown(String description) {
-		if (description.contains("<pre>") && description.contains("&lt;")) {
+		int openPre = description.indexOf("<pre>");
+		int closePre = description.indexOf("</pre>", openPre);
+		if (openPre >= 0 && description.contains("&lt;") && closePre > openPre) {
 			//Add markdown formatting to XML
-			String xmlContent = description.substring(description.indexOf("<pre>") + 6, description.indexOf("</pre>") - 1);
-			description = description.substring(0, description.indexOf("<pre>"));
+			String xmlContent = description.substring(openPre + "<pre>".length() + 1, closePre - 1);
+			description = description.substring(0, openPre);
 			xmlContent = xmlContent.replaceAll("&lt;", "<");
 			xmlContent = xmlContent.replaceAll("&gt;", ">");
 			xmlContent = "```XML" + "\n" + xmlContent + "\n" + "```";
