@@ -50,7 +50,7 @@ import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
  */
 public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
-	private static final int POLLING_INTERVAL = 10;
+	private static final int POLLING_INTERVAL = 30;
 
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	
@@ -65,6 +65,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 		public void run() {
 			// already processed, don't repeat operation
 			if (!workspaceArtifacts.containsValue(pomFile)) {
+				LOGGER.finest("Trying to add " + pomFile + "to workspace...");
 				skipFlushBeforeResult.set(true); // avoid deadlock as building project will go through this workspace reader
 				Optional<MavenProject> snapshotProject = Optional.empty();
 				try {
@@ -80,7 +81,9 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 					while (project != null) { 
 						File pom = project.getFile();
 						if (toProcess.contains(pom)) {
-							workspaceArtifacts.put(new DefaultArtifact(project.getGroupId(), project.getArtifactId(), null, project.getVersion()), pom);
+							DefaultArtifact artifact = new DefaultArtifact(project.getGroupId(), project.getArtifactId(), null, project.getVersion());
+							workspaceArtifacts.put(artifact, pom);
+							LOGGER.finest("Registered" + artifact + " -> " + pom + " into workspace...");
 						}
 						propagateProcessed(pom);
 						project = project.getParent();
@@ -104,7 +107,9 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 								if (groupId.isPresent() && !groupId.get().contains("$") && //
 									artifactId.isPresent() && !artifactId.get().contains("$") &&
 									version.isPresent() && !version.get().contains("$")) {
-									workspaceArtifacts.put(new DefaultArtifact(groupId.get(), artifactId.get(), null, version.get()), pomFile);
+									DefaultArtifact artifact = new DefaultArtifact(groupId.get(), artifactId.get(), null, version.get());
+									workspaceArtifacts.put(artifact, pomFile);
+									LOGGER.finest("Registered" + artifact + " -> " + pomFile + " into workspace...");
 								}
 							});
 					} catch (IOException ex) {
@@ -112,6 +117,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 					}
 				});
 			}
+			LOGGER.finest("Done adding " + pomFile + "to workspace...");
 			// ensure we remove it from further processing even in case no MavenProject can be built
 			propagateProcessed(pomFile);
 		}
@@ -182,6 +188,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				.findAny()
 				.or(() -> {
 					if (skipFlushBeforeResult.get() != Boolean.TRUE) {
+						LOGGER.finest("Waiting for " + projectKey + " to be avilable; processing workspace in the meantime...");
 						while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(projectKey).isEmpty()) {
 							try {
 								Thread.sleep(POLLING_INTERVAL);
@@ -189,6 +196,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 								LOGGER.severe(e.getMessage());
 							}
 						}
+						LOGGER.finest("Done waiting from " + projectKey + ". Either found, or all workspace processed.");
 					}
 					return getCurrentWorkspaceArtifact(projectKey);
 				}).orElse(null);
@@ -204,6 +212,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	@Override
 	public List<String> findVersions(Artifact artifact) {
 		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
+			LOGGER.finest("Lookup available versions for " + artifact + "; processing workspace in the meantime...");
 			while (!toProcess.isEmpty()) {
 				try {
 					Thread.sleep(POLLING_INTERVAL);
@@ -211,6 +220,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 					LOGGER.severe(e.getMessage());
 				}
 			}
+			LOGGER.finest("Workspace processing complete");
 		}
 		String key = ArtifactUtils.versionlessKey(artifact.getGroupId(), artifact.getArtifactId());
 		SortedSet<String> res = new TreeSet<>(Comparator.reverseOrder());
