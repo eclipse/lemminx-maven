@@ -28,117 +28,125 @@ public class MavenCompletionParticipantTest {
 	@Test
 	public void testOneExistingDependencyDependenciesCompletion() throws Exception {
 		String pom = //
-				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + //
-				"<project\n" + //
-				"  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0\n" + //
-				"                      https://maven.apache.org/xsd/maven-4.0.0.xsd\"\n" + //
-				"  xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" + //
-				"  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" + //
-				"  <modelVersion>4.0.0</modelVersion>\n" + //
-				"  <artifactId>just-a-pom</artifactId>\n" + //
-				"  <groupId>com.datho7561</groupId>\n" + //
-				"  <version>0.1.0</version>\n" + //
-				"  <dependencies>\n" + //
-				"    <dependency>\n" + //
-				"      <groupId>com.fasterxml.jackson.core</groupId>\n" + //
-				"      <artifactId>jackson-core</artifactId>\n" + //
-				"      <version>2.11.3</version>\n" + //
-				"    </dependency>\n" + //
-				"    maven-core|\n" + //
-				"  </dependencies>\n" + //
-				"</project>\n";
+				"""
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>just-a-pom</artifactId>
+			  <groupId>com.datho7561</groupId>
+			  <version>0.1.0</version>
+			  <dependencies>
+			    <dependency>
+			      <groupId>com.fasterxml.jackson.core</groupId>
+			      <artifactId>jackson-core</artifactId>
+			      <version>2.11.3</version>
+			    </dependency>
+			    maven-core|
+			  </dependencies>
+			</project>
+			""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-core - org.apache.maven:maven-core:3.0", //
 				te(16, 4, 16, 14, //
-						"<dependency>\n" + //
-						"      <groupId>org.apache.maven</groupId>\n" + //
-						"      <artifactId>maven-core</artifactId>\n" + //
-						"      <version>3.0</version>\n" + //
-						"    </dependency>"),
+						"""
+							<dependency>
+							      <groupId>org.apache.maven</groupId>
+							      <artifactId>maven-core</artifactId>
+							      <version>3.0</version>
+							    </dependency>"""),
 				"maven-core"));
 	}
 
 	@Test
 	public void testNoExistingDependencyDependenciesCompletion() throws Exception {
-		String pom = //
-				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + //
-				"<project\n" + //
-				"  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0\n" + //
-				"                      https://maven.apache.org/xsd/maven-4.0.0.xsd\"\n" + //
-				"  xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" + //
-				"  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" + //
-				"  <modelVersion>4.0.0</modelVersion>\n" + //
-				"  <artifactId>just-a-pom</artifactId>\n" + //
-				"  <groupId>com.datho7561</groupId>\n" + //
-				"  <version>0.1.0</version>\n" + //
-				"  <dependencies>\n" + //
-				"    maven-core|\n" + //
-				"  </dependencies>\n" + //
-				"</project>\n";
+		String pom = """
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>just-a-pom</artifactId>
+			  <groupId>com.datho7561</groupId>
+			  <version>0.1.0</version>
+			  <dependencies>
+			    maven-core|
+			  </dependencies>
+			</project>
+			""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-core - org.apache.maven:maven-core:3.0", //
 				te(11, 4, 11, 14, //
-						"<dependency>\n" + //
-						"      <groupId>org.apache.maven</groupId>\n" + //
-						"      <artifactId>maven-core</artifactId>\n" + //
-						"      <version>3.0</version>\n" + //
-						"    </dependency>"),
+						"""
+							<dependency>
+							      <groupId>org.apache.maven</groupId>
+							      <artifactId>maven-core</artifactId>
+							      <version>3.0</version>
+							    </dependency>"""),
 				"maven-core"));
 	}
 
 	@Test
 	public void testNoExistingDependencyDependencyCompletion() throws Exception {
-		String pom = //
-				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + //
-				"<project\n" + //
-				"  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0\n" + //
-				"                      https://maven.apache.org/xsd/maven-4.0.0.xsd\"\n" + //
-				"  xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" + //
-				"  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" + //
-				"  <modelVersion>4.0.0</modelVersion>\n" + //
-				"  <artifactId>just-a-pom</artifactId>\n" + //
-				"  <groupId>com.datho7561</groupId>\n" + //
-				"  <version>0.1.0</version>\n" + //
-				"  <dependencies>\n" + //
-				"    <dependency>\n" + //
-				"      maven-core|\n" + //
-				"    </dependency>\n" + //
-				"  </dependencies>\n" + //
-				"</project>\n";
+		String pom = """
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>just-a-pom</artifactId>
+			  <groupId>com.datho7561</groupId>
+			  <version>0.1.0</version>
+			  <dependencies>
+			    <dependency>
+			      maven-core|
+			    </dependency>
+			  </dependencies>
+			</project>
+			""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-core - org.apache.maven:maven-core:3.0", //
 				te(12, 6, 12, 16, //
-						"<groupId>org.apache.maven</groupId>\n" + //
-						"      <artifactId>maven-core</artifactId>\n" + //
-						"      <version>3.0</version>"),
+						"""
+							<groupId>org.apache.maven</groupId>
+							      <artifactId>maven-core</artifactId>
+							      <version>3.0</version>"""),
 						"maven-core"));
 	}
 
 	@Test
 	public void testNotPrefixedPropertyCompletion() throws Exception {
-		String pom = //
-				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + //
-				"<project\n" + //
-				"  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0\n" + //
-				"                      https://maven.apache.org/xsd/maven-4.0.0.xsd\"\n" + //
-				"  xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" + //
-				"  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" + //
-				"  <modelVersion>4.0.0</modelVersion>\n" + //
-				"  <artifactId>just-a-pom</artifactId>\n" + //
-				"  <groupId>com.datho7561</groupId>\n" + //
-				"  <version>0.1.0</version>\n" + //
-				"  <properties>\n" + //
-				"    <spring.version>5.0.2</spring.version>\n" + //
-				"  </properties>\n" + //
-				"  <dependencies>\n" + //
-				"    <dependency>\n" + //
-				"      <groupId>org.springframework</groupId>\n" + //
-				"      <artifactId>spring-context</artifactId>\n" + //
-				"      <version>spring.ver|</version>\n" + //
-				"      <scope>runtime</scope>\n" + //
-				"    </dependency>\n" + //
-				"  </dependencies>\n" + //
-				"</project>\n";
+		String pom = """
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>just-a-pom</artifactId>
+			  <groupId>com.datho7561</groupId>
+			  <version>0.1.0</version>
+			  <properties>
+			    <spring.version>5.0.2</spring.version>
+			  </properties>
+			  <dependencies>
+			    <dependency>
+			      <groupId>org.springframework</groupId>
+			      <artifactId>spring-context</artifactId>
+			      <version>spring.ver|</version>
+			      <scope>runtime</scope>
+			    </dependency>
+			  </dependencies>
+			</project>
+			""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("${spring.version}", //
 				te(17, 25, 17, 25, //
@@ -148,21 +156,21 @@ public class MavenCompletionParticipantTest {
 
 	@Test
 	public void testInsertionWithAlreadyExistingGroupId() throws Exception {
-		String pom = //
-				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
-				+ "	xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
-				+ "	xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
-				+ "	<modelVersion>4.0.0</modelVersion>\n"
-				+ "	<groupId>org.test</groupId>\n"
-				+ "	<artifactId>test</artifactId>\n"
-				+ "	<version>0.0.1-SNAPSHOT</version>\n"
-				+ "	<dependencies>\n"
-				+ "		<dependency>\n"
-				+ "			<groupId>org.apache.maven.plugins</groupId>\n"
-				+ "			|\n"
-				+ "		</dependency>\n"
-				+ "	</dependencies>\n"
-				+ "</project>";
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+				xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+				xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+				<modelVersion>4.0.0</modelVersion>
+				<groupId>org.test</groupId>
+				<artifactId>test</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.apache.maven.plugins</groupId>
+						|
+					</dependency>
+				</dependencies>
+			</project>""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
 				te(10, 3, 10, 3, //
@@ -172,20 +180,20 @@ public class MavenCompletionParticipantTest {
 
 	@Test
 	public void testInsertionDependencyWithPartiallyTypedInArtifactId() throws Exception {
-		String pom = //
-				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
-				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
-				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
-				+ "  <modelVersion>4.0.0</modelVersion>\n"
-				+ "  <groupId>org.test</groupId>\n"
-				+ "  <artifactId>test</artifactId>\n"
-				+ "  <version>0.0.1-SNAPSHOT</version>\n"
-				+ "  <dependencies>\n"
-				+ "    <dependency>\n"
-				+ "      <artifactId>maven-surefire-plu|</artifactId>\n"
-				+ "    </dependency>\n"
-				+ "  </dependencies>\n"
-				+ "</project>";
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <groupId>org.test</groupId>
+			  <artifactId>test</artifactId>
+			  <version>0.0.1-SNAPSHOT</version>
+			  <dependencies>
+			    <dependency>
+			      <artifactId>maven-surefire-plu|</artifactId>
+			    </dependency>
+			  </dependencies>
+			</project>""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
 					te(9, 18, 9, 36, //
@@ -200,17 +208,18 @@ public class MavenCompletionParticipantTest {
 
 	@Test
 	public void testInsertionDependencyWithPartiallyTypedInArtifactIdNotWellFormed() throws Exception {
-		String pom = //
-				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
-				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
-				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
-				+ "  <modelVersion>4.0.0</modelVersion>\n"
-				+ "  <groupId>org.test</groupId>\n"
-				+ "  <artifactId>test</artifactId>\n"
-				+ "  <version>0.0.1-SNAPSHOT</version>\n"
-				+ "  <dependencies>\n"
-				+ "    <dependency>\n"
-				+ "      <artifactId>maven-surefire-plu|</artifactId>\n";
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <groupId>org.test</groupId>
+			  <artifactId>test</artifactId>
+			  <version>0.0.1-SNAPSHOT</version>
+			  <dependencies>
+			    <dependency>
+			      <artifactId>maven-surefire-plu|</artifactId>
+			""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 			c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
 					te(9, 18, 9, 36, //
@@ -225,17 +234,17 @@ public class MavenCompletionParticipantTest {
 
 	@Test
 	public void testInsertionDependencyWithPartiallyTypedInArtifactIdNotWellFormedNoEOL() throws Exception {
-		String pom = //
-				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
-				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
-				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
-				+ "  <modelVersion>4.0.0</modelVersion>\n"
-				+ "  <groupId>org.test</groupId>\n"
-				+ "  <artifactId>test</artifactId>\n"
-				+ "  <version>0.0.1-SNAPSHOT</version>\n"
-				+ "  <dependencies>\n"
-				+ "    <dependency>\n"
-				+ "      <artifactId>maven-surefire-plu|</artifactId>";
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <groupId>org.test</groupId>
+			  <artifactId>test</artifactId>
+			  <version>0.0.1-SNAPSHOT</version>
+			  <dependencies>
+			    <dependency>
+			      <artifactId>maven-surefire-plu|</artifactId>""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
 					te(9, 18, 9, 36, //
@@ -250,17 +259,17 @@ public class MavenCompletionParticipantTest {
 
 	@Test
 	public void testInsertionDependencyWithPartiallyTypedInArtifactIdBrokenEnd() throws Exception {
-		String pom = //
-				"<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
-				+ "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\"\n"
-				+ "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
-				+ "  <modelVersion>4.0.0</modelVersion>\n"
-				+ "  <groupId>org.test</groupId>\n"
-				+ "  <artifactId>test</artifactId>\n"
-				+ "  <version>0.0.1-SNAPSHOT</version>\n"
-				+ "  <dependencies>\n"
-				+ "    <dependency>\n"
-				+ "      <artifactId>maven-surefire-plu|";
+		String pom = """
+			<project xmlns="http://maven.apache.org/POM/4.0.0"
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <groupId>org.test</groupId>
+			  <artifactId>test</artifactId>
+			  <version>0.0.1-SNAPSHOT</version>
+			  <dependencies>
+			    <dependency>
+			      <artifactId>maven-surefire-plu|""";
 		testCompletionFor(pom, null, "file:///pom.xml", null, //
 				c("maven-surefire-plugin - org.apache.maven.plugins:maven-surefire-plugin:2.22.2", //
 					te(9, 18, 9, 36, //
