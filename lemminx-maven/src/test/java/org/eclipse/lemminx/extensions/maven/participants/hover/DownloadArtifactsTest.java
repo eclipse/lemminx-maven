@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
@@ -57,7 +58,7 @@ public class DownloadArtifactsTest {
 	}
 
 	@Test
-	@Timeout(15000)
+	@Timeout(value = 60, unit = TimeUnit.SECONDS)
 	public void testDownloadArtifactOnHover()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		languageService.initializeIfNeeded();

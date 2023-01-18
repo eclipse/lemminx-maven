@@ -13,7 +13,7 @@
 	</properties>
 	<dependencies>
 		<dependency>
-			<groupId>org.${myProperty}.${project.version}</groupId>
+			<groupId>org.${myProperty}.test.${project.version}</groupId>
 		</dependency>
 	</dependencies>
 </project>

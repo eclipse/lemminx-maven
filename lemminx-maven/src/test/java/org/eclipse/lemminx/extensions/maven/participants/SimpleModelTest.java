@@ -187,7 +187,7 @@ public class SimpleModelTest {
 		Hover hover = languageService.doHover(document, new Position(15, 20), new SharedSettings());
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("$")));
 
- 		hover = languageService.doHover(document, new Position(15, 35), new SharedSettings());
+ 		hover = languageService.doHover(document, new Position(15, 40), new SharedSettings());
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("0.0.1-SNAPSHOT")));
 
  		hover = languageService.doHover(document, new Position(15, 13), new SharedSettings());
