@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.maven.model.Dependency;
@@ -37,6 +39,8 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Range;
 
 public class ParticipantUtils {
+	private static final Logger LOGGER = Logger.getLogger(ParticipantUtils.class.getName());
+
 	private static Properties environmentProperties = null;
 	
 	public static Properties getEnvironmentProperties() {
@@ -95,6 +99,9 @@ public class ParticipantUtils {
 			}
 		} catch (ArtifactResolutionException | ComponentLookupException e) {
 			// can happen
+			LOGGER.log(Level.FINEST, e.getMessage(), e);
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return null;
 	}
@@ -164,6 +171,7 @@ public class ParticipantUtils {
 		int start = 0;
 		while((index = value.indexOf("${", start)) != -1 && 
 				(closeIndex = value.indexOf("}", start)) != -1) {
+			sb.append(value.substring(start, index));
 			String propertyName = value.substring(index + 2, closeIndex);
 			String propertyValue = properties.get(propertyName);
 			if (propertyValue != null) {

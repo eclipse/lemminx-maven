@@ -28,18 +28,15 @@ public class DOMUtils {
 		if (localName == null || request == null) {
 			return null;
 		}
-		DOMNode pluginNode = request.getNode();
-		try {
-			while (!localName.equals(pluginNode.getLocalName())) {
-				pluginNode = pluginNode.getParentNode();
-			}
-		} catch (NullPointerException e) {
-			return null;
-		}
 
-		if (localName.equals(pluginNode.getLocalName())) {
-			return pluginNode;
+		DOMNode pluginNode = request.getNode();
+		while (pluginNode != null) {
+			if (localName.equals(pluginNode.getLocalName())) {
+				return pluginNode;
+			}
+			pluginNode = pluginNode.getParentNode();
 		}
+		
 		return null;
 	}
 	
@@ -51,9 +48,9 @@ public class DOMUtils {
 		}
 		while (!nodes.isEmpty()) {
 			DOMNode node = nodes.pop();
-				if (node.getLocalName() != null && node.getLocalName().equals(localName)) {
-					foundNodes.add(node);
-				}
+			if (node.getLocalName() != null && node.getLocalName().equals(localName)) {
+				foundNodes.add(node);
+			}
 			if (node.hasChildNodes()) {
 				for (DOMNode childNode : node.getChildren()) {
 					nodes.push(childNode);
@@ -108,19 +105,19 @@ public class DOMUtils {
 		if (parentName == null || request == null) {
 			return null;
 		}
+		
 		DOMNode parentNode = request.getNode().getParentNode();
-		DOMNode ancestorNode = parentNode;
-		try {
-			while (!parentName.equals(parentNode.getLocalName())) {
-				ancestorNode = parentNode;
-				parentNode = parentNode.getParentNode();
-			}
-		} catch (NullPointerException e) {
+		if (parentNode == null) {
 			return null;
 		}
-
-		if (parentName.equals(parentNode.getLocalName())) {
-			return ancestorNode;
+		
+		DOMNode ancestorNode = parentNode;
+		while(parentNode != null) {
+			if (parentName.equals(parentNode.getLocalName())) {
+				return ancestorNode;
+			}
+			ancestorNode = parentNode;
+			parentNode = parentNode.getParentNode();
 		}
 		return null;
 	}
