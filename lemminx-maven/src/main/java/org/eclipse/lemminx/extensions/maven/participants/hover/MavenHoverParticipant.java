@@ -12,17 +12,13 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.io.File;
-import java.net.URI;
 import java.text.MessageFormat;
 import java.util.Comparator;
 import java.util.List;
@@ -35,7 +31,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.maven.Maven;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
@@ -182,7 +177,6 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 
 		// make sure model is resolved and up-to-date
-		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
 		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
 		if (element == null || (!DEPENDENCY_ELT.equals(element.getLocalName()) && !PLUGIN_ELT.equals(element.getLocalName()))) {
 			return null;
@@ -193,7 +187,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request);
 
 		// Search for DEPENDENCY/PLUGIN through the parents pom's
-		File parentPomFile = getParentPomFile(p, currentFolder, request.getXMLDocument());
+		File parentPomFile = getParentPomFile(p);
 
 		while (parentPomFile != null && parentPomFile.exists()) {
 			DOMDocument parentXmlDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
@@ -215,7 +209,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			}
 				
 			// Else proceed with the next parent
-			parentPomFile = getParentPomFile(parentMavenProject, currentFolder, parentXmlDocument);
+			parentPomFile = getParentPomFile(parentMavenProject);
 		}
 		return null;
 	}
@@ -232,32 +226,11 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}).filter(DOMElement.class::isInstance).map(DOMElement.class::cast).collect(Collectors.toList());
 	}
 
-	private File getParentPomFile (MavenProject project, File currentFolder, DOMDocument document) {
-		Optional<DOMElement> projectElement = DOMUtils.findChildElement(document, PROJECT_ELT);
-		Optional<DOMElement> parentElement = projectElement.isPresent() ? DOMUtils.findChildElement(projectElement.get(), PARENT_ELT) : Optional.empty();
-		Optional<String> relativePath = parentElement.isPresent() ? DOMUtils.findChildElementText(parentElement.get(), RELATIVE_PATH_ELT) : Optional.empty();
-		if (relativePath.isPresent()) {
-			File relativeFile = new File(currentFolder, relativePath.get());
-			if (relativeFile.isDirectory()) {
-				relativeFile = new File(relativeFile, Maven.POMv4);
-			}
-			if (relativeFile.isFile()) {
-				return relativeFile;
-			}
-		} else {
-			File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
-			if (relativeFile.isFile()) {
-				return relativeFile;
-			} else {
-				// those next lines may actually be more generic and suit parent definition in any case
-				if (project != null && project.getParentFile() != null) {
-					return project.getParentFile();
-				}
-			}
-		}
-		return null;
+	private File getParentPomFile (MavenProject project) {
+	    return Optional.ofNullable(project)
+	        .map(MavenProject::getParentFile)
+	        .orElse(null);
 	}
-	
 	
 	private static String createVersionMessage(boolean supportsMarkdown, String version, InputLocation location) {
 		String sourceModelId = null;

@@ -102,6 +102,21 @@ class ManagedVersionHoverTest {
 		assertFalse(value.contains("The artifact is managed in"));
 	}
 	
+    @Test
+    @Timeout(90000)
+    void testManagedVersionHoverInDependencyGrandchild() throws IOException, URISyntaxException {
+        DOMDocument document = createDOMDocument("/hierarchy2/child/grandchild/pom.xml", languageService);
+        Hover hover = languageService.doHover(document, new Position(11, 28), createSharedSettings());
+        String value = hover.getContents().getRight().getValue();
+        System.out.println("testManagedVersionHoverInDependencyGrandchild: [" + value + "]");
+        assertNotNull(value);
+        assertTrue(value.contains("The managed version is"));
+        assertTrue(value.contains("2.0.6"));
+        assertTrue(value.contains("The artifact is managed in"));
+        assertTrue(value.contains("com.zollum.demo:demo:0.0.1-SNAPSHOT"));
+        assertTrue(value.contains("hierarchy2/pom.xml"));
+    }
+	
 	// Enable MARKDOWN format
 	private static SharedSettings createSharedSettings() {
 		HoverCapabilities hoverCapabilities = new HoverCapabilities();
