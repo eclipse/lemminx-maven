@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2022 Red Hat Inc. and others.
+ * Copyright (c) 2020-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -20,7 +20,6 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.io.File;
 import java.text.MessageFormat;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,7 +30,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
 import org.apache.maven.model.InputSource;
@@ -111,7 +109,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 		
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
-		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, request);
+		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, tag);
 
 		return switch (parent.getLocalName()) {
 		case GROUP_ID_ELT, ARTIFACT_ID_ELT, VERSION_ELT -> {
@@ -184,7 +182,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		
 		boolean isPlugin = PLUGIN_ELT.equals(element.getLocalName());
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
-		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request);
+		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
 
 		// Search for DEPENDENCY/PLUGIN through the parents pom's
 		File parentPomFile = getParentPomFile(p);
@@ -302,50 +300,45 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
-		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, request);
-		boolean wellDefined = ParticipantUtils.isWellDefinedDependency(artifactToSearch);
+		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
+		boolean wellDefined = ParticipantUtils.isWellDefinedDependency(dependency);
+		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
+		dependency = ParticipantUtils.resolveDependency(p, dependency, element, plugin);
+
 		try {
 			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
-			Optional<String> localDescription = plugin.getLocalRepositorySearcher()
-					.getLocalArtifactsLastVersion().stream()
-					.filter(gav -> (artifactToSearch.getGroupId() == null
-							|| artifactToSearch.getGroupId().equals(gav.getGroupId()))
-							&& (artifactToSearch.getArtifactId() == null
-									|| artifactToSearch.getArtifactId().equals(gav.getArtifactId()))
-							&& (artifactToSearch.getVersion() == null
-									|| artifactToSearch.getVersion().equals(gav.getVersion())))
-					.sorted(Comparator.comparing((Artifact artifact) -> new DefaultArtifactVersion(artifact.getVersion())).reversed())
-					.findFirst().map(plugin.getLocalRepositorySearcher()::findLocalFile).map(file -> 
-							builder.buildRawModel(file, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, true).get())
-					.map(model -> {
-						UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
-								: UnaryOperator.identity();
-						String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
-						String message = "";
+			// Find in local repository
+			File localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
+			if (localArtifactLocation != null && localArtifactLocation.isFile()) {
+				Model model = builder.buildRawModel(localArtifactLocation, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, true).get();
+				if (model != null) {
+					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
+							: UnaryOperator.identity();
+					String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
+					String message = "";
 
-						if (model.getName() != null) {
-							message += toBold.apply(model.getName());
-						}
+					if (model.getName() != null) {
+						message += toBold.apply(model.getName());
+					}
 
-						if (model.getDescription() != null) {
-							message += lineBreak + model.getDescription();
-						}
+					if (model.getDescription() != null) {
+						message += lineBreak + model.getDescription();
+					}
 
-						if (!wellDefined) {
-							String managedVersion = getManagedVersionText(request);
-							if (managedVersion == null) {
-								managedVersion = getActualVersionText(supportsMarkdown, model);
-							}
-							if (managedVersion != null) {
-								message += lineBreak + managedVersion;
-							}
+					if (!wellDefined) {
+						String managedVersion = getManagedVersionText(request);
+						if (managedVersion == null) {
+							managedVersion = getActualVersionText(supportsMarkdown, model);
 						}
-						
-						return message;
-					}).map(message -> (message.length() > 2 ? message : null));
-			if (localDescription.isPresent()) {
-				return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT,
-						localDescription.get()));
+						if (managedVersion != null) {
+							message += lineBreak + managedVersion;
+						}
+					}
+					
+					if (message.length() > 2) {
+						return new Hover(new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
+					}
+				}
 			}
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.toString(), e1);
@@ -358,7 +351,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private Hover collectGoal(IPositionRequest request) {
 		DOMNode node = request.getNode();
 		try {
-			PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+			PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(node, plugin);
 			if (pluginDescriptor == null) { // probable incorrect pom file at this moment
 				return null;
 			}

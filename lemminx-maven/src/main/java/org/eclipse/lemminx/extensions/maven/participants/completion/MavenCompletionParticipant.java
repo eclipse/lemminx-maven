@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2022 Red Hat Inc. and others.
+ * Copyright (c) 2019-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -433,6 +433,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		};
 	}
 
+	@SuppressWarnings("deprecation")
 	private Optional<MavenProject> computeFilesystemParent(ICompletionRequest request) {
 		Optional<String> relativePath = null;
 		if (request.getParentElement().getLocalName().equals(PARENT_ELT)) {
@@ -480,7 +481,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private Collection<CompletionItem> collectGoals(ICompletionRequest request) {
 		PluginDescriptor pluginDescriptor;
 		try {
-			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
 			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal,
 					MojoDescriptor::getDescription, request);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
@@ -495,7 +496,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
 		boolean insertArtifactIsEnd = !request.getParentElement().hasEndTag();
 		boolean insertGroupId = strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !hasGroupIdSet;
-		boolean isExclusion = DOMUtils.findClosestParentNode(request, DOMConstants.EXCLUSIONS_ELT) != null;
+		boolean isExclusion = DOMUtils.findClosestParentNode(request.getNode(), DOMConstants.EXCLUSIONS_ELT) != null;
 		boolean insertVersion = !isExclusion && (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy || !DOMUtils
 				.findChildElementText(request.getParentElement().getParentElement(), VERSION_ELT).isPresent());
 		CompletionItem item = new CompletionItem();
@@ -725,6 +726,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		});
 	}
 
+	@SuppressWarnings("deprecation")
 	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
 		DOMDocument doc = request.getXMLDocument();
 		File docFolder = new File(URI.create(doc.getTextDocument().getUri())).getParentFile();
@@ -763,6 +765,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				.collect(Collectors.toList());
 	}
 	
+	@SuppressWarnings("deprecation")
 	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
