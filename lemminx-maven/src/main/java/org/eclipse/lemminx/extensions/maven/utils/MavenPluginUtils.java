@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2022 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -87,12 +87,12 @@ public class MavenPluginUtils {
 	public static Set<Parameter> collectPluginConfigurationParameters(IPositionRequest request,
 			MavenLemminxExtension plugin)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
 		if (pluginDescriptor == null) {
 			return Collections.emptySet();
 		}
 		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
-		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, "execution");
+		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request.getNode(), "execution");
 		if (executionElementDomNode != null) {
 			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
 					.filter(node -> GOALS_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
@@ -108,12 +108,12 @@ public class MavenPluginUtils {
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
 			MavenLemminxExtension plugin)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request, plugin);
+		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
 		if (pluginDescriptor == null) {
 			return Collections.emptySet();
 		}
 		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
-		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request, EXECUTION_ELT);
+		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request.getNode(), EXECUTION_ELT);
 		if (executionElementDomNode != null) {
 			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
 					.filter(node -> GOALS_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
@@ -137,15 +137,15 @@ public class MavenPluginUtils {
 		return builder.build();
 	}
 
-	public static PluginDescriptor getContainingPluginDescriptor(IPositionRequest request,
+	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node,
 			MavenLemminxExtension lemminxMavenPlugin)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		MavenProject project = lemminxMavenPlugin.getProjectCache()
-				.getLastSuccessfulMavenProject(request.getXMLDocument());
+				.getLastSuccessfulMavenProject(node.getOwnerDocument());
 		if (project == null) {
 			return null;
 		}
-		DOMNode pluginNode = DOMUtils.findClosestParentNode(request, PLUGIN_ELT);
+		DOMNode pluginNode = DOMUtils.findClosestParentNode(node, PLUGIN_ELT);
 		if (pluginNode == null) {
 			return null;
 		}
@@ -162,15 +162,15 @@ public class MavenPluginUtils {
 		Plugin plugin = findPluginInProject(project, pluginKey, artifactId);
 
 		if (plugin == null) {
-			DOMNode profileNode = DOMUtils.findClosestParentNode(request, "profile");
+			DOMNode profileNode = DOMUtils.findClosestParentNode(node, "profile");
 			if (profileNode != null) {
 				project = profileNode.getChildren().stream() //
 						.filter(DOMElement.class::isInstance) //
 						.map(DOMElement.class::cast) //
-						.filter(node -> "id".equals(node.getLocalName())) //
-						.map(node -> node.getChild(0).getTextContent())
+						.filter(n -> "id".equals(n.getLocalName())) //
+						.map(n -> n.getChild(0).getTextContent())
 						.filter(Objects::nonNull)
-						.map(profileId -> lemminxMavenPlugin.getProjectCache().getSnapshotProject(request.getXMLDocument(), profileId)) //
+						.map(profileId -> lemminxMavenPlugin.getProjectCache().getSnapshotProject(node.getOwnerDocument(), profileId)) //
 						.filter(Objects::nonNull)
 						.findFirst().orElse(null);
 				if (project != null) {
@@ -225,5 +225,4 @@ public class MavenPluginUtils {
 		}
 		return plugin.orElse(null);
 	}
-
 }

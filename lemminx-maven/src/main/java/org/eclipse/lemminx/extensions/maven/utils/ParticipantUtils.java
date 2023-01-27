@@ -1,3 +1,15 @@
+/*******************************************************************************
+ * Copyright (c) 2022, 2023 Red Hat Inc. and others.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Victor Rubezhny (Red Hat Inc.) - initial implementation
+ *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
@@ -20,6 +32,10 @@ import java.util.logging.Logger;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.plugin.InvalidPluginDescriptorException;
+import org.apache.maven.plugin.PluginDescriptorParsingException;
+import org.apache.maven.plugin.PluginResolutionException;
+import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
@@ -75,6 +91,46 @@ public class ParticipantUtils {
 			return element;
 		}
 		return null;
+	}
+	
+	public static Dependency resolveDependency (MavenProject project, Dependency dependency, DOMElement element,
+			MavenLemminxExtension plugin) {
+		if (dependency == null || element == null) {
+			return null;
+		}
+
+		if (isWellDefinedDependency(dependency)) {
+			return dependency;
+		}
+
+		if (isPlugin(element)) {
+			try {
+				PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(element, plugin);
+				if (pluginDescriptor != null) {
+					dependency.setGroupId(pluginDescriptor.getGroupId());
+					dependency.setArtifactId(pluginDescriptor.getArtifactId());
+					dependency.setVersion(pluginDescriptor.getVersion());
+				}					
+			} catch (PluginResolutionException | PluginDescriptorParsingException
+					| InvalidPluginDescriptorException e) {
+				// Ignore
+			}
+		} else if (isDependency(element)) {
+			if (dependency.getGroupId() == null || dependency.getVersion() == null) {
+				if (project != null) {
+					final Dependency originalDependency = dependency;
+					dependency = project.getDependencies().stream()
+							.filter(dep -> (originalDependency.getGroupId() == null
+									|| originalDependency.getGroupId().equals(dep.getGroupId())
+											&& (originalDependency.getArtifactId() == null
+													|| originalDependency.getArtifactId().equals(dep.getArtifactId()))
+											&& (originalDependency.getVersion() == null
+													|| originalDependency.getVersion().equals(dep.getVersion()))))
+							.findFirst().orElse(dependency);
+				}
+			}
+		}
+		return dependency;
 	}
 	
 	public static Artifact findWorkspaceArtifact(MavenLemminxExtension plugin, IPositionRequest request, Dependency artifactToSearch) {
@@ -143,8 +199,8 @@ public class ParticipantUtils {
 					(element.getParentElement() != null && PARENT_ELT.equals(element.getParentElement().getLocalName()));
 	}
 
-	public static Dependency getArtifactToSearch(MavenProject pproject, IPositionRequest request) {
-		Dependency artifactToSearch = MavenParseUtils.parseArtifact(request.getNode());
+	public static Dependency getArtifactToSearch(MavenProject pproject, DOMNode node) {
+		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		if (artifactToSearch != null) {
 			if (artifactToSearch.getGroupId() != null && artifactToSearch.getGroupId().contains("$")) {
 				artifactToSearch = artifactToSearch.clone();

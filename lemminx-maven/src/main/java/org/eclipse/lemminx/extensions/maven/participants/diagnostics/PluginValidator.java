@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2020 Red Hat Inc. and others.
+ * Copyright (c) 2019-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -42,13 +42,13 @@ class PluginValidator {
 
 	public Optional<List<Diagnostic>> validatePluginResolution(DiagnosticRequest diagnosticRequest) {
 		try {
-			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
+			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest.getNode(), plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.WARNING, "Could not resolve plugin description", e);
 
 			// Add artifactId diagnostic
 			String errorMessage = e.getMessage();
-			DOMNode pluginNode = DOMUtils.findClosestParentNode(diagnosticRequest, "plugin");
+			DOMNode pluginNode = DOMUtils.findClosestParentNode(diagnosticRequest.getNode(), "plugin");
 			Optional<DOMNode> artifactNode = pluginNode.getChildren().stream().filter(node -> !node.isComment())
 					.filter(node -> node.getLocalName().equals("artifactId")).findAny();
 			List<Diagnostic> diagnostics = new ArrayList<>();
@@ -113,7 +113,7 @@ class PluginValidator {
 		if (node.isElement() && node.hasChildNodes()) {
 			PluginDescriptor pluginDescriptor;
 			try {
-				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest, plugin);
+				pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest.getNode(), plugin);
 				if (pluginDescriptor != null) {
 					internalValidateGoal(diagnosticRequest, pluginDescriptor).ifPresent(diagnostics::add);;
 				}

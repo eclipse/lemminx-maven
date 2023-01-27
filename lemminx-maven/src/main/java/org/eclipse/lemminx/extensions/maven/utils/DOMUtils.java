@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -24,17 +24,17 @@ import org.w3c.dom.Text;
 
 public class DOMUtils {
 
-	public static DOMNode findClosestParentNode(final IPositionRequest request, final String localName) {
-		if (localName == null || request == null) {
+	public static DOMNode findClosestParentNode(final DOMNode node, final String localName) {
+		if (localName == null || node == null) {
 			return null;
 		}
 
-		DOMNode pluginNode = request.getNode();
-		while (pluginNode != null) {
-			if (localName.equals(pluginNode.getLocalName())) {
-				return pluginNode;
+		DOMNode parentNode = node;
+		while (parentNode != null) {
+			if (localName.equals(parentNode.getLocalName())) {
+				return parentNode;
 			}
-			pluginNode = pluginNode.getParentNode();
+			parentNode = parentNode.getParentNode();
 		}
 		
 		return null;
