@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Red Hat Inc. and others.
+ * Copyright (c) 2022, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -24,6 +25,7 @@ import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverCapabilities;
+import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.AfterEach;
@@ -117,6 +119,34 @@ class ManagedVersionHoverTest {
         assertTrue(value.contains("hierarchy2/pom.xml"));
     }
 	
+    @Test
+    @Timeout(90000)
+    void testManagedVersionHoverForBomProvidedDependency() throws IOException, URISyntaxException {
+        System.out.println(">>> testManagedVersionHoverForBomProvidedDependency");
+        DOMDocument document = createDOMDocument("/pom-bom-defined-dependency-version.xml", languageService);
+        Position position = new Position(25, 20);
+        
+        // Find Definition links
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, position, ()->{});
+		definitions.stream().map(LocationLink::getTargetUri).forEach(u -> System.out.println("Definition Link: " + u));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("jakarta.jakartaee-api-8.0.0.pom")));
+
+        // Find Hover with managed version
+        Hover hover = languageService.doHover(document, position, createSharedSettings());
+        final String value = hover.getContents().getRight().getValue();
+        System.out.println("Hover Text: [" + value + "]");
+        assertNotNull(value);
+        assertTrue(value.contains("The managed version is"));
+        assertTrue(value.contains("8.0.0"));
+        assertTrue(value.contains("The artifact is managed in"));
+        assertTrue(value.contains("jakarta.platform:jakarta.jakartaee-api:8.0.0"));
+        
+        // Compare the links from definition and hover
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
+				.anyMatch(uri -> value.replace('\\', '/').contains(uri.substring("file:/".length()))));
+        System.out.println("<<< testManagedVersionHoverForBomProvidedDependency");
+    }
+
 	// Enable MARKDOWN format
 	private static SharedSettings createSharedSettings() {
 		HoverCapabilities hoverCapabilities = new HoverCapabilities();

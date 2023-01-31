@@ -184,6 +184,11 @@ public class MavenPluginUtils {
 
 		PluginDescriptor pluginDescriptor = null;
 		try {
+			// Fix plugin version in case its value is 'null', to initiate search for an actual version
+			if (plugin.getVersion() == null) {
+				plugin.setVersion("0.0.1-SNAPSHOT");
+			}
+			
 			pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
 				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
 				lemminxMavenPlugin.getMavenSession().getRepositorySession());
