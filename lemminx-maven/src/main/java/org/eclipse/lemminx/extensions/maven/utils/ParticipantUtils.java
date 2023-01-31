@@ -114,6 +114,8 @@ public class ParticipantUtils {
 			} catch (PluginResolutionException | PluginDescriptorParsingException
 					| InvalidPluginDescriptorException e) {
 				// Ignore
+			} catch (Exception e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
 		} else if (isDependency(element)) {
 			if (dependency.getGroupId() == null || dependency.getVersion() == null) {

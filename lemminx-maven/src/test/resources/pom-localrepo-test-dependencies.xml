@@ -31,5 +31,29 @@
 			<artifactId>target-platform-configuration</artifactId>
 			<version>3.0.0</version>
 		</dependency>
+		<dependency>
+	        <groupId>jakarta.platform</groupId>
+	        <artifactId>jakarta.jakartaee-api</artifactId>
+	        <version>8.0.0</version>
+	        <scope>provided</scope>
+		</dependency>
+ 		<dependency>
+			 <!-- 
+			 	Do not remove '.' (dot)-character in <groupId/> element - 
+			 	this hack allows to make maven to download and save to local repository
+			 	two different versions of the same artifact 
+			 -->
+	        <groupId>jakarta.platform.</groupId>
+	        <artifactId>jakarta.jakartaee-api</artifactId>
+	        <version>10.0.0</version>
+	        <scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>fish.payara.api</groupId>
+			<artifactId>payara-bom</artifactId>
+			<version>5.2022.3</version>
+			<type>pom</type>
+			<scope>import</scope>
+		</dependency>
 	</dependencies>
 </project>
