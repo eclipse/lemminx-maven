@@ -201,8 +201,9 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			for (DOMElement e : elements) {
 				Optional<String> version = DOMUtils.findChildElementText(e, VERSION_ELT);
 				if (version.isPresent()) {
+					Dependency d = ParticipantUtils.getArtifactToSearch(parentMavenProject, e);
 					String sourceModelId = parentMavenProject.getGroupId() + ':' + parentMavenProject.getArtifactId() + ':' + parentMavenProject.getVersion();
-					return createVersionMessage(request.canSupportMarkupKind(MarkupKind.MARKDOWN), version.get(), sourceModelId, parentPomFile.toURI().toString());
+					return createVersionMessage(request.canSupportMarkupKind(MarkupKind.MARKDOWN), d.getVersion(), sourceModelId, parentPomFile.toURI().toString());
 				}
 			}
 				
