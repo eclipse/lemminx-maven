@@ -62,14 +62,7 @@ Then, just start the LemMinX Language Server as documented on the LemMinX docume
 
 ### Eclipse IDE
 
-This extension is already used from the "Generic Text Editor" in Eclipse 4.16+ when m2e is installed.
-If you don't have m2e installed, you can get it with the latest snapshot LemMinX-Maven below.
-
-#### m2e download site with LemMinX-Maven included
-
-```
-https://download.eclipse.org/technology/m2e/snapshots/1.16.1/latest/
-```
+This extension is already used from the "Generic Text Editor" in Eclipse 4.16+ when [Eclipse m2e is installed](https://github.com/eclipse-m2e/m2e-core/blob/master/README.md#-installation).
 
 ### VSCode
 
