@@ -131,14 +131,22 @@
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.aether</groupId>
-			<artifactId>aether-connector-basic</artifactId>
-			<version>1.1.0</version>
-		</dependency>
-		<dependency>
 			<groupId>io.takari.aether</groupId>
 			<artifactId>aether-connector-okhttp</artifactId>
 			<version>0.17.8</version>
+                        <!-- Parts of these got merged into maven-resolver-api and would cause conflicts if on the classpath
+                             See https://github.com/eclipse/lemminx-maven/issues/360
+                        -->
+			<exclusions>
+				<exclusion>
+					<groupId>org.eclipse.aether</groupId>
+					<artifactId>aether-api</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.eclipse.aether</groupId>
+					<artifactId>aether-util</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
