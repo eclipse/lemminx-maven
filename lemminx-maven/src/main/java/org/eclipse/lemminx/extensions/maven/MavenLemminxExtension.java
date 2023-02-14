@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2022 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -64,6 +64,7 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenNoGrammarConstraintsCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinitionParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
@@ -73,6 +74,7 @@ import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySear
 import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
+import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
 import org.eclipse.lemminx.services.extensions.completion.ICompletionParticipant;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext;
@@ -99,6 +101,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private IHoverParticipant hoverParticipant;
 	private MavenDefinitionParticipant definitionParticipant;
 	private MavenWorkspaceService workspaceServiceParticipant;
+	private List<ICodeActionParticipant> codeActionParticipants = new ArrayList<>();
 
 	private MavenProjectCache cache;
 	private RemoteCentralRepositorySearcher centralSearcher;
@@ -157,6 +160,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			registry.registerHoverParticipant(hoverParticipant);
 			definitionParticipant = new MavenDefinitionParticipant(this);
 			registry.registerDefinitionParticipant(definitionParticipant);
+			registerCodeActionParticipants(registry);
 		} catch (Exception ex) {
 			LOGGER.log(Level.SEVERE, ex.getCause().toString(), ex);
 		}
@@ -339,6 +343,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 	@Override
 	public void stop(XMLExtensionsRegistry registry) {
+		unregisterCodeActionParticipants(registry);
 		registry.unregisterCompletionParticipant(completionParticipant);
 		this.completionParticipant = null;
 		registry.unregisterDiagnosticsParticipant(diagnosticParticipant);
@@ -466,5 +471,25 @@ public class MavenLemminxExtension implements IXMLExtension {
 		});
 
 		return projectsToAdd;
+	}
+	
+	private void registerCodeActionParticipants(XMLExtensionsRegistry registry) {
+		if (codeActionParticipants.isEmpty()) {
+			synchronized (codeActionParticipants) {
+				if (!codeActionParticipants.isEmpty()) {
+					return;
+				}
+				codeActionParticipants.add(new MavenNoGrammarConstraintsCodeAction());
+				
+				codeActionParticipants.stream().forEach(registry::registerCodeActionParticipant);
+			}
+		}
+	}
+	
+	private void unregisterCodeActionParticipants(XMLExtensionsRegistry registry) {
+		synchronized (codeActionParticipants) {
+			codeActionParticipants.stream().forEach(registry::unregisterCodeActionParticipant);
+			codeActionParticipants.clear();
+		}
 	}
 }

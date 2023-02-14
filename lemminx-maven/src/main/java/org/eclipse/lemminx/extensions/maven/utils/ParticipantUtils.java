@@ -52,6 +52,7 @@ import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
+import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Range;
 
 public class ParticipantUtils {
@@ -311,4 +312,21 @@ public class ParticipantUtils {
             Validate.notBlank( str, "Argument can neither be null, empty nor blank" );
         }
     }
+	
+	/**
+	 * Matches the provided Diagnostic with the specified code.
+	 * 
+	 * @param diagnostic 
+	 * @param code
+	 * @return Returns true in case the code matches the Diagnostics code (even if both 
+	 * 			values are null),, otherwise returns false
+	 */
+	public static boolean match(Diagnostic diagnostic, String code) {
+		if (diagnostic == null || diagnostic.getCode() == null || !diagnostic.getCode().isLeft()) {
+			return false;
+		}
+		
+		return code == null ? diagnostic.getCode().getLeft() == null :
+				code.equals(diagnostic.getCode().getLeft());
+	}
 }
