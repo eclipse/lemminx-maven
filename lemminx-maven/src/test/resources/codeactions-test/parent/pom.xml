@@ -6,4 +6,18 @@
   <artifactId>just-a-parent</artifactId>
   <version>1.0.0</version>
   <packaging>pom</packaging>
+
+  <properties>
+    <commons-lang3-version>3.12.0</commons-lang3-version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3-version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>
