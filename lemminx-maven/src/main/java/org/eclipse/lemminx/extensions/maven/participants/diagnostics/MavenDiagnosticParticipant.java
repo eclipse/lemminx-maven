@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2021 Red Hat Inc. and others.
+ * Copyright (c) 2019-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -10,6 +10,7 @@ package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -61,6 +62,16 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		DOMElement documentElement = xmlDocument.getDocumentElement();
 		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
+		// Validate project element
+		if (PROJECT_ELT.equals(documentElement.getNodeName())) {
+			ProjectValidator projectValidator = new ProjectValidator(plugin);
+			projectValidator.validateProject(new DiagnosticRequest(documentElement, xmlDocument))
+				.ifPresent(diagnosticList ->{
+						diagnostics.addAll(diagnosticList.stream()
+							.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
+					});
+		}
+		
 		Deque<DOMNode> nodes = new ArrayDeque<>();
 		for (DOMNode node : documentElement.getChildren()) {
 			nodes.push(node);

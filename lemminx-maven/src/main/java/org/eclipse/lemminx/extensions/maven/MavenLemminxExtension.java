@@ -64,6 +64,7 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenIdPartRemovalCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenNoGrammarConstraintsCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.completion.MavenCompletionParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinitionParticipant;
@@ -480,7 +481,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 					return;
 				}
 				codeActionParticipants.add(new MavenNoGrammarConstraintsCodeAction());
-				
+				codeActionParticipants.add(new MavenIdPartRemovalCodeAction());
+
 				codeActionParticipants.stream().forEach(registry::registerCodeActionParticipant);
 			}
 		}
