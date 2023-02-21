@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -79,8 +80,8 @@ public class DOMUtils {
 				.filter(DOMElement.class::isInstance).map(DOMElement.class::cast).findAny();
 	}
 
-	public static Optional<String> findChildElementText(DOMNode pluginNode, final String elementName) {
-		return findChildElement(pluginNode, elementName) //
+	public static Optional<String> findChildElementText(DOMNode rootNode, final String elementName) {
+		return findChildElement(rootNode, elementName) //
 				.stream() //
 				.flatMap(element -> element.getChildren().stream()) //
 				.filter(Text.class::isInstance)
@@ -88,7 +89,15 @@ public class DOMUtils {
 				.map(Text::getData)
 				.findFirst();
 	}
-
+	
+	public static Optional<String> findElementText(DOMElement element) {
+		return element.getChildren().stream() //
+				.filter(Text.class::isInstance)
+				.map(Text.class::cast)
+				.map(Text::getData)
+				.findFirst();
+	}
+	
 	public static String getOneLevelIndent(ICompletionRequest request) throws BadLocationException {
 		String oneLevelIndent = request.getLineIndentInfo().getWhitespacesIndent();
 		int nodeDepth = 0;
