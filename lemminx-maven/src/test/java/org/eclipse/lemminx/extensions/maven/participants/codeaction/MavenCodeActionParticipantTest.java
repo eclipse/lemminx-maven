@@ -8,17 +8,21 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.codeaction;
 
-import static org.eclipse.lemminx.XMLAssert.assertDiagnostics;
 import static org.eclipse.lemminx.XMLAssert.ca;
 import static org.eclipse.lemminx.XMLAssert.d;
 import static org.eclipse.lemminx.XMLAssert.teOp;
 import static org.eclipse.lemminx.XMLAssert.testCodeActionsFor;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 
+import java.io.File;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.eclipse.lemminx.XMLAssert.SettingsSaveContext;
@@ -30,9 +34,11 @@ import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationRootSet
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
+import org.eclipse.lemminx.utils.StringUtils;
 import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.Diagnostic;
-
+import org.eclipse.lsp4j.DiagnosticRelatedInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -84,7 +90,69 @@ public class MavenCodeActionParticipantTest {
 		testCodeAction(xmlDocument,true, expectedDiagnostic, expectedCodeAction);
 	}
 	
-//	@TODO: EDITOR_HINT_MANAGED_DEPENDENCY_OVERRIDE (from m2e.ui)
+//	EDITOR_HINT_MANAGED_DEPENDENCY_OVERRIDE (from m2e.ui)
+	@Test
+	public void testCodeActionsForManagedDependencyOverride() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-overriding-of-managed-version.xml", xmlLanguageService);
+
+		String uri = xmlDocument.getDocumentURI();
+		File file = new File(new URI(uri).getPath());
+		File parentFile = new File (file.getParentFile(), "parent/pom.xml");
+	
+		Diagnostic expectedDiagnostic = d(17, 15, 17, 21, 
+				MavenSyntaxErrorCode.OverridingOfManagedDependency,
+				"Overriding managed version 3.12.0 for commons-lang3"
+//				xmlDocument.getDocumentURI(),
+//				DiagnosticSeverity.Warning
+				);
+		// Fake location for managed version 
+		Map<String, String> data = new HashMap<>();
+		data.put("managedVersionLocation", parentFile.toURI().toString());
+		data.put("managedVersionLine",  "19");
+		data.put("managedVersionColumn",  "18");
+		expectedDiagnostic.setData(data);
+		
+		// Test diagnostic and code action for a different version value
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
+				new Command("Open declaration of managed version", "xml.open.uri", 
+						Arrays.asList(parentFile.toURI().toString() + 
+								"#L"  + data.get("managedVersionLine") + "," + data.get("managedVersionColumn") )));;
+		testCodeAction(xmlDocument,false, expectedDiagnostic, expectedCodeAction_1, expectedCodeAction_2, expectedCodeAction_3);
+	}
+
+	@Test
+	public void testCodeActionsForManagedDependencyDuplicate() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-duplication-of-managed-version.xml", xmlLanguageService);
+
+		String uri = xmlDocument.getDocumentURI();
+		File file = new File(new URI(uri).getPath());
+		File parentFile = new File (file.getParentFile(), "parent/pom.xml");
+
+		Diagnostic expectedDiagnostic = d(17, 15, 17, 21, 
+				MavenSyntaxErrorCode.OverridingOfManagedDependency,
+				"Duplicating managed version 3.12.0 for commons-lang3");
+		
+		// Fake location for managed version 
+		Map<String, String> data = new HashMap<>();
+		data.put("managedVersionLocation", parentFile.toURI().toString());
+		data.put("managedVersionLine",  "19");
+		data.put("managedVersionColumn",  "18");
+		expectedDiagnostic.setData(data);
+
+		// Test diagnostic and code action for the same version value
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
+				new Command("Open declaration of managed version", "xml.open.uri", 
+						Arrays.asList(parentFile.toURI().toString() + 
+								"#L"  + data.get("managedVersionLine") + "," + data.get("managedVersionColumn") )));;
+		
+		testCodeAction(xmlDocument,true, expectedDiagnostic, expectedCodeAction_1, expectedCodeAction_2, expectedCodeAction_3);
+	}
+	
+	
 //	@TODO: EDITOR_HINT_MANAGED_PLUGIN_OVERRIDE (from m2e.ui)
 //	@TODO: EDITOR_HINT_CONFLICTING_LIFECYCLEMAPPING (from m2e.core)
 //	@TODO: EDITOR_HINT_NOT_COVERED_MOJO_EXECUTION (from m2e.core)
@@ -92,7 +160,7 @@ public class MavenCodeActionParticipantTest {
 //	@TODO: EDITOR_HINT_IMPLICIT_LIFECYCLEMAPPINGEDITOR_HINT_IMPLICIT_LIFECYCLEMAPPING
 	
 	
-	private void testCodeAction(DOMDocument xmlDocument, boolean ignoreNoGrammar, Diagnostic expectedDiagnostic, CodeAction expectedCodeAction) throws BadLocationException {
+	private void testCodeAction(DOMDocument xmlDocument, boolean ignoreNoGrammar, Diagnostic expectedDiagnostic, CodeAction... expectedCodeAction) throws BadLocationException {
 		// Test for expected diagnostics is returned
 		ContentModelSettings settings = createContentModelSettings(ignoreNoGrammar);
 		xmlLanguageService.setDocumentProvider((uri) -> xmlDocument);
@@ -109,10 +177,44 @@ public class MavenCodeActionParticipantTest {
 		assertDiagnostics(actual, Arrays.asList(expectedDiagnostic), true);		
 
 		// Test for expected code action is returned
-		testCodeActionsFor(xmlDocument.getText(), expectedCodeAction.getDiagnostics().get(0), (String) null, "pom.xml", 
+		testCodeActionsFor(xmlDocument.getText(), expectedDiagnostic, (String) null, "pom.xml", 
 				sharedSettings, xmlLanguageService, -1, expectedCodeAction);
 	}
 	
+	public static void assertDiagnostics(List<Diagnostic> actual, List<Diagnostic> expected, boolean filter) {
+		List<Diagnostic> received = actual;
+		final boolean filterMessage;
+		if (expected != null && !expected.isEmpty() && !StringUtils.isEmpty(expected.get(0).getMessage())) {
+			filterMessage = true;
+		} else {
+			filterMessage = false;
+		}
+		if (filter) {
+			received = actual.stream().map(d -> {
+				Diagnostic simpler = new Diagnostic(d.getRange(), "");
+				if (d.getCode() != null && !StringUtils.isEmpty(d.getCode().getLeft())) {
+					simpler.setCode(d.getCode());
+				}
+				if (filterMessage) {
+					simpler.setMessage(d.getMessage());
+				}
+				if (d.getData() != null) {
+					simpler.setData(d.getData());
+				}
+				return simpler;
+			}).collect(Collectors.toList());
+		}
+		// Don't compare message of diagnosticRelatedInformation
+		for (Diagnostic diagnostic : received) {
+			List<DiagnosticRelatedInformation> diagnosticRelatedInformations = diagnostic.getRelatedInformation();
+			if (diagnosticRelatedInformations != null) {
+				for (DiagnosticRelatedInformation diagnosticRelatedInformation : diagnosticRelatedInformations) {
+					diagnosticRelatedInformation.setMessage("");
+				}
+			}
+		}
+		assertIterableEquals(expected, received, "Unexpected diagnostics:\n" + actual);
+	}
 	
 	private static ContentModelSettings  createContentModelSettings(boolean ignoreNoGrammar) {
 		ContentModelSettings settings = new ContentModelSettings();

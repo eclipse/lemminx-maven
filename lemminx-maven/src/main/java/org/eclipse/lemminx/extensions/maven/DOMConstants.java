@@ -29,6 +29,8 @@ public class DOMConstants {
 	public static final String VERSION_ELT = "version";
 	public static final String PLUGINS_ELT = "plugins";
 	public static final String PLUGIN_ELT = "plugin";
+	public static final String PROFILE_ELT = "profile";
+	public static final String PROFILES_ELT = "profiles";
 	public static final String PARENT_ELT = "parent";
 	public static final String SCOPE_ELT = "scope";
 	public static final String PHASE_ELT = "phase";
@@ -40,6 +42,7 @@ public class DOMConstants {
 	public static final String CLASSIFIER_ELT = "classifier";
 	public static final String EXCLUSION_ELT = "exclusion";
 	public static final String EXCLUSIONS_ELT = "exclusions";
+	public static final String ID_ELT = "id";
 	
 	public static final String TARGET_PATH_ELT = "targetPath";
 	public static final String DIRECTORY_ELT = "directory";

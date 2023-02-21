@@ -80,6 +80,11 @@ public class DOMUtils {
 				.filter(DOMElement.class::isInstance).map(DOMElement.class::cast).findAny();
 	}
 
+	public static List<DOMElement> findChildElements(DOMElement parent, String elementName) {
+		return parent.getChildren().stream().filter(node -> elementName.equals(node.getLocalName()))
+				.filter(DOMElement.class::isInstance).map(DOMElement.class::cast).collect(Collectors.toList());
+	}
+
 	public static Optional<String> findChildElementText(DOMNode rootNode, final String elementName) {
 		return findChildElement(rootNode, elementName) //
 				.stream() //
