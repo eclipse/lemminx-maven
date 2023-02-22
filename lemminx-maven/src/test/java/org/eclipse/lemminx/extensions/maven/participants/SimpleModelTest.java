@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2022 Red Hat Inc. and others.
+ * Copyright (c) 2019-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -372,7 +372,6 @@ public class SimpleModelTest {
 	@Test
 	public void testModulesDefinitionInDependency() throws IOException, URISyntaxException {
 		// We need the targetDocument to be placed to MavenProjectCache
-		XMLLanguageService languageService = new XMLLanguageService();
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
 		
@@ -399,7 +398,6 @@ public class SimpleModelTest {
 	@Test
 	public void testModulesDefinitionInParent() throws IOException, URISyntaxException {
 		// We need the targetDocument to be placed to MavenProjectCache
-		XMLLanguageService languageService = new XMLLanguageService();
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
 		
@@ -425,7 +423,6 @@ public class SimpleModelTest {
 
 	@Test
  	public void testModulesHoverInDependency() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		XMLLanguageService languageService = new XMLLanguageService();
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
 		
@@ -444,25 +441,21 @@ public class SimpleModelTest {
 		// Hover over groupID text
 		Position pos = new Position(10, 16);	// <groupId>o|rg.test.modules</groupId>
 		Hover hover = languageService.doHover(document,pos, new SharedSettings());
-		Range firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 		
 		// Hover over artifactID text
 		pos = new Position(11, 19); 	// <artifactId>M|oduleA</artifactId>
 		hover = languageService.doHover(document, pos, new SharedSettings());
-		firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 
 		// Hover over version text
  		pos = new Position(12, 16);		// <version>0|.0.1-SNAPSHOT</version>
 		hover = languageService.doHover(document, pos, new SharedSettings());
-		firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 	}
 
 	@Test
  	public void testModulesHoverInParent() throws IOException, InterruptedException, ExecutionException, URISyntaxException {
-		XMLLanguageService languageService = new XMLLanguageService();
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
 		
@@ -481,19 +474,16 @@ public class SimpleModelTest {
 		// Hover over groupID text
 		Position pos = new Position(9, 14);	// <groupId>o|rg.test.modules</groupId>
 		Hover hover = languageService.doHover(document, pos, new SharedSettings());
-		Range firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 		
 		// Hover over artifactID text
 		pos = new Position(10, 17); 	// <artifactId>M|oduleA</artifactId>
 		hover = languageService.doHover(document, pos, new SharedSettings());
-		firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 
 		// Hover over version text
  		pos = new Position(11, 14);		// <version>0|.0.1-SNAPSHOT</version>
 		hover = languageService.doHover(document, pos, new SharedSettings());
-		firstHoverRange = hover.getRange();
  		assertTrue((((MarkupContent) hover.getContents().getRight()).getValue().contains("ModuleA")));
 	}
 	
