@@ -16,7 +16,8 @@ import org.eclipse.lemminx.services.extensions.diagnostics.IXMLErrorCode;
 public enum MavenSyntaxErrorCode implements IXMLErrorCode {
 	DuplicationOfParentGroupId,
 	DuplicationOfParentVersion,
-	OverridingOfManagedDependency;
+	OverridingOfManagedDependency,
+	OverridingOfManagedPlugin;
 
 	private final String code;
 

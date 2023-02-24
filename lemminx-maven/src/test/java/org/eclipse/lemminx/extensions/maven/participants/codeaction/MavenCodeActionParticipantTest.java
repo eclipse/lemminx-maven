@@ -62,9 +62,9 @@ public class MavenCodeActionParticipantTest {
 		testCodeAction(xmlDocument,false, expectedDiagnostic, expectedCodeAction);
 	}
 	
-//	The following org.eclipse.m2e.core.internal.IMavenConstants hint quickfixes are to be moved to LemMinX-Maven:
-//
-//	EDITOR_HINT_PARENT_VERSION (from m2e.ui)
+	// The following org.eclipse.m2e.core.internal.IMavenConstants hint quickfixes are to be moved to LemMinX-Maven:
+	//
+	// EDITOR_HINT_PARENT_VERSION (from m2e.ui)
 	@Test
 	public void testCodeActionsForParentVersionRemoval() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-duplication-of-version.xml", xmlLanguageService);
@@ -77,7 +77,7 @@ public class MavenCodeActionParticipantTest {
 		testCodeAction(xmlDocument,true, expectedDiagnostic, expectedCodeAction);
 	}
 
-//	EDITOR_HINT_PARENT_GROUP_ID (from m2e.ui)
+	// EDITOR_HINT_PARENT_GROUP_ID (from m2e.ui)
 	@Test
 	public void testCodeActionsForParentGroupIdRemoval() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-duplication-of-groupid.xml", xmlLanguageService);
@@ -90,7 +90,7 @@ public class MavenCodeActionParticipantTest {
 		testCodeAction(xmlDocument,true, expectedDiagnostic, expectedCodeAction);
 	}
 	
-//	EDITOR_HINT_MANAGED_DEPENDENCY_OVERRIDE (from m2e.ui)
+	// EDITOR_HINT_MANAGED_DEPENDENCY_OVERRIDE (from m2e.ui)
 	@Test
 	public void testCodeActionsForManagedDependencyOverride() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-overriding-of-managed-version.xml", xmlLanguageService);
@@ -101,20 +101,20 @@ public class MavenCodeActionParticipantTest {
 	
 		Diagnostic expectedDiagnostic = d(17, 15, 17, 21, 
 				MavenSyntaxErrorCode.OverridingOfManagedDependency,
-				"Overriding managed version 3.12.0 for commons-lang3"
-//				xmlDocument.getDocumentURI(),
-//				DiagnosticSeverity.Warning
-				);
+				"Overriding managed version 3.12.0 for commons-lang3");
+		
 		// Fake location for managed version 
 		Map<String, String> data = new HashMap<>();
 		data.put("managedVersionLocation", parentFile.toURI().toString());
 		data.put("managedVersionLine",  "19");
 		data.put("managedVersionColumn",  "18");
+		data.put("groupId",  "org.apache.commons");
+		data.put("artifactId",  "commons-lang3");
 		expectedDiagnostic.setData(data);
 		
 		// Test diagnostic and code action for a different version value
-		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
-		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
 		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
 				new Command("Open declaration of managed version", "xml.open.uri", 
 						Arrays.asList(parentFile.toURI().toString() + 
@@ -139,11 +139,78 @@ public class MavenCodeActionParticipantTest {
 		data.put("managedVersionLocation", parentFile.toURI().toString());
 		data.put("managedVersionLine",  "19");
 		data.put("managedVersionColumn",  "18");
+		data.put("groupId",  "org.apache.commons");
+		data.put("artifactId",  "commons-lang3");
 		expectedDiagnostic.setData(data);
 
 		// Test diagnostic and code action for the same version value
-		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
-		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 17, 6, 17, 31, ""));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 17, 31, 17, 31, "<!--$NO-MVN-MAN-VER$-->"));
+		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
+				new Command("Open declaration of managed version", "xml.open.uri", 
+						Arrays.asList(parentFile.toURI().toString() + 
+								"#L"  + data.get("managedVersionLine") + "," + data.get("managedVersionColumn") )));;
+		
+		testCodeAction(xmlDocument,true, expectedDiagnostic, expectedCodeAction_1, expectedCodeAction_2, expectedCodeAction_3);
+	}
+	
+	// EDITOR_HINT_MANAGED_PLUGIN_OVERRIDE (from m2e.ui)
+	@Test
+	public void testCodeActionsForManagedPluginOverride() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-overriding-of-managed-plugin.xml", xmlLanguageService);
+
+		String uri = xmlDocument.getDocumentURI();
+		File file = new File(new URI(uri).getPath());
+		File parentFile = new File (file.getParentFile(), "parent/pom.xml");
+	
+		Diagnostic expectedDiagnostic = d(24, 21, 24, 26, 
+				MavenSyntaxErrorCode.OverridingOfManagedPlugin,
+				"Overriding managed version 3.8.1 for maven-compiler-plugin");
+		
+		// Fake location for managed version 
+		Map<String, String> data = new HashMap<>();
+		data.put("managedVersionLocation", parentFile.toURI().toString());
+		data.put("managedVersionLine",  "30");
+		data.put("managedVersionColumn",  "20");
+		data.put("groupId",  "org.apache.maven.plugins");
+		data.put("artifactId",  "maven-compiler-plugin");
+		data.put("profile",  "OverrideProfile");
+		expectedDiagnostic.setData(data);
+		
+		// Test diagnostic and code action for a different version value
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 24, 12, 24, 36, ""));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 24, 36, 24, 36, "<!--$NO-MVN-MAN-VER$-->"));
+		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
+				new Command("Open declaration of managed version", "xml.open.uri", 
+						Arrays.asList(parentFile.toURI().toString() + 
+								"#L"  + data.get("managedVersionLine") + "," + data.get("managedVersionColumn") )));;
+		testCodeAction(xmlDocument,false, expectedDiagnostic, expectedCodeAction_1, expectedCodeAction_2, expectedCodeAction_3);
+	}
+
+	@Test
+	public void testCodeActionsForManagedPluginDuplicate() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/codeactions-test/pom-duplication-of-managed-plugin.xml", xmlLanguageService);
+
+		String uri = xmlDocument.getDocumentURI();
+		File file = new File(new URI(uri).getPath());
+		File parentFile = new File (file.getParentFile(), "parent/pom.xml");
+
+		Diagnostic expectedDiagnostic = d(18, 17, 18, 22, 
+				MavenSyntaxErrorCode.OverridingOfManagedPlugin,
+				"Duplicating managed version 3.8.1 for maven-compiler-plugin");
+		
+		// Fake location for managed version 
+		Map<String, String> data = new HashMap<>();
+		data.put("managedVersionLocation", parentFile.toURI().toString());
+		data.put("managedVersionLine",  "30");
+		data.put("managedVersionColumn",  "20");
+		data.put("groupId",  "org.apache.maven.plugins");
+		data.put("artifactId",  "maven-compiler-plugin");
+		expectedDiagnostic.setData(data);
+
+		// Test diagnostic and code action for the same version value
+		CodeAction expectedCodeAction_1 = ca(expectedDiagnostic, teOp("pom.xml", 18, 8, 18, 32, ""));
+		CodeAction expectedCodeAction_2 = ca(expectedDiagnostic, teOp("pom.xml", 18, 32, 18, 32, "<!--$NO-MVN-MAN-VER$-->"));
 		CodeAction expectedCodeAction_3 = ca(expectedDiagnostic, 
 				new Command("Open declaration of managed version", "xml.open.uri", 
 						Arrays.asList(parentFile.toURI().toString() + 
@@ -153,12 +220,11 @@ public class MavenCodeActionParticipantTest {
 	}
 	
 	
-//	@TODO: EDITOR_HINT_MANAGED_PLUGIN_OVERRIDE (from m2e.ui)
+	
 //	@TODO: EDITOR_HINT_CONFLICTING_LIFECYCLEMAPPING (from m2e.core)
 //	@TODO: EDITOR_HINT_NOT_COVERED_MOJO_EXECUTION (from m2e.core)
 //	@TODO: EDITOR_HINT_MISSING_CONFIGURATOR (from m2e.core)
 //	@TODO: EDITOR_HINT_IMPLICIT_LIFECYCLEMAPPINGEDITOR_HINT_IMPLICIT_LIFECYCLEMAPPING
-	
 	
 	private void testCodeAction(DOMDocument xmlDocument, boolean ignoreNoGrammar, Diagnostic expectedDiagnostic, CodeAction... expectedCodeAction) throws BadLocationException {
 		// Test for expected diagnostics is returned
@@ -181,6 +247,7 @@ public class MavenCodeActionParticipantTest {
 				sharedSettings, xmlLanguageService, -1, expectedCodeAction);
 	}
 	
+	// TODO: Move this change back to XMLAssert
 	public static void assertDiagnostics(List<Diagnostic> actual, List<Diagnostic> expected, boolean filter) {
 		List<Diagnostic> received = actual;
 		final boolean filterMessage;
@@ -204,6 +271,7 @@ public class MavenCodeActionParticipantTest {
 				return simpler;
 			}).collect(Collectors.toList());
 		}
+		
 		// Don't compare message of diagnosticRelatedInformation
 		for (Diagnostic diagnostic : received) {
 			List<DiagnosticRelatedInformation> diagnosticRelatedInformations = diagnostic.getRelatedInformation();
