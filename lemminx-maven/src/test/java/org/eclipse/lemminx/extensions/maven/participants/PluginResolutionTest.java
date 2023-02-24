@@ -28,6 +28,7 @@ import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSetting
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
+import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.Diagnostic;
@@ -66,6 +67,7 @@ public class PluginResolutionTest {
 			}
 		}
 		FileUtils.deleteDirectory(initialMavenPluginApiDirectory);
+		MavenLemminxTestsUtils.prefetchDavenXSD();
 	}
 
 	@AfterEach
