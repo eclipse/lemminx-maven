@@ -70,6 +70,7 @@ public class SimpleModelTest {
 	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
+		MavenLemminxTestsUtils.prefetchDavenXSD();
 	}
 
 	@AfterEach
