@@ -43,6 +43,7 @@ public class DOMConstants {
 	public static final String EXCLUSION_ELT = "exclusion";
 	public static final String EXCLUSIONS_ELT = "exclusions";
 	public static final String ID_ELT = "id";
+	public static final String BUILD_ELT = "build";
 	
 	public static final String TARGET_PATH_ELT = "targetPath";
 	public static final String DIRECTORY_ELT = "directory";
