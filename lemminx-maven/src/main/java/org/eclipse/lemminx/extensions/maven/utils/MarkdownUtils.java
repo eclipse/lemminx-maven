@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2022 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -7,6 +7,11 @@
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
+
+import java.util.Arrays;
+import java.util.Objects;
+
+import org.eclipse.lsp4j.Range;
 
 public class MarkdownUtils {
 	public static final String LINE_BREAK = "\n\n";
@@ -47,12 +52,30 @@ public class MarkdownUtils {
 	}
 	
 	public static String toLink(String uri, String message, String title) {
+		return toLink(uri, null, message, title);
+	}	
+
+	public static String toLink(String uri, Range range, String message, String title) {
 		StringBuilder link = new StringBuilder();
 		
 		// [Message](http://example.com/ "Title")
 		link.append('[').append(message != null ? message : "This link").append(']');   
 		if (uri != null) {
 			link.append('(').append(uri);
+			if(range != null && (range.getStart() != null || range.getEnd() != null)) {
+				// #L34,1-L35,3
+				StringBuilder selection = new StringBuilder();
+				Arrays.asList(range.getStart(), range.getEnd()).stream().filter(Objects::nonNull)				
+					.forEach(r -> {
+						if (!selection.isEmpty()) {
+							selection.append('-');
+						}
+						selection.append('L').append(r.getLine() + 1).append(',').append(r.getCharacter() + 1);
+					});
+				if (!selection.isEmpty()) {
+					link.append('#').append(selection);
+				}
+			}
 			if (title != null && title.trim().length() > 0) {
 				link.append(' ').append('"').append(title.trim()).append('"');
 			}

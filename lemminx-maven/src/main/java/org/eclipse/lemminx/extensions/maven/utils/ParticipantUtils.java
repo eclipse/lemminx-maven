@@ -21,6 +21,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -328,5 +329,14 @@ public class ParticipantUtils {
 		
 		return code == null ? diagnostic.getCode().getLeft() == null :
 				code.equals(diagnostic.getCode().getLeft());
+	}
+	
+	public static URI normalizedUri(String uriString) {
+		try {
+			return URI.create(uriString).normalize();
+		} catch (IllegalArgumentException e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			return null;
+		}
 	}
 }
