@@ -23,6 +23,11 @@
 				<artifactId>someAritfact</artifactId>
 				<version>${myProperty}</version>
 			</plugin>
+			<plugin>
+				<groupId>test</groupId>
+				<artifactId>anotherAritfact</artifactId>
+				<version>${anotherProperty}</version>
+			</plugin>
 		</plugins>
 	</build>
 </project>

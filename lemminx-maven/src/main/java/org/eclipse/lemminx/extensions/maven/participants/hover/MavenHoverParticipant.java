@@ -16,15 +16,17 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.io.File;
+import java.net.URI;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,6 +59,7 @@ import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
 import org.eclipse.lemminx.services.extensions.HoverParticipantAdapter;
 import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
@@ -139,6 +142,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private static final String PomTextHover_managed_version_missing = "The managed version could not be determined.";
 	private static final String PomTextHover_managed_location = "The artifact is managed in {0}";
 	private static final String PomTextHover_managed_location_missing = "The managed definition location could not be determined, probably defined by \"import\" scoped dependencies.";
+	private static final String PomTextHover_property_location = "The property is defined in {0}";
 
 	private static String getActualVersionText(boolean supportsMarkdown, MavenProject project) {
 		if (project == null) {
@@ -427,25 +431,56 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 	private Hover collectProperty(IHoverRequest request, Map.Entry<Range, String> property) {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
+		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 		DOMDocument doc = request.getXMLDocument();
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
 			Map<String, String> allProps = ParticipantUtils.getMavenProjectProperties(project);
-			UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
+			return allProps.entrySet().stream()
+				.filter(prop -> property.getValue().equals(prop.getKey()))
+				.map(prop -> {
+					StringBuilder message = new StringBuilder();
+					message.append(toBold.apply("Property: ")).append(prop.getKey()).append(lineBreak)
+						.append(toBold.apply("Value: ")).append(prop.getValue()).append(lineBreak);
+	
+					// Find location
+					MavenProject parentProject = project, childProj = project;
+					while (parentProject != null && parentProject.getProperties().containsKey(property.getValue())) {
+						childProj = parentProject;
+						parentProject = parentProject.getParent();
+					}
 
-			for (Entry<String, String> prop : allProps.entrySet()) {
-				String mavenProperty = prop.getKey();
-				if (property.getValue().equals(mavenProperty)) {
-					String message = toBold.apply("Property: ") + mavenProperty + lineBreak + toBold.apply("Value: ")
-							+ prop.getValue() + lineBreak;
+					DOMNode propertyDeclaration = null;
+					Predicate<DOMNode> isMavenProperty = (node) -> PROPERTIES_ELT.equals(node.getParentNode().getLocalName());
+
+					URI childProjectUri = ParticipantUtils.normalizedUri(childProj.getFile().toURI().toString());
+					URI thisProjectUri = ParticipantUtils.normalizedUri(doc.getDocumentURI());
+					if (childProjectUri.equals(thisProjectUri)) {
+						// Property is defined in the same file as the request
+						propertyDeclaration = DOMUtils.findNodesByLocalName(doc, property.getValue()).stream()
+								.filter(isMavenProperty).findFirst().orElse(null);
+					} else {
+						DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
+								childProj.getFile().toURI().toString(),
+								request.getNode().getOwnerDocument().getResolverExtensionManager());
+						propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, property.getValue())
+								.stream().filter(isMavenProperty).findFirst().orElse(null);
+					}
+
+					if (propertyDeclaration != null) {
+						String uri = childProj.getFile().toURI().toString();
+						Range targetRange = XMLPositionUtility.createRange(propertyDeclaration);
+						String sourceModelId = childProj.getGroupId() + ':' + childProj.getArtifactId() + ':' + childProj.getVersion();
+						message.append(toBold.apply(MessageFormat.format(PomTextHover_property_location, 
+								supportsMarkdown ? MarkdownUtils.toLink(uri, targetRange, sourceModelId, null) : sourceModelId)));
+					}
 
 					Hover hover = new Hover(
-							new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message));
+							new MarkupContent(supportsMarkdown ? MarkupKind.MARKDOWN : MarkupKind.PLAINTEXT, message.toString()));
 					hover.setRange(property.getKey());
 					return hover;
-				}
-			}
+				}).findAny().orElse(null);
 		}
 		return null;
 	}

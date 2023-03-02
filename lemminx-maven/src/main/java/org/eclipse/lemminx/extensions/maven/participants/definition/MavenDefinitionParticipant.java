@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
@@ -158,16 +157,18 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		DOMNode propertyDeclaration = null;
 		Predicate<DOMNode> isMavenProperty = (node) -> PROPERTIES_ELT.equals(node.getParentNode().getLocalName());
 
-		if (childProj.getFile().toURI().toString().equals(xmlDocument.getDocumentURI())) {
+		URI childProjectUri = ParticipantUtils.normalizedUri(childProj.getFile().toURI().toString());
+		URI thisProjectUri = ParticipantUtils.normalizedUri(xmlDocument.getDocumentURI());
+		if (childProjectUri.equals(thisProjectUri)) {
 			// Property is defined in the same file as the request
 			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getValue()).stream()
-					.filter(isMavenProperty).collect(Collectors.toList()).get(0);
+					.filter(isMavenProperty).findFirst().orElse(null);
 		} else {
 			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 					childProj.getFile().toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
 			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getValue())
-					.stream().filter(isMavenProperty).collect(Collectors.toList()).get(0);
+					.stream().filter(isMavenProperty).findFirst().orElse(null);
 		}
 
 		if (propertyDeclaration == null) {
