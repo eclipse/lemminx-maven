@@ -47,6 +47,8 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.lemminx.commons.BadLocationException;
+import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
@@ -338,5 +340,16 @@ public class ParticipantUtils {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return null;
 		}
+	}
+	
+	public static String getDocumentLineSeparator(DOMDocument document) {
+		String lineDelimiter = System.lineSeparator();
+		try {
+			lineDelimiter = document.lineDelimiter(0);
+		} catch (BadLocationException e) {
+			LOGGER.log(Level.SEVERE, "Unable to get document line delimiter", e);
+		}
+		return (lineDelimiter == null || lineDelimiter.isEmpty()) 
+				? System.lineSeparator() : lineDelimiter;
 	}
 }
