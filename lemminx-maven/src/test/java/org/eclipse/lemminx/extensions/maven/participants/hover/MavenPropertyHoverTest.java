@@ -21,6 +21,7 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
+import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.junit.jupiter.api.AfterEach;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenPropertyHoverTest {
 	private XMLLanguageService languageService;
+
+	private static String NL = MarkdownUtils.getLineBreak(true);
 
 	@BeforeEach
 	public void setUp() throws IOException {
@@ -50,12 +53,9 @@ public class MavenPropertyHoverTest {
 		String text = document.getText();
 		int offset = text.indexOf("${anotherProperty}") + "${".length();
 		text = text.substring(0, offset) + '|' + text.substring(offset);
-		String expectedHoverText = """
-				**Property:** anotherProperty
-
-				**Value:** $
-
-				**The property is defined in [org.test:child:0.0.1-SNAPSHOT](%s#L16,3-L16,39)**""";
+		String expectedHoverText = "**Property:** anotherProperty" + NL //
+				+ "**Value:** $" + NL //
+				+ "**The property is defined in [org.test:child:0.0.1-SNAPSHOT](%s#L16,3-L16,39)**";
 
 		ContentModelSettings settings = new ContentModelSettings();
 		settings.setUseCache(false);
@@ -71,12 +71,9 @@ public class MavenPropertyHoverTest {
 		String text = document.getText();
 		int offset = text.indexOf("${myProperty}") + "${".length();
 		text = text.substring(0, offset) + '|' + text.substring(offset);
-		String expectedHoverText = """
-				**Property:** myProperty
-				
-				**Value:** $
-				
-				**The property is defined in [org.test:test:0.0.1-SNAPSHOT](%s#L12,3-L12,29)**""";
+		String expectedHoverText = "**Property:** myProperty" + NL //
+				+ "**Value:** $" + NL //
+				+ "**The property is defined in [org.test:test:0.0.1-SNAPSHOT](%s#L12,3-L12,29)**";
 		
 		File documentFile = new File(ParticipantUtils.normalizedUri(document.getDocumentURI()).getPath());
 		File expectedFile = new File(documentFile.getParent(), "pom-with-properties-for-definition.xml");

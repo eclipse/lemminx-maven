@@ -13,7 +13,10 @@ import static org.eclipse.lemminx.XMLAssert.d;
 import static org.eclipse.lemminx.XMLAssert.teOp;
 import static org.eclipse.lemminx.XMLAssert.testCodeActionsFor;
 
+import static org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenNoGrammarConstraintsCodeAction.XSI_VALUE_PATTERN;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.getDocumentLineSeparator;
+
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 
 import java.io.File;
@@ -58,7 +61,8 @@ public class MavenCodeActionParticipantTest {
 		Diagnostic expectedDiagnostic = d(1, 1, 1, 8, 
 				XMLSyntaxErrorCode.NoGrammarConstraints,
 				"No grammar constraints (DTD or XML Schema).");
-		CodeAction expectedCodeAction = ca(expectedDiagnostic, teOp("pom.xml", 1, 8, 1, 8, MavenNoGrammarConstraintsCodeAction.XSI_VALUE));
+		CodeAction expectedCodeAction = ca(expectedDiagnostic, teOp("pom.xml", 1, 8, 1, 8, 
+				String.format(XSI_VALUE_PATTERN, getDocumentLineSeparator(xmlDocument))));
 		testCodeAction(xmlDocument,false, expectedDiagnostic, expectedCodeAction);
 	}
 	

@@ -8,6 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.codeaction;
 
+import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.getDocumentLineSeparator;
+
 import java.util.List;
 
 import org.eclipse.lemminx.commons.CodeActionFactory;
@@ -22,12 +24,13 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenNoGrammarConstraintsCodeAction implements ICodeActionParticipant {
-	public static final String XSI_VALUE = " xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n" //$NON-NLS-1$
+	public static final String XSI_VALUE_PATTERN = " xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"%s" //$NON-NLS-1$
 		      + "    xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\""; //$NON-NLS-1$
 
 	@Override
 	public void doCodeAction(ICodeActionRequest request, List<CodeAction> codeActions, CancelChecker cancelChecker) {
 		Diagnostic diagnostic = request.getDiagnostic();
+		
 		if (!ParticipantUtils.match(diagnostic, XMLSyntaxErrorCode.NoGrammarConstraints.getCode())) {
 			return;
 		}
@@ -35,8 +38,9 @@ public class MavenNoGrammarConstraintsCodeAction implements ICodeActionParticipa
 		Range diagnosticRange = diagnostic.getRange();
 
 		// Add Maven XML Schema declaration
-		CodeAction addSchemaAction = CodeActionFactory.insert("Add Maven XML Schema declaration", diagnosticRange.getEnd(), XSI_VALUE,
-				document.getTextDocument(),  diagnostic);
+		String insertText = String.format(XSI_VALUE_PATTERN, getDocumentLineSeparator(document));
+		CodeAction addSchemaAction = CodeActionFactory.insert("Add Maven XML Schema declaration", diagnosticRange.getEnd(), 
+				insertText, document.getTextDocument(),  diagnostic);
 		codeActions.add(addSchemaAction);
 	}
 }

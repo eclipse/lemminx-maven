@@ -57,7 +57,7 @@ class PluginValidator {
 						diagnosticRequest.getXMLDocument());
 				diagnostics.add(artifactDiagnosticReq.createDiagnostic(
 						"Plugin could not be resolved. Ensure the plugin's groupId, artifactId and version are present."
-								+ MarkdownUtils.LINE_BREAK + "Additional information: " + errorMessage,
+								+ MarkdownUtils.getLineBreak(true) + "Additional information: " + errorMessage,
 						DiagnosticSeverity.Warning));
 			});
 			if (!diagnostics.isEmpty()) {

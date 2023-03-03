@@ -14,12 +14,13 @@ import java.util.Objects;
 import org.eclipse.lsp4j.Range;
 
 public class MarkdownUtils {
-	public static final String LINE_BREAK = "\n\n";
+	public static final String NL = System.lineSeparator();
+	private static final String LINE_BREAK = NL + NL; // Needed for markdown
 
 	private MarkdownUtils() {}
 	
 	public static String getLineBreak(boolean supportsMarkdown) {
-		return supportsMarkdown ? MarkdownUtils.LINE_BREAK : "\n";
+		return supportsMarkdown ? MarkdownUtils.LINE_BREAK : NL;
 	}
 	
 	public static String toBold(String message) {
@@ -45,7 +46,7 @@ public class MarkdownUtils {
 			description = description.substring(0, openPre);
 			xmlContent = xmlContent.replaceAll("&lt;", "<");
 			xmlContent = xmlContent.replaceAll("&gt;", ">");
-			xmlContent = "```XML" + "\n" + xmlContent + "\n" + "```";
+			xmlContent = "```XML" + "" + NL + xmlContent + NL + "```";
 			description = description + LINE_BREAK + xmlContent;
 		}
 		return description;
