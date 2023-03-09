@@ -63,6 +63,7 @@ class ManagedVersionHoverTest {
 		assertTrue(value.contains("The artifact is managed in"));
 		assertTrue(value.contains("dependencyManagement:parent:0.0.1-SNAPSHOT"));
 		assertTrue(value.contains("pom-dependencyManagement-parent.xml"));
+		assertTrue(value.contains("The managed scope is: \"compile\""));
 	}
 
 	@Test
@@ -75,6 +76,7 @@ class ManagedVersionHoverTest {
 		assertNotNull(value);
 		assertFalse(value.contains("The managed version is"));
 		assertFalse(value.contains("The artifact is managed in"));
+		assertFalse(value.contains("The managed scope is:"));
 	}
 
 	@Test
@@ -90,6 +92,7 @@ class ManagedVersionHoverTest {
 		assertTrue(value.contains("The artifact is managed in"));
 		assertTrue(value.contains("pluginManagement:parent:0.0.1-SNAPSHOT"));
 		assertTrue(value.contains("pom-pluginManagement-parent.xml"));
+		assertFalse(value.contains("The managed scope is:"));
 	}
 
 	@Test
@@ -102,6 +105,7 @@ class ManagedVersionHoverTest {
 		assertNotNull(value);
 		assertFalse(value.contains("The managed version is"));
 		assertFalse(value.contains("The artifact is managed in"));
+		assertFalse(value.contains("The managed scope is:"));
 	}
 	
     @Test
@@ -117,6 +121,7 @@ class ManagedVersionHoverTest {
         assertTrue(value.contains("The artifact is managed in"));
         assertTrue(value.contains("com.zollum.demo:demo:0.0.1-SNAPSHOT"));
         assertTrue(value.contains("hierarchy2/pom.xml"));
+		assertTrue(value.contains("The managed scope is: \"compile\""));
     }
 	
     @Test
@@ -145,7 +150,9 @@ class ManagedVersionHoverTest {
         // Compare the links from definition and hover
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
 				.anyMatch(uri -> value.replace('\\', '/').contains(uri.substring("file:/".length()))));
-        System.out.println("<<< testManagedVersionHoverForBomProvidedDependency");
+
+		assertTrue(value.contains("The managed scope is: \"provided\""));
+		System.out.println("<<< testManagedVersionHoverForBomProvidedDependency");
     }
 
     @Test
@@ -170,6 +177,7 @@ class ManagedVersionHoverTest {
         assertTrue(value.contains("The artifact is managed in"));
         assertTrue(value.contains("org.eclipse.test:bom-import-parent:1.0.0"));
         assertTrue(value.contains("eclipse-bom-tester/parent/pom.xml"));
+		assertTrue(value.contains("The managed scope is: \"compile\""));
         System.out.println("<<< testManagedVersionHoverForBomProvidedDependencyWithProperty");
     }
 
