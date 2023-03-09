@@ -143,6 +143,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private static final String PomTextHover_managed_location = "The artifact is managed in {0}";
 	private static final String PomTextHover_managed_location_missing = "The managed definition location could not be determined, probably defined by \"import\" scoped dependencies.";
 	private static final String PomTextHover_property_location = "The property is defined in {0}";
+	private static final String PomTextHover_managed_scope = "The managed scope is: \"{0}\"";
 
 	private static String getActualVersionText(boolean supportsMarkdown, MavenProject project) {
 		if (project == null) {
@@ -252,12 +253,9 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private static String createVersionMessage(boolean supportsMarkdown, String version, String sourceModelId, String uri) {
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 
-		String message = null;
-		if (version != null) {
-			message = toBold.apply(MessageFormat.format(PomTextHover_managed_version, version));
-		} else {
-			message = toBold.apply(PomTextHover_managed_version_missing);
-		}
+		String message = (version != null) 
+				? toBold.apply(MessageFormat.format(PomTextHover_managed_version, version)) 
+				: toBold.apply(PomTextHover_managed_version_missing);
 
 		if (sourceModelId != null) {
 			message += ' ' + toBold.apply(MessageFormat.format(PomTextHover_managed_location, 
@@ -338,6 +336,11 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						if (managedVersion != null) {
 							message += lineBreak + managedVersion;
 						}
+					}
+					
+					// Add dependency scope info
+					if (dependency.getScope() != null) {
+						message += lineBreak + toBold.apply(MessageFormat.format(PomTextHover_managed_scope, dependency.getScope()));
 					}
 					
 					if (message.length() > 2) {
