@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.eclipse.lemminx.maven</groupId>
-	<artifactId>parent</artifactId>
+	<artifactId>lemminx-maven-parent</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
