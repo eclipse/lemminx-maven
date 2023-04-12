@@ -22,6 +22,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MISSING_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.OUTPUT_DIRECTORY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PHASE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
@@ -35,6 +36,13 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_OUTPUT_DIRE
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_SOURCE_DIRECTORY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_JAR;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_WAR;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EJB;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EAR;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_POM;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_MAVEN_PLUGIN;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +54,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,17 +67,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.maven.Maven;
+import org.apache.maven.artifact.handler.ArtifactHandler;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
+import org.apache.maven.model.Plugin;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -77,6 +93,7 @@ import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
@@ -106,6 +123,10 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
@@ -117,7 +138,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	private static final String FILE_TYPE = "File";
 	private static final String STRING_TYPE = "File";
 	private static final String DIRECTORY_STRING_LC = "directory";
-	
+
+	// Extension packaging types: components.xml path and element names
+	private static final String COMPONENTS_PATH = "META-INF/plexus/components.xml";
+	private static final String JAR_EXT = ".jar";
+	private static final String COMPONENTS_COMPONENT_ELT = "component";
+	private static final String COMPONENTS_ROLE_ELT = "role";
+	private static final String COMPONENTS_CONFIGURATION_ELT = "configuration";
+	private static final String COMPONENTS_TYPE_ELT = "type";
+
 	static interface GAVInsertionStrategy {
 		/**
 		 * set current element value and add siblings as addition textEdits
@@ -361,6 +390,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		case GOAL_ELT:
 			collectGoals(request).forEach(response::addCompletionItem);
 			break;
+		case PACKAGING_ELT:
+			collectPackaging(request).forEach(response::addCompletionItem);
+			break;
 		default:
 			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin)
 					.stream().filter(p -> p.name.equals(parent.getLocalName()))
@@ -488,6 +520,95 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 		return Collections.emptySet();
+	}
+
+	private Collection<CompletionItem> collectPackaging(ICompletionRequest request) {
+		Set<String> packagingTypes = new LinkedHashSet<>();
+		packagingTypes.add(PACKAGING_TYPE_JAR);
+		packagingTypes.add(PACKAGING_TYPE_WAR);
+		packagingTypes.add(PACKAGING_TYPE_EAR);
+		packagingTypes.add(PACKAGING_TYPE_EJB);
+		packagingTypes.add(PACKAGING_TYPE_POM);
+		packagingTypes.add(PACKAGING_TYPE_MAVEN_PLUGIN);
+		
+		// dynamically load available packaging types from build plugins
+		updateAvailablePackagingTypes(packagingTypes, request); 
+
+		return packagingTypes.stream().map(type -> {
+			try {
+				CompletionItem item = toTextCompletionItem(request, type);
+				item.setDocumentation("Packagng Type: " + (type != null ? type : "unknown"));
+				item.setKind(CompletionItemKind.Value);
+				item.setSortText(type != null ? type : "zzz");
+				return item;
+			} catch (BadLocationException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+				return toErrorCompletionItem(e);
+			}
+		}).collect(Collectors.toList());
+	}
+
+	private void updateAvailablePackagingTypes(Set<String> packagingTypes, ICompletionRequest request) {
+		MavenProject project = plugin.getProjectCache().getSnapshotProject(request.getXMLDocument(), null, false);
+		if (project == null) {
+			return;
+		}
+
+		for (Plugin plugin : project.getBuildPlugins()) {
+			if (plugin.isExtensions()) {
+				Artifact artifact = new DefaultArtifact(
+						plugin.getGroupId(), plugin.getArtifactId(),
+						null, plugin.getVersion());
+				addPluginPackagingTypes(packagingTypes, artifact);
+			}
+		}
+	}	
+	
+	/**
+	 * Parses the plugin's META-INF/plexus/components.xml file for available
+	 * packaging types
+	 * 
+	 * @param packagingTypes Set of packaging types that this method will add to
+	 * @param artifact       The artifact of the build plugin
+	 * @apiNote If any exceptions occur during this method, such as an XML parsing
+	 *          exception or file not found, this method will immediately stop. It
+	 *          is assumed that there is something wrong with the user's project or
+	 *          repository setup which prevents this method from completing.
+	 */
+	private void addPluginPackagingTypes(Set<String> packagingTypes, Artifact artifact) {
+		File artifactPomFile = plugin.getLocalRepositorySearcher().findLocalFile(artifact);
+		if (artifactPomFile == null) {
+			return;
+		}
+
+		File artifactJarFile = new File(artifactPomFile.getParentFile().getAbsoluteFile(),
+				artifact.getArtifactId() + '-' + artifact.getVersion() + JAR_EXT);
+		try (JarFile jarFile = new JarFile(artifactJarFile.getAbsoluteFile())) {
+			DocumentBuilder db = DocumentBuilderFactory.newDefaultInstance().newDocumentBuilder();
+			JarEntry componentsxml = jarFile.getJarEntry(COMPONENTS_PATH);
+			if (componentsxml != null) {
+				Document doc = db.parse(jarFile.getInputStream(componentsxml));
+				doc.getDocumentElement().normalize();
+				NodeList components = doc.getElementsByTagName(COMPONENTS_COMPONENT_ELT);
+				for (int i = 0; i < components.getLength(); i++) {
+					Node component = components.item(i);
+					if (component.getNodeType() == Node.ELEMENT_NODE) {
+						Element element = (Element) component;
+						String role = element.getElementsByTagName(COMPONENTS_ROLE_ELT).item(0).getTextContent();
+						if (ArtifactHandler.ROLE.equals(role)) {
+							Node config = element.getElementsByTagName(COMPONENTS_CONFIGURATION_ELT).item(0);
+							if (config.getNodeType() == Node.ELEMENT_NODE) {
+								Element configEl = (Element) config;
+								String name = configEl.getElementsByTagName(COMPONENTS_TYPE_ELT).item(0).getTextContent();
+								packagingTypes.add(name);
+							}
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			// Broken XML, file not found, etc. Can't add packaging types.
+		}
 	}
 
 	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2022 Red Hat Inc. and others.
+ * Copyright (c) 2020-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -202,6 +202,10 @@ public class MavenProjectCache {
 	}
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {
+		return newProjectBuildingRequest(true);
+	}
+	
+	private ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies) {
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
 		request.setSystemProperties(mavenRequest.getSystemProperties());
 		request.setLocalRepository(mavenRequest.getLocalRepository());
@@ -209,7 +213,7 @@ public class MavenProjectCache {
 		request.setPluginArtifactRepositories(mavenRequest.getPluginArtifactRepositories());
 		// TODO more to transfer from mavenRequest to ProjectBuildingRequest?
 		request.setRepositorySession(lemminxMavenPlugin.getMavenSession().getRepositorySession());
-		request.setResolveDependencies(true);
+		request.setResolveDependencies(resolveDependencies);
 		return request;
 	}
 
@@ -234,8 +238,12 @@ public class MavenProjectCache {
 	}
 
 	public MavenProject getSnapshotProject(DOMDocument document, String profileId) {
+		return getSnapshotProject(document, profileId, true);
+	}
+	
+	public MavenProject getSnapshotProject(DOMDocument document, String profileId, boolean resolveDependencies) {
 		// it would be nice to directly rebuild from Model instead of reparsing text
-		ProjectBuildingRequest request = newProjectBuildingRequest();
+		ProjectBuildingRequest request = newProjectBuildingRequest(resolveDependencies);
 		if (profileId != null) {
 			request.setActiveProfileIds(List.of(profileId));
 		}
