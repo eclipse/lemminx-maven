@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021-2022 Red Hat Inc. and others.
+ * Copyright (c) 2021-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -310,5 +310,41 @@ public class MavenCompletionParticipantTest {
 					te(14, 9, 14, 9, //
 							"<target>$0</target>"),
 					"<target>$0</target>", null));
+	}
+	
+	@Test
+	public void testPackagingyCompletion() throws Exception {
+		String pom = """
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>pom-with-packaging</artifactId>
+			  <groupId>org.eclipse.lemminx.extention.maven.tests</groupId>
+			  <version>0.1.0</version>
+			  <packaging>|</packaging>
+			  <build>
+			      <plugins>
+			        <plugin>
+			          <groupId>org.eclipse.tycho</groupId>
+			          <artifactId>tycho-maven-plugin</artifactId>
+			          <version>2.7.5</version> <!-- Later versions may not work here -->
+			          <extensions>true</extensions>
+			        </plugin>
+			      </plugins>
+			  </build>
+			</project>
+			""";
+		testCompletionFor(pom, null, "file:///pom.xml", null, //
+				c("jar", te(10, 13, 10, 13, "jar"), "jar"),
+				c("war", te(10, 13, 10, 13, "war"), "war"),
+				c("ear", te(10, 13, 10, 13, "ear"), "ear"),
+				c("ejb", te(10, 13, 10, 13, "ejb"), "ejb"),
+				c("pom", te(10, 13, 10, 13, "pom"), "pom"),
+				c("maven-plugin", te(10, 13, 10, 13, "maven-plugin"), "maven-plugin"),
+				c("eclipse-plugin", te(10, 13, 10, 13, "eclipse-plugin"), "eclipse-plugin"));
 	}
 }

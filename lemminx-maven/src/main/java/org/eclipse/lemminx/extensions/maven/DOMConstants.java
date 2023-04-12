@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021-2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -18,6 +18,7 @@ public class DOMConstants {
 
 	}
 
+	public static final String PACKAGING_ELT = "packaging";
 	public static final String PROJECT_ELT = "project";
 	public static final String MODULE_ELT = "module";
 	public static final String RELATIVE_PATH_ELT = "relativePath";
@@ -59,4 +60,12 @@ public class DOMConstants {
 	public static final String FILE_ELT = "file";
 	public static final String EXISTS_ELT = "exists";
 	public static final String MISSING_ELT = "missing";
+	
+	// Packaging values
+	public static final String PACKAGING_TYPE_JAR ="jar";
+	public static final String PACKAGING_TYPE_WAR = "war";
+	public static final String PACKAGING_TYPE_EJB = "ejb"; 
+	public static final String PACKAGING_TYPE_EAR = "ear";
+	public static final String PACKAGING_TYPE_POM = "pom";
+	public static final String PACKAGING_TYPE_MAVEN_PLUGIN = "maven-plugin";
 }
