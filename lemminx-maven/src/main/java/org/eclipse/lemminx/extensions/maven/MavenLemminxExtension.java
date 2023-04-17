@@ -11,6 +11,9 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -23,6 +26,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,6 +47,8 @@ import org.apache.maven.execution.MavenExecutionRequestPopulator;
 import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Parent;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.project.MavenProject;
@@ -63,7 +71,10 @@ import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
+import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.dom.DOMElement;
+import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenIdPartRemovalCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenManagedVersionRemovalCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenNoGrammarConstraintsCodeAction;
@@ -73,6 +84,8 @@ import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagno
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
+import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
+import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
@@ -430,11 +443,92 @@ public class MavenLemminxExtension implements IXMLExtension {
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
-			reader.addToWorkspace(projectsToAdd);
+			reader.addToWorkspace(sortProjects(projectsToAdd));
 			projectsToRemove.stream().forEach(reader::remove);
 		}
 	}
+	
+	private Collection<URI> sortProjects(Collection<URI> projectsUris) {
+		HashMap<URI, String> depByUri = new HashMap<>();
+		HashMap<String, URI> uriByDep = new HashMap<>();
+		LinkedHashMap<String, String> parentByDep = new LinkedHashMap<>();
+		LinkedHashSet<URI> resultUris = new LinkedHashSet<>();
+		
+		Optional.ofNullable(projectsUris).ifPresent(uris -> {
+			uris.stream().filter(Objects::nonNull).forEach(uri ->{
+				Optional.ofNullable(createDOMDocument(uri)).ifPresent(doc -> {
+					if (PROJECT_ELT.equals(doc.getDocumentElement().getNodeName())) {
+						Optional.ofNullable(MavenParseUtils.parseArtifact(doc.getDocumentElement())).ifPresent(a -> {
+							Parent p = MavenParseUtils.parseParent(DOMUtils.findChildElement(doc.getDocumentElement(), PARENT_ELT).orElse(null));
+							// If artifact groupId is null - set it from parent
+							if (a.getGroupId() == null && p != null) {
+								a.setGroupId(p.getGroupId());
+							}
+							// If artifact version is null - set it from parent
+							if (a.getVersion() == null && p != null) {
+								a.setVersion(p.getVersion());
+							}
 
+							String key = key(a);
+							depByUri.put(uri, key);
+							uriByDep.put(key, uri);
+							if (p != null) {
+								parentByDep.put(key, key(p));
+							}
+						});
+					}
+				});
+			});
+
+			uris.stream().filter(Objects::nonNull).forEach(uri -> {
+				String a = depByUri.get(uri);
+				if (a != null) {
+					adUrisdParentFirst(a, parentByDep, uriByDep, resultUris);
+				}
+			});
+		});
+		return resultUris;
+	}
+
+	private static DOMDocument createDOMDocument(URI uri) {
+		File pomFile = new File(uri);
+		try {
+			String fileContent = String.join(System.lineSeparator(), Files.readAllLines(pomFile.toPath()));
+			return DOMParser.getInstance().parse(new TextDocument(fileContent, pomFile.toURI().toString()), null);
+		} catch (IOException e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
+		return null;
+	}
+
+	private static String key(Dependency artifact) {
+		return Optional.ofNullable(artifact.getGroupId()).orElse("") + ':' 
+			+ Optional.ofNullable(artifact.getArtifactId()).orElse("") + ':' 
+			+ Optional.ofNullable(artifact.getVersion()).orElse("");
+	}
+	
+	private static String key(Parent parent) {
+		return Optional.ofNullable(parent.getGroupId()).orElse("") + ':' 
+			+ Optional.ofNullable(parent.getArtifactId()).orElse("") + ':' 
+			+ Optional.ofNullable(parent.getVersion()).orElse("");
+	}
+	
+	private void adUrisdParentFirst(String artifactKey, 
+			LinkedHashMap<String, String> parentByDep,
+			HashMap<String, URI> uriByDep,
+			LinkedHashSet<URI> resultUris) {
+
+		String pKey = parentByDep.get(artifactKey);
+		if(pKey != null) {
+			adUrisdParentFirst(pKey,  parentByDep, uriByDep, resultUris);
+		}
+
+		URI uri = uriByDep.get(artifactKey);
+		if (uri != null) {
+			resultUris.add(uri);
+		}
+	}
+	
 	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
 		Collection<MavenProject> cachedProjects = getProjectCache().getProjects();
 		return cachedProjects.stream().filter(p -> {
@@ -453,7 +547,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 				Files.walkFileTree(addedPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
 					@Override
 					public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
-						if (file.getFileName().toString().charAt(0) == '.') {
+						String fileName = file.getFileName().toString();
+						// Skip hidden files and directories as well as 'target' directories
+						if (fileName.charAt(0) == '.' || "target".equals(fileName)) {
 							return FileVisitResult.SKIP_SUBTREE;
 						}
 						return FileVisitResult.CONTINUE;

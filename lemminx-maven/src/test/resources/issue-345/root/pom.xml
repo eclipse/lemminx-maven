@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation=" http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>mygroup</groupId>
+	<artifactId>root</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+
+	<packaging>pom</packaging>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<m2e.wtp.activation>false</m2e.wtp.activation>
+		<m2e.jaxrs.activation>false</m2e.jaxrs.activation>
+		<m2e.jpa.activation>false</m2e.jpa.activation>
+		<m2e.jsf.activation>false</m2e.jsf.activation>
+
+		<!--
+		Eclipse
+		-->
+		<net.upperlimit.root.eclipse.isrunning>false</net.upperlimit.root.eclipse.isrunning>
+		<net.upperlimit.root.eclipse.notrunning>true</net.upperlimit.root.eclipse.notrunning>
+		<!--
+		Enforcer
+		-->
+		<version.maven-enforcer-plugin>1.4.1</version.maven-enforcer-plugin>
+		<version.maven.prerequisite>3.3.3</version.maven.prerequisite>
+		<version.maven.prerequisite.spec>[${version.maven.prerequisite},)</version.maven.prerequisite.spec>
+		<version.java.prerequisite>1.8.0</version.java.prerequisite>
+		<version.java.prerequisite.spec>[${version.java.prerequisite},)</version.java.prerequisite.spec>
+		<!--
+		Maven Cleanup
+		-->
+		<version.m2cachecleanup>1.0.4</version.m2cachecleanup>
+		<!--
+		Release
+		-->
+		<version.maven-release-plugin>2.5.3</version.maven-release-plugin>
+
+		<!--
+		CLASSPATH FIX
+		for Log4J2 zero day vulnerability
+		https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228
+		https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-45105
+		-->
+		<version.log4j-bom>2.18.0</version.log4j-bom>
+
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!--
+			CLASSPATH FIX
+			for Log4J2 zero day vulnerability
+			-->
+			<dependency>
+				<groupId>org.apache.logging.log4j</groupId>
+				<artifactId>log4j-bom</artifactId>
+				<version>${version.log4j-bom}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-enforcer-plugin</artifactId>
+					<version>${version.maven-enforcer-plugin}</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-release-plugin</artifactId>
+					<version>${version.maven-release-plugin}</version>
+				</plugin>
+				<plugin>
+					<groupId>ch.ringler.tools</groupId>
+					<artifactId>m2cachecleanup</artifactId>
+					<version>${version.m2cachecleanup}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+		<plugins>
+			<plugin>
+				<?m2e execute?>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>display-current-platform-information</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>display-info</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>enforce-platform-requirements</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireMavenVersion>
+									<version>${version.maven.prerequisite.spec}</version>
+								</requireMavenVersion>
+								<requireJavaVersion>
+									<version>${version.java.prerequisite.spec}</version>
+								</requireJavaVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-release-plugin</artifactId>
+				<configuration>
+					<tagNameFormat>@{project.version}</tagNameFormat>
+					<autoVersionSubmodules>true</autoVersionSubmodules>
+					<pushChanges>true</pushChanges>
+					<releaseProfiles>release</releaseProfiles>
+					<localCheckout>false</localCheckout>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>ch.ringler.tools</groupId>
+				<artifactId>m2cachecleanup</artifactId>
+				<executions>
+					<execution>
+						<id>cleanup-maven-cache</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>cleanup-cache</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>detect-eclipse</id>
+			<activation>
+				<property>
+					<name>eclipse.launcher.name</name>
+				</property>
+				<file>
+					<exists>${eclipse.launcher}</exists>
+				</file>
+			</activation>
+			<properties>
+				<net.upperlimit.root.eclipse.isrunning>true</net.upperlimit.root.eclipse.isrunning>
+				<net.upperlimit.root.eclipse.notrunning>false</net.upperlimit.root.eclipse.notrunning>
+			</properties>
+		</profile>
+	</profiles>
+
+</project>

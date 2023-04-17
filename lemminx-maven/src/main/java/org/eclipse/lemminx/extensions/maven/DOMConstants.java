@@ -25,6 +25,7 @@ public class DOMConstants {
 	public static final String CONFIGURATION_ELT = "configuration";
 	public static final String DEPENDENCIES_ELT = "dependencies";
 	public static final String DEPENDENCY_ELT = "dependency";
+	public static final String DEPENDENCY_MANAGEMENT_ELT = "dependencyManagement";
 	public static final String GROUP_ID_ELT = "groupId";
 	public static final String ARTIFACT_ID_ELT = "artifactId";
 	public static final String VERSION_ELT = "version";

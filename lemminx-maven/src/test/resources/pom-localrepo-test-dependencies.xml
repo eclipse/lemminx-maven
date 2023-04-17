@@ -55,5 +55,20 @@
 			<type>pom</type>
 			<scope>import</scope>
 		</dependency>
+		<!-- ddependency>
+			<groupId>net.upperlimit</groupId>
+			<artifactId>tools.springframework</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+
+			<type>pom</type>
+			<scope>import</scope>
+		</dependency -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-dependencies</artifactId>
+			<version>2.4.2</version>
+			<type>pom</type>
+			<scope>import</scope>
+		</dependency>
 	</dependencies>
 </project>
