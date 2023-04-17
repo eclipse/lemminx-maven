@@ -14,8 +14,10 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
@@ -32,6 +34,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
 import org.apache.maven.model.InputSource;
@@ -53,6 +56,7 @@ import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
+import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
@@ -117,8 +121,17 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 		return switch (parent.getLocalName()) {
 		case GROUP_ID_ELT, ARTIFACT_ID_ELT, VERSION_ELT -> {
-			Hover hover = isParentDeclaration && p != null && p.getParent() != null ? hoverForProject(request,
-					p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch)) : null;
+			Hover hover = null;
+			
+			if (isParentDeclaration) {
+				if (p != null) {
+					File parentPomFile = getParentPomFile(p, request.getXMLDocument());
+					if (parentPomFile != null) {
+						hover = hoverForProject(request, p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch));
+					}
+				}
+			}
+
 			if (hover == null) {
 				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, artifactToSearch);
 				if (artifact != null && artifact.getFile() != null) {
@@ -191,7 +204,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
 
 		// Search for DEPENDENCY/PLUGIN through the parents pom's
-		File parentPomFile = getParentPomFile(p);
+		File parentPomFile = getParentPomFile(p, request.getXMLDocument());
 
 		while (parentPomFile != null && parentPomFile.exists()) {
 			DOMDocument parentXmlDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
@@ -214,7 +227,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			}
 				
 			// Else proceed with the next parent
-			parentPomFile = getParentPomFile(parentMavenProject);
+			parentPomFile = getParentPomFile(parentMavenProject, parentXmlDocument);
 		}
 		return null;
 	}
@@ -231,10 +244,41 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}).filter(DOMElement.class::isInstance).map(DOMElement.class::cast).collect(Collectors.toList());
 	}
 
-	private File getParentPomFile (MavenProject project) {
-	    return Optional.ofNullable(project)
-	        .map(MavenProject::getParentFile)
-	        .orElse(null);
+	@SuppressWarnings("deprecation")
+	private File getParentPomFile (MavenProject project,  DOMDocument document) {
+		Optional<File> parentPomFile = Optional.ofNullable(project)
+		        .map(MavenProject::getParentFile);
+		if (parentPomFile.isPresent()) {
+			return parentPomFile.get();
+		}
+		
+		// Try searching from the document's parent section
+		File currentFolder = new File(URI.create(document.getTextDocument().getUri())).getParentFile();
+		Optional<DOMElement> projectElement = DOMUtils.findChildElement(document, PROJECT_ELT);
+		if(projectElement.isPresent()) {
+			Optional<DOMElement> parentElement = DOMUtils.findChildElement(projectElement.get(), PARENT_ELT);
+			if (parentElement.isPresent()) {
+				// @TODO: check group/artifactId/version if present
+				Parent parent = MavenParseUtils.parseParent(parentElement.get());
+				String relativePath = parent.getRelativePath();
+				if (relativePath != null && !relativePath.isEmpty()) {
+					File relativeFile = new File(currentFolder, relativePath);
+					if (relativeFile.canRead() && relativeFile.isDirectory()) {
+						relativeFile = new File(relativeFile, Maven.POMv4);
+					}
+					if (relativeFile.canRead() && relativeFile.isFile()) {
+						return relativeFile.getAbsoluteFile();
+					}
+				} else {
+					File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
+					if (relativeFile.canRead() && relativeFile.isFile()) {
+						return relativeFile;
+					}
+				}
+			}
+		}
+		
+		return null;
 	}
 	
 	private static String createVersionMessage(boolean supportsMarkdown, String version, InputLocation location) {
