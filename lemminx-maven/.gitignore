@@ -4,6 +4,8 @@ bin/
 .bin/
 target/
 
+*.log
+
 /gradle.properties
 /archive/
 /META-INF
