@@ -10,10 +10,10 @@ package org.eclipse.lemminx.extensions.maven.participants.hover;
 
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CONFIGURATION_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
@@ -56,14 +56,15 @@ import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.extensions.maven.utils.PlexusConfigHelper;
-import org.eclipse.lemminx.services.extensions.HoverParticipantAdapter;
-import org.eclipse.lemminx.services.extensions.IHoverRequest;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lemminx.services.extensions.hover.HoverParticipantAdapter;
+import org.eclipse.lemminx.services.extensions.hover.IHoverRequest;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenHoverParticipant extends HoverParticipantAdapter {
 
@@ -75,7 +76,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	}
 
 	@Override
-	public Hover onTag(IHoverRequest request) throws Exception {
+	public Hover onTag(IHoverRequest request, CancelChecker cancelChecker) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return null;
 		}
@@ -96,7 +97,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	}
 
 	@Override
-	public Hover onText(IHoverRequest request) throws Exception {
+	public Hover onText(IHoverRequest request, CancelChecker cancelChecker) throws Exception {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return null;
 		}
