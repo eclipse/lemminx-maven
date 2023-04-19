@@ -73,12 +73,12 @@ import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagno
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
-import org.eclipse.lemminx.services.extensions.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
 import org.eclipse.lemminx.services.extensions.completion.ICompletionParticipant;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
+import org.eclipse.lemminx.services.extensions.hover.IHoverParticipant;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
 import org.eclipse.lemminx.settings.AllXMLSettings;
