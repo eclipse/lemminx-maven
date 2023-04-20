@@ -41,7 +41,7 @@
 		<!--
 		Spring Boot
 		-->
-		<version.spring-boot>2.4.6</version.spring-boot>
+		<version.spring-boot>2.5.12</version.spring-boot>
 		<version.spring-cloud>2020.0.3</version.spring-cloud>
 		<version.spring-boot-maven-plugin>${version.spring-boot}</version.spring-boot-maven-plugin>
 		<version.spring-session>2.5.3</version.spring-session>
