@@ -147,6 +147,8 @@ public class MavenProjectCache {
 				projectCache.put(uri, buildResult.getProject());
 				projectParsedListeners.forEach(listener -> listener.accept(buildResult.getProject()));
 			}
+			lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
+			problemCache.put(uri, problems);
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
 				if (e.getCause() instanceof ModelBuildingException modelBuildingException) {
@@ -193,12 +195,14 @@ public class MavenProjectCache {
 					}
 				}
 			}
+			lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
+			problemCache.put(uri, problems);
 		} catch (Exception e) {
+			// Do not add any info, like lastCheckedVersion or problems, to the cache 
+			// In case of project/problems etc. is not available due to an exception happened.
+			// 
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
-
-		lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
-		problemCache.put(uri, problems);
 	}
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {

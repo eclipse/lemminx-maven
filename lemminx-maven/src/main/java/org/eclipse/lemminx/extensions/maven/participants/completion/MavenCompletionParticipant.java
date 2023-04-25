@@ -588,19 +588,21 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			JarEntry componentsxml = jarFile.getJarEntry(COMPONENTS_PATH);
 			if (componentsxml != null) {
 				Document doc = db.parse(jarFile.getInputStream(componentsxml));
-				doc.getDocumentElement().normalize();
-				NodeList components = doc.getElementsByTagName(COMPONENTS_COMPONENT_ELT);
-				for (int i = 0; i < components.getLength(); i++) {
-					Node component = components.item(i);
-					if (component.getNodeType() == Node.ELEMENT_NODE) {
-						Element element = (Element) component;
-						String role = element.getElementsByTagName(COMPONENTS_ROLE_ELT).item(0).getTextContent();
-						if (ArtifactHandler.ROLE.equals(role)) {
-							Node config = element.getElementsByTagName(COMPONENTS_CONFIGURATION_ELT).item(0);
-							if (config.getNodeType() == Node.ELEMENT_NODE) {
-								Element configEl = (Element) config;
-								String name = configEl.getElementsByTagName(COMPONENTS_TYPE_ELT).item(0).getTextContent();
-								packagingTypes.add(name);
+				if (doc.getDocumentElement() != null) {
+					doc.getDocumentElement().normalize();
+					NodeList components = doc.getElementsByTagName(COMPONENTS_COMPONENT_ELT);
+					for (int i = 0; i < components.getLength(); i++) {
+						Node component = components.item(i);
+						if (component.getNodeType() == Node.ELEMENT_NODE) {
+							Element element = (Element) component;
+							String role = element.getElementsByTagName(COMPONENTS_ROLE_ELT).item(0).getTextContent();
+							if (ArtifactHandler.ROLE.equals(role)) {
+								Node config = element.getElementsByTagName(COMPONENTS_CONFIGURATION_ELT).item(0);
+								if (config.getNodeType() == Node.ELEMENT_NODE) {
+									Element configEl = (Element) config;
+									String name = configEl.getElementsByTagName(COMPONENTS_TYPE_ELT).item(0).getTextContent();
+									packagingTypes.add(name);
+								}
 							}
 						}
 					}

@@ -55,7 +55,9 @@ public class WorkspaceProjectsHyperlinkDetectorTest {
 	public static String TOOLS_SPRINGFRAMEWORK_PARENT = "tools.internal";
 	public static String TOOLS_BOM_PATH = "/tools/modules/BOM/pom.xml";
 	public static String TOOLS_BOM_PARENT = "tools";
-	
+	public static String PROJECT_PATH = "/project/pom.xml";
+	public static String PROJECT_PARENT = "root";
+
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_PATH = "/tools/modules/retry-springframework/pom.xml";
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_ARTIFACT = "spring-boot-dependencies";
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_GROUP = "org.springframework.boot";
@@ -240,6 +242,47 @@ public class WorkspaceProjectsHyperlinkDetectorTest {
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testHyperlinkFromToolsBomToParentDocument(): " + uri));
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uriiRawPathEndsWith(uri, "/issue-345/tools/pom.xml")));
+	}
+
+	/**
+	 * Test Ctrl-clicking on parent for  artifact 'project'. 
+	 * The resulting URI should lead to parent artifact 'root'
+	 * 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws URISyntaxException
+	 * @throws BadLocationException
+	 */
+	@Test
+	public void testHyperlinkFromProjectToParentDocument()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource(WORKSPACE_PATH).toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+	
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+	
+		DOMDocument document = createDOMDocument(WORKSPACE_PATH + PROJECT_PATH, languageService);
+		DOMElement parent = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.PARENT_ELT).orElse(null);
+		assertNotNull(parent, "Parent element not found!");
+		DOMElement parentArtifactId = DOMUtils.findChildElement(parent, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+		assertNotNull(parentArtifactId, "Parent ArtifactId element not found!");
+		int offset = (parentArtifactId.getStart() + parentArtifactId.getEnd()) / 2;
+	
+		TextDocument textDocument = document.getTextDocument();
+		Position offsetPosition = textDocument.positionAt(offset);
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, ()->{});
+		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testHyperlinkFromProjectToParentDocument(): " + uri));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uriiRawPathEndsWith(uri, "/issue-345/root/pom.xml")));
 	}
 
 	//
