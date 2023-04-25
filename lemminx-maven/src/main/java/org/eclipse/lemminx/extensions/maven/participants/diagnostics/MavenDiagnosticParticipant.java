@@ -60,6 +60,9 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 		
 		DOMElement documentElement = xmlDocument.getDocumentElement();
+		if (documentElement == null) {
+			return;
+		}
 		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
 
 		// Validate project element

@@ -457,7 +457,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		Optional.ofNullable(projectsUris).ifPresent(uris -> {
 			uris.stream().filter(Objects::nonNull).forEach(uri ->{
 				Optional.ofNullable(createDOMDocument(uri)).ifPresent(doc -> {
-					if (PROJECT_ELT.equals(doc.getDocumentElement().getNodeName())) {
+					if (doc.getDocumentElement() != null
+							&& PROJECT_ELT.equals(doc.getDocumentElement().getNodeName())) {
 						Optional.ofNullable(MavenParseUtils.parseArtifact(doc.getDocumentElement())).ifPresent(a -> {
 							Parent p = MavenParseUtils.parseParent(DOMUtils.findChildElement(doc.getDocumentElement(), PARENT_ELT).orElse(null));
 							// If artifact groupId is null - set it from parent
@@ -480,12 +481,17 @@ public class MavenLemminxExtension implements IXMLExtension {
 				});
 			});
 
+			LinkedHashSet<URI> skippedUris = new LinkedHashSet<>();
 			uris.stream().filter(Objects::nonNull).forEach(uri -> {
 				String a = depByUri.get(uri);
 				if (a != null) {
 					adUrisdParentFirst(a, parentByDep, uriByDep, resultUris);
+				} else {
+					skippedUris.add(uri);
 				}
 			});
+			// Add skipped IRIs to the end of the collection
+			resultUris.addAll(skippedUris);
 		});
 		return resultUris;
 	}
