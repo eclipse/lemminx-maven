@@ -783,9 +783,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 		DOMDocument doc = request.getXMLDocument();
-
-		Range range = XMLPositionUtility.createRange(node.getStartTagCloseOffset() + 1, node.getEndTagOpenOffset(),
-				doc);
+		int startTagCloseOffset = node.getStartTagCloseOffset() >= 0 ? node.getStartTagCloseOffset() : 0;
+		int endTagOpenOffset = node.getEndTagOpenOffset() >= 0 ? node.getEndTagOpenOffset() : request.getOffset();
+		Range range = XMLPositionUtility.createRange(startTagCloseOffset + 1, endTagOpenOffset, doc);
 		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(1));
 		final CompletionItem updatingItem = new CompletionItem(WAITING_LABEL);
 		updatingItem.setPreselect(false);
