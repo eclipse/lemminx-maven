@@ -16,11 +16,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -155,7 +157,11 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	private final WorkspaceRepository repository;
 	private final MavenLemminxExtension plugin;
 	
-	private SortedSet<File> toProcess = Collections.synchronizedSortedSet(new TreeSet<>(Comparator.comparingInt(file -> file.getAbsolutePath().length())));
+	// Don't add any sorting here, the files are to be processed exactly in the order they added.
+	// Any sorting is to be done before adding to this set
+	//
+	private Set<File> toProcess = Collections.synchronizedSet(new LinkedHashSet<File>());
+	
 	private ThreadLocal<Boolean> skipFlushBeforeResult = new ThreadLocal<>();
 	private final PriorityBlockingQueue</*ResolveArtifactsAndPopulateWorkspaceRunnable*/Runnable> runnables = new PriorityBlockingQueue<>(1, DEEPEST_FIRST);
 	private final ExecutorService executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, runnables);
@@ -278,6 +284,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
 	/**
 	 * Parses and adds a document for a given URI into the projects cache
+	 * Any sorting is to be done before the method is invoked.
 	 * 
 	 * @param uri An URI of a document to add
 	 * @param documents documents to add
