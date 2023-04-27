@@ -6,15 +6,15 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven.participants.hover;
+package org.eclipse.lemminx.extensions.maven.participants.definition;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.commons.BadLocationException;
@@ -24,8 +24,7 @@ import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.CancelCheckerCallCounter;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.PhaseCancelChecker;
 import org.eclipse.lemminx.services.XMLLanguageService;
-import org.eclipse.lemminx.settings.SharedSettings;
-import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
-public class MavenHoverCancellationTest {
+public class MavenDefinitionCancellationTest {
 	private XMLLanguageService languageService;
 
 	@BeforeEach
@@ -48,53 +47,58 @@ public class MavenHoverCancellationTest {
 	}
 	
 	@Test
-	public void testHoverCancellationOnProperty()
+	public void testDefinitionCancellationOnDependency()
 			throws BadLocationException, IOException, URISyntaxException {
-		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
+		DOMDocument document = createDOMDocument("/pom-localrepo-test-dependencies.xml", languageService);
 		String text = document.getText();
 		// Will test an offset somewhere in the middle of the property name
-		int offset = text.indexOf("${anotherProperty}")
-				+ "${".length() + "anotherProperty".length() / 2; 
+		int offset = text.indexOf("<artifactId>maven-compiler-plugin")
+				+ "<artifactId>".length() + "maven-compiler-plugin".length() / 2; 
 		TextDocument textDocument = document.getTextDocument();
 		Position offsetPosition = textDocument.positionAt(offset);
-		
+	
 		// Should return some hover
 		CancelCheckerCallCounter cancelCheckerCallCounter = new CancelCheckerCallCounter();
-		Hover hover = languageService.doHover(document, offsetPosition, new SharedSettings(), cancelCheckerCallCounter);
-		assertNotNull(hover, "Hover Participant didn't return any Hover");
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, cancelCheckerCallCounter);
+		assertNotNull(definitions, "Definition Participant returned a null result");
+		assertTrue(definitions.size() > 0, "Definition Participant didn't return any Location Link");
 		int numberOfChecks = cancelCheckerCallCounter.getCounterValue();
 		assertTrue( (numberOfChecks > 0), "No cancellation checks performed during the processing");
 
 		// Should not return any hover
 		for (int i = 1; i <= numberOfChecks; i++) {
 			PhaseCancelChecker phaseChacker = new PhaseCancelChecker(i);
-			hover = languageService.doHover(document, offsetPosition, new SharedSettings(), phaseChacker);
-			assertNull(hover, "Hover Participant is not canceled at phase " + i);
+			definitions = languageService.findDefinition(document, offsetPosition, phaseChacker);
+			assertNotNull(definitions, "Definition Participant returned a null result");
+			assertTrue(definitions.size() == 0, "Definition Participant is not canceled at phase " + i);
 		}	
 	}
 
-    @Test
-    void testHoverCancellationOnDependency() throws BadLocationException, IOException, URISyntaxException  {
-        DOMDocument document = createDOMDocument("/hierarchy2/child/grandchild/pom.xml", languageService);
+	@Test
+	public void testDefinitionCancellationOnParent()
+			throws BadLocationException, IOException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/parent-from-repo.pom", languageService);
 		String text = document.getText();
-		// Will test an offset somewhere in the middle of the dependency artifact ID
-		int offset = text.indexOf("<artifactId>slf4j-api")
-				+ "<artifactId>".length() + "slf4j-api".length() / 2; 
+		// Will test an offset somewhere in the middle of the property name
+		int offset = text.indexOf("<artifactId>spring-boot-starter-parent")
+				+ "<artifactId>".length() + "spring-boot-starter-parent".length() / 2; 
 		TextDocument textDocument = document.getTextDocument();
 		Position offsetPosition = textDocument.positionAt(offset);
-
+	
 		// Should return some hover
 		CancelCheckerCallCounter cancelCheckerCallCounter = new CancelCheckerCallCounter();
-		Hover hover = languageService.doHover(document, offsetPosition, new SharedSettings(), cancelCheckerCallCounter);
-		assertNotNull(hover, "Hover Participant didn't return any Hover");
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, cancelCheckerCallCounter);
+		assertNotNull(definitions, "Definition Participant returned a null result");
+		assertTrue(definitions.size() > 0, "Definition Participant didn't return any Location Link");
 		int numberOfChecks = cancelCheckerCallCounter.getCounterValue();
 		assertTrue( (numberOfChecks > 0), "No cancellation checks performed during the processing");
 
 		// Should not return any hover
 		for (int i = 1; i <= numberOfChecks; i++) {
 			PhaseCancelChecker phaseChacker = new PhaseCancelChecker(i);
-			hover = languageService.doHover(document, offsetPosition, new SharedSettings(), phaseChacker);
-			assertNull(hover, "Hover Participant is not canceled at phase " + i);
+			definitions = languageService.findDefinition(document, offsetPosition, phaseChacker);
+			assertNotNull(definitions, "Definition Participant returned a null result");
+			assertTrue(definitions.size() == 0, "Definition Participant is not canceled at phase " + i);
 		}	
-    }
+	}
 }
