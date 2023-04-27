@@ -62,10 +62,7 @@ public class DOMUtils {
 	}
 	
 	public static boolean isADescendantOf(DOMNode tag, String parentName) {
-		if (tag.getLocalName() != null && tag.getLocalName().equals(parentName)) {
-			return true;
-		}
-		DOMNode parent = tag.getParentNode();
+		DOMNode parent = tag;
 		while (parent != null) {
 			if (parent.getLocalName() != null && parent.getLocalName().equals(parentName)) {
 				return true;

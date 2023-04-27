@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
@@ -84,20 +85,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return null;
 		}
-
-		DOMNode tag = request.getNode();
-		DOMElement parent = tag.getParentElement();
-
-		if (tag.getLocalName() == null) {
-			return null;
+		try {
+			if (DOMUtils.isADescendantOf(request.getNode(), CONFIGURATION_ELT)) {
+				return collectPluginConfiguration(request, cancelChecker);
+			}
+		} catch (CancellationException e) {
+			LOGGER.log(Level.FINER, e.toString(), e);
 		}
-
-		if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
-			return collectPluginConfiguration(request);
-		}
-
-		// TODO: Get rid of this?
-		return CONFIGURATION_ELT.equals(parent.getLocalName()) ? collectPluginConfiguration(request) : null;
+		return null;
 	}
 
 	@Override
@@ -105,51 +100,59 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return null;
 		}
-
-		DOMNode tag = request.getNode();
-		DOMElement parent = tag.getParentElement();
-
-		boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
-
-		Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
-		if (mavenProperty != null) {
-			return collectProperty(request, mavenProperty);
-		}
-		
-		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
-		Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, tag);
-
-		return switch (parent.getLocalName()) {
-		case GROUP_ID_ELT, ARTIFACT_ID_ELT, VERSION_ELT -> {
-			Hover hover = null;
+		try {
+			DOMNode tag = request.getNode();
+			DOMElement parent = tag.getParentElement();
+	
+			boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
+	
+			Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
+			if (mavenProperty != null) {
+				return collectProperty(request, mavenProperty, cancelChecker);
+			}
 			
-			if (isParentDeclaration) {
-				if (p != null) {
-					File parentPomFile = getParentPomFile(p, request.getXMLDocument());
-					if (parentPomFile != null) {
-						hover = hoverForProject(request, p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch));
+			cancelChecker.checkCanceled();
+			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+			Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, tag);
+	
+			return switch (parent.getLocalName()) {
+				case GROUP_ID_ELT, ARTIFACT_ID_ELT, VERSION_ELT -> {
+					Hover hover = null;
+					
+					if (isParentDeclaration) {
+						if (p != null) {
+							cancelChecker.checkCanceled();
+							File parentPomFile = getParentPomFile(p, request.getXMLDocument());
+							if (parentPomFile != null) {
+								hover = hoverForProject(request, p.getParent(), ParticipantUtils.isWellDefinedDependency(artifactToSearch), cancelChecker);
+							}
+						}
 					}
+		
+					if (hover == null) {
+						cancelChecker.checkCanceled();
+						Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, artifactToSearch);
+						if (artifact != null && artifact.getFile() != null) {
+							yield hoverForProject(request,
+									plugin.getProjectCache().getSnapshotProject(artifact.getFile()).orElse(null),
+									ParticipantUtils.isWellDefinedDependency(artifactToSearch),
+									cancelChecker);
+						}
+					}
+		
+					if (hover == null) {
+						hover = collectArtifactDescription(request, cancelChecker);
+					}
+					yield hover;
 				}
-			}
-
-			if (hover == null) {
-				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, artifactToSearch);
-				if (artifact != null && artifact.getFile() != null) {
-					yield hoverForProject(request,
-							plugin.getProjectCache().getSnapshotProject(artifact.getFile()).orElse(null),
-							ParticipantUtils.isWellDefinedDependency(artifactToSearch));
-				}
-			}
-
-			if (hover == null) {
-				hover = collectArtifactDescription(request);
-			}
-			yield hover;
+				case GOAL_ELT -> collectGoal(request, cancelChecker);
+				// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
+				default -> null;
+				};
+		} catch (CancellationException e) {
+			LOGGER.log(Level.FINER, e.toString(), e);
 		}
-		case GOAL_ELT -> collectGoal(request);
-		// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
-		default -> null;
-		};
+		return null;
 	}
 
 	private static final String PomTextHover_managed_version = "The managed version is {0}.";
@@ -159,14 +162,15 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private static final String PomTextHover_property_location = "The property is defined in {0}";
 	private static final String PomTextHover_managed_scope = "The managed scope is: \"{0}\"";
 
-	private static String getActualVersionText(boolean supportsMarkdown, MavenProject project) {
+	private static String getActualVersionText(boolean supportsMarkdown, MavenProject project, CancelChecker cancelChecker) throws CancellationException {
 		if (project == null) {
 			return null;
 		}
 
 		String sourceModelId = project.getGroupId() + ':' + project.getArtifactId() + ':' + project.getVersion();
 		File locacion = project.getFile();
-		return createVersionMessage(supportsMarkdown, project.getVersion(), (locacion != null && locacion.exists() ? sourceModelId : null), locacion.toURI().toString());
+		return createVersionMessage(supportsMarkdown, project.getVersion(), 
+				(locacion != null && locacion.exists() ? sourceModelId : null), locacion.toURI().toString());
 	}
 	
 	private static String getActualVersionText(boolean supportsMarkdown, Model model) {
@@ -188,7 +192,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return createVersionMessage(supportsMarkdown, version, location);
 	}
 	
-	private String getManagedVersionText(IHoverRequest request) {
+	private String getManagedVersionText(IHoverRequest request, CancelChecker cancelChecker) throws CancellationException {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return null;
 		}
@@ -199,14 +203,16 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			return null;
 		}
 		
+		cancelChecker.checkCanceled();
 		boolean isPlugin = PLUGIN_ELT.equals(element.getLocalName());
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
 		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
 
+		cancelChecker.checkCanceled();
 		// Search for DEPENDENCY/PLUGIN through the parents pom's
 		File parentPomFile = getParentPomFile(p, request.getXMLDocument());
-
 		while (parentPomFile != null && parentPomFile.exists()) {
+			cancelChecker.checkCanceled();
 			DOMDocument parentXmlDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 					parentPomFile.toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
@@ -214,10 +220,12 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				return null; // An error occurred while loading the document
 			}
 
+			cancelChecker.checkCanceled();
 			MavenProject parentMavenProject = plugin.getProjectCache().getLastSuccessfulMavenProject(parentXmlDocument);
-			
+
 			List<DOMElement> elements = findDependencyOrPluginElement(parentXmlDocument, isPlugin, dependency.getGroupId(), dependency.getArtifactId());
 			for (DOMElement e : elements) {
+				cancelChecker.checkCanceled();
 				Optional<String> version = DOMUtils.findChildElementText(e, VERSION_ELT);
 				if (version.isPresent()) {
 					Dependency d = ParticipantUtils.getArtifactToSearch(parentMavenProject, e);
@@ -232,7 +240,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return null;
 	}
 
-	List<DOMElement> findDependencyOrPluginElement(DOMDocument document, boolean isPlugin, String groupId, String artifactId) {
+	private static List<DOMElement> findDependencyOrPluginElement(DOMDocument document, boolean isPlugin, String groupId, String artifactId) {
 		return DOMUtils.findNodesByLocalName(document, isPlugin ? PLUGIN_ELT : DEPENDENCY_ELT)
 		.stream().filter(d -> {
 			if (!DOMUtils.isADescendantOf(d, isPlugin ? PLUGINS_ELT : DEPENDENCIES_ELT)) {
@@ -245,7 +253,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	}
 
 	@SuppressWarnings("deprecation")
-	private File getParentPomFile (MavenProject project,  DOMDocument document) {
+	private static File getParentPomFile (MavenProject project,  DOMDocument document) {
 		Optional<File> parentPomFile = Optional.ofNullable(project)
 		        .map(MavenProject::getParentFile);
 		if (parentPomFile.isPresent()) {
@@ -312,7 +320,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return message;
 	}
 
-	private Hover hoverForProject(IHoverRequest request, MavenProject p, boolean isWellDefined) {
+	private Hover hoverForProject(IHoverRequest request, MavenProject p, boolean isWellDefined, CancelChecker cancelChecker) throws CancellationException {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
 				: UnaryOperator.identity();
@@ -328,9 +336,9 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		}
 
 		if (!isWellDefined) {
-			String managedVersion = getManagedVersionText(request);
+			String managedVersion = getManagedVersionText(request, cancelChecker);
 			if (managedVersion == null) {
-				managedVersion = getActualVersionText(supportsMarkdown, p);
+				managedVersion = getActualVersionText(supportsMarkdown, p, cancelChecker);
 			}
 			if (managedVersion != null) {
 				message += lineBreak + managedVersion;
@@ -344,20 +352,23 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				message));
 	}
 	
-	private Hover collectArtifactDescription(IHoverRequest request) {
+	private Hover collectArtifactDescription(IHoverRequest request, CancelChecker cancelChecker) throws CancellationException {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 
+		cancelChecker.checkCanceled();
 		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
 		boolean wellDefined = ParticipantUtils.isWellDefinedDependency(dependency);
 		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
 		dependency = ParticipantUtils.resolveDependency(p, dependency, element, plugin);
 
+		cancelChecker.checkCanceled();
 		try {
 			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
 			// Find in local repository
 			File localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
 			if (localArtifactLocation != null && localArtifactLocation.isFile()) {
+				cancelChecker.checkCanceled();
 				Model model = builder.buildRawModel(localArtifactLocation, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, true).get();
 				if (model != null) {
 					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
@@ -374,7 +385,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					}
 
 					if (!wellDefined) {
-						String managedVersion = getManagedVersionText(request);
+						String managedVersion = getManagedVersionText(request, cancelChecker);
 						if (managedVersion == null) {
 							managedVersion = getActualVersionText(supportsMarkdown, model);
 						}
@@ -393,35 +404,44 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					}
 				}
 			}
+		} catch (CancellationException e) {
+			// Log at FINER level and return null
+			LOGGER.log(Level.FINER, e.toString(), e);
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.toString(), e1);
 		}
 		
-		// we don't have description or other valuable information for non-local artifacts.
+		// we don't have description or other valuable information for non-local artifacts
+		// or the operation is cancelled
 		return null;
 	}
 
-	private Hover collectGoal(IPositionRequest request) {
+	private Hover collectGoal(IPositionRequest request, CancelChecker cancelChecker) throws CancellationException {
 		DOMNode node = request.getNode();
+		cancelChecker.checkCanceled();
+		PluginDescriptor pluginDescriptor = null;
 		try {
-			PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(node, plugin);
-			if (pluginDescriptor == null) { // probable incorrect pom file at this moment
-				return null;
-			}
-			for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
-				if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
-					return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
-				}
-			}
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(node, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
+		if (pluginDescriptor == null) { // probable incorrect pom file at this moment
+			return null;
+		}
+
+		for (MojoDescriptor mojo : pluginDescriptor.getMojos()) {
+			cancelChecker.checkCanceled();
+			if (!node.getNodeValue().trim().isEmpty() && node.getNodeValue().equals(mojo.getGoal())) {
+				return new Hover(new MarkupContent(MarkupKind.PLAINTEXT, mojo.getDescription()));
+			}
 		}
 		return null;
 	}
 
-	private Hover collectPluginConfiguration(IHoverRequest request) {
+	private Hover collectPluginConfiguration(IHoverRequest request, CancelChecker cancelChecker) throws CancellationException {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		Set<MojoParameter> parameters;
+		cancelChecker.checkCanceled();
 		try {
 			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
@@ -431,12 +451,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
 			// The configuration element being hovered is at the top level
 			for (MojoParameter parameter : parameters) {
+				cancelChecker.checkCanceled();
 				if (request.getNode().getLocalName().equals(parameter.name)) {
 					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null, supportsMarkdown));
 				}
 			}
 			// not found by name, search by alias
 			for (MojoParameter parameter : parameters) {
+				cancelChecker.checkCanceled();
 				if (request.getNode().getLocalName().equals(parameter.alias)) {
 					return new Hover(MavenPluginUtils.getMarkupDescription(parameter, null, supportsMarkdown));
 				}
@@ -447,13 +469,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		// Get the node's ancestor which is a child of configuration
 		DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
 		if (parentParameterNode != null) {
+			cancelChecker.checkCanceled();
 			List<MojoParameter> parentParameters = parameters.stream()
 					.filter(mojoParameter -> mojoParameter.name.equals(parentParameterNode.getLocalName()))
 					.collect(Collectors.toList());
 			if (!parentParameters.isEmpty()) {
 				MojoParameter parentParameter = parentParameters.get(0);
-
 				if (parentParameter.getNestedParameters().size() == 1) {
+					cancelChecker.checkCanceled();
 					// The parent parameter must be a collection of a type
 					MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 					Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
@@ -463,10 +486,12 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					}
 				}
 
+				cancelChecker.checkCanceled();
 				// Get all deeply nested parameters
 				List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
 				nestedParameters.add(parentParameter);
 				for (MojoParameter parameter : nestedParameters) {
+					cancelChecker.checkCanceled();
 					if (request.getNode().getLocalName().equals(parameter.name)) {
 						return new Hover(
 								MavenPluginUtils.getMarkupDescription(parameter, parentParameter, supportsMarkdown));
@@ -477,13 +502,16 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		return null;
 	}
 
-	private Hover collectProperty(IHoverRequest request, Map.Entry<Range, String> property) {
+	private Hover collectProperty(IHoverRequest request, Map.Entry<Range, String> property, CancelChecker cancelChecker) throws CancellationException {
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 		String lineBreak = MarkdownUtils.getLineBreak(supportsMarkdown);
 		DOMDocument doc = request.getXMLDocument();
+		
+		cancelChecker.checkCanceled();
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(doc);
 		if (project != null) {
+			cancelChecker.checkCanceled();
 			Map<String, String> allProps = ParticipantUtils.getMavenProjectProperties(project);
 			return allProps.entrySet().stream()
 				.filter(prop -> property.getValue().equals(prop.getKey()))
@@ -495,6 +523,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					// Find location
 					MavenProject parentProject = project, childProj = project;
 					while (parentProject != null && parentProject.getProperties().containsKey(property.getValue())) {
+						cancelChecker.checkCanceled();
 						childProj = parentProject;
 						parentProject = parentProject.getParent();
 					}
@@ -504,6 +533,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 					URI childProjectUri = ParticipantUtils.normalizedUri(childProj.getFile().toURI().toString());
 					URI thisProjectUri = ParticipantUtils.normalizedUri(doc.getDocumentURI());
+					cancelChecker.checkCanceled();
 					if (childProjectUri.equals(thisProjectUri)) {
 						// Property is defined in the same file as the request
 						propertyDeclaration = DOMUtils.findNodesByLocalName(doc, property.getValue()).stream()
@@ -512,11 +542,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 								childProj.getFile().toURI().toString(),
 								request.getNode().getOwnerDocument().getResolverExtensionManager());
+						cancelChecker.checkCanceled();
 						propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, property.getValue())
 								.stream().filter(isMavenProperty).findFirst().orElse(null);
 					}
 
 					if (propertyDeclaration != null) {
+						cancelChecker.checkCanceled();
 						String uri = childProj.getFile().toURI().toString();
 						Range targetRange = XMLPositionUtility.createRange(propertyDeclaration);
 						String sourceModelId = childProj.getGroupId() + ':' + childProj.getArtifactId() + ':' + childProj.getVersion();

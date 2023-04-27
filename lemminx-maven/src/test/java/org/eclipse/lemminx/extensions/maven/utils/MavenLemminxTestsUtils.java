@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2020 Red Hat Inc. and others.
+ * Copyright (c) 2019, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -29,8 +30,44 @@ import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.uriresolver.CacheResourceDownloadingException;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.TextDocumentItem;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public interface MavenLemminxTestsUtils {
+	// Checks the number of `checkCancel()` calls and throws CancallationException 
+	// when the number of  calls reaches the specified haseNumber with two exclusions:
+	// if phaseNumber == -1 - the cancellation never happens
+	// if phaseNumber == 0 or 1 - the cancellation happens immediately
+	public static class PhaseCancelChecker extends CancelCheckerCallCounter {
+		int cancellingPhase = -1;
+		
+		public PhaseCancelChecker(int phaseNumber) {
+			this.cancellingPhase = phaseNumber;
+		}
+		
+		@Override
+		public void checkCanceled() {
+			super.checkCanceled();
+			if (cancellingPhase == getCounterValue()) {
+				throw new CancellationException("Call is cancelled on phase " + cancellingPhase);
+			}
+		}
+		
+	}
+
+	// Counts the 'checkCanceled()` calls for an operation 
+	public static class CancelCheckerCallCounter implements CancelChecker {
+		private int counter = 0;
+		
+		@Override
+		public void checkCanceled() {
+			counter++;
+		}
+		
+		public int getCounterValue() {
+			return counter;
+		}
+		
+	}
 
 	public static TextDocumentItem createTextDocumentItem(String resourcePath) throws IOException, URISyntaxException {
 		return createTextDocumentItem(resourcePath, null);
