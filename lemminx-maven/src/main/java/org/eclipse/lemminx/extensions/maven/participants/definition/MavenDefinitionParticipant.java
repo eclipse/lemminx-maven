@@ -18,7 +18,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
@@ -40,6 +43,7 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenDefinitionParticipant implements IDefinitionParticipant {
 
+	private static final Logger LOGGER = Logger.getLogger(MavenDefinitionParticipant.class.getName());
 	private final MavenLemminxExtension plugin;
 
 	public MavenDefinitionParticipant(MavenLemminxExtension plugin) {
@@ -52,113 +56,137 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 		if (!MavenLemminxExtension.match(request.getXMLDocument())) {
 			return;
 		}
-		// make sure model is resolved and up-to-date
-		File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
-
-		LocationLink propertyLocation = findMavenPropertyLocation(request);
-		if (propertyLocation != null) {
-			locations.add(propertyLocation);
-			return;
-		}
-
-		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
-		if (element == null) {
-			return;
-		}
-		
-		if (MODULE_ELT.equals(element.getLocalName())) {
-			File subModuleFile = new File(currentFolder,
-					element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
-			if (subModuleFile.isFile()) {
-				locations.add(toLocationNoRange(subModuleFile, element));
-			}
-			return;
-		}
-		
-		MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
-		Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
-
-		DOMNode parentNode = DOMUtils.findClosestParentNode(request.getNode(), PARENT_ELT);
-		if (parentNode != null && parentNode.isElement()) {
-			// Find in workspace
-			if (ParticipantUtils.isWellDefinedDependency(dependency)) {
-				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
-				if (artifact != null && artifact.getFile() != null) {
-					LocationLink location = toLocationNoRange(artifact.getFile(), element);
-					if (location != null) {
-						locations.add(location);
-						return;
-					}
-				}
-			}
+		try {
+			// make sure model is resolved and up-to-date
+			File currentFolder = new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile();
 			
-			Optional<String> relativePath = DOMUtils.findChildElementText(element, RELATIVE_PATH_ELT);
-			if (relativePath.isPresent()) {
-				File relativeFile = new File(currentFolder, relativePath.get());
-				if (relativeFile.isDirectory()) {
-					relativeFile = new File(relativeFile, Maven.POMv4);
-				}
-				if (relativeFile.isFile()) {
-					locations.add(toLocationNoRange(relativeFile, parentNode));
-					return;
-				}
-			} else {
-				File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
-				if (match(relativeFile, dependency)) {
-					locations.add(toLocationNoRange(relativeFile, parentNode));
-					return;
-				} else {
-					// those next lines may actually be more generic and suit parent definition in any case
-					MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
-					if (project != null && project.getParentFile() != null) {
-						locations.add(toLocationNoRange(project.getParentFile(), parentNode));
-						return;
-					}
-				}
-			}
-		}
-
-		dependency = ParticipantUtils.resolveDependency(p, dependency, element, plugin);
-		if (dependency != null) {
-			// Find in workspace
-			if (ParticipantUtils.isWellDefinedDependency(dependency)) {
-				Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
-				if (artifact != null && artifact.getFile() != null) {
-					locations.add(toLocationNoRange(artifact.getFile(), element));
-					return;
-				}
-			}
-			
-			// Find in local repository
-			File localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
-			if (localArtifactLocation != null && localArtifactLocation.isFile()) {
-				locations.add(toLocationNoRange(localArtifactLocation, element));
+			LocationLink propertyLocation = findMavenPropertyLocation(request, cancelChecker);
+			if (propertyLocation != null) {
+				cancelChecker.checkCanceled();
+				locations.add(propertyLocation);
 				return;
 			}
+	
+			cancelChecker.checkCanceled();
+			DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
+			if (element == null) {
+				return;
+			}
+			if (MODULE_ELT.equals(element.getLocalName())) {
+				File subModuleFile = new File(currentFolder,
+						element.getFirstChild().getTextContent() + File.separator + Maven.POMv4);
+				if (subModuleFile.isFile()) {
+					cancelChecker.checkCanceled();
+					locations.add(toLocationNoRange(subModuleFile, element));
+				}
+				return;
+			}
+			
+			cancelChecker.checkCanceled();
+			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(element.getOwnerDocument());
+			Dependency dependency = ParticipantUtils.getArtifactToSearch(p, request.getNode());
+	
+			cancelChecker.checkCanceled();
+			DOMNode parentNode = DOMUtils.findClosestParentNode(request.getNode(), PARENT_ELT);
+			if (parentNode != null && parentNode.isElement()) {
+				// Find in workspace
+				if (ParticipantUtils.isWellDefinedDependency(dependency)) {
+					cancelChecker.checkCanceled();
+					Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+					if (artifact != null && artifact.getFile() != null) {
+						LocationLink location = toLocationNoRange(artifact.getFile(), element);
+						if (location != null) {
+							cancelChecker.checkCanceled();
+							locations.add(location);
+							return;
+						}
+					}
+				}
+				
+				cancelChecker.checkCanceled();
+				Optional<String> relativePath = DOMUtils.findChildElementText(element, RELATIVE_PATH_ELT);
+				if (relativePath.isPresent()) {
+					File relativeFile = new File(currentFolder, relativePath.get());
+					if (relativeFile.isDirectory()) {
+						relativeFile = new File(relativeFile, Maven.POMv4);
+					}
+					if (relativeFile.isFile()) {
+						cancelChecker.checkCanceled();
+						locations.add(toLocationNoRange(relativeFile, parentNode));
+						return;
+					}
+				} else {
+					File relativeFile = new File(currentFolder.getParentFile(), Maven.POMv4);
+					if (match(relativeFile, dependency)) {
+						cancelChecker.checkCanceled();
+						locations.add(toLocationNoRange(relativeFile, parentNode));
+						return;
+					} else {
+						// those next lines may actually be more generic and suit parent definition in any case
+						MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+						if (project != null && project.getParentFile() != null) {
+							cancelChecker.checkCanceled();
+							locations.add(toLocationNoRange(project.getParentFile(), parentNode));
+							return;
+						}
+					}
+				}
+			}
+	
+			cancelChecker.checkCanceled();
+			dependency = ParticipantUtils.resolveDependency(p, dependency, element, plugin);
+			if (dependency != null) {
+				cancelChecker.checkCanceled();
+				// Find in workspace
+				if (ParticipantUtils.isWellDefinedDependency(dependency)) {
+					Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+					if (artifact != null && artifact.getFile() != null) {
+						cancelChecker.checkCanceled();
+						locations.add(toLocationNoRange(artifact.getFile(), element));
+						return;
+					}
+				}
+				
+				cancelChecker.checkCanceled();
+				// Find in local repository
+				File localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
+				if (localArtifactLocation != null && localArtifactLocation.isFile()) {
+					cancelChecker.checkCanceled();
+					locations.add(toLocationNoRange(localArtifactLocation, element));
+					return;
+				}
+			}
+		} catch (CancellationException e) {
+			LOGGER.log(Level.FINER, e.toString(), e);
 		}
 	}
 	
-	private LocationLink findMavenPropertyLocation(IDefinitionRequest request) {
+	private LocationLink findMavenPropertyLocation(IDefinitionRequest request, CancelChecker cancelChecker) throws CancellationException{
+		cancelChecker.checkCanceled();
 		Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
 		if (mavenProperty == null) {
 			return null;
 		}
+
+		cancelChecker.checkCanceled();
 		DOMDocument xmlDocument = request.getXMLDocument();
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(xmlDocument);
 		if (project == null) {
 			return null;
 		}
+		
 		MavenProject childProj = project;
 		while (project != null && project.getProperties().containsKey(mavenProperty.getValue())) {
+			cancelChecker.checkCanceled();
 			childProj = project;
 			project = project.getParent();
 		}
 
 		DOMNode propertyDeclaration = null;
 		Predicate<DOMNode> isMavenProperty = (node) -> PROPERTIES_ELT.equals(node.getParentNode().getLocalName());
-
 		URI childProjectUri = ParticipantUtils.normalizedUri(childProj.getFile().toURI().toString());
 		URI thisProjectUri = ParticipantUtils.normalizedUri(xmlDocument.getDocumentURI());
+		cancelChecker.checkCanceled();
 		if (childProjectUri.equals(thisProjectUri)) {
 			// Property is defined in the same file as the request
 			propertyDeclaration = DOMUtils.findNodesByLocalName(xmlDocument, mavenProperty.getValue()).stream()
@@ -167,6 +195,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 					childProj.getFile().toURI().toString(),
 					request.getNode().getOwnerDocument().getResolverExtensionManager());
+			cancelChecker.checkCanceled();
 			propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, mavenProperty.getValue())
 					.stream().filter(isMavenProperty).findFirst().orElse(null);
 		}
@@ -175,6 +204,7 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 			return null;
 		}
 
+		cancelChecker.checkCanceled();
 		return toLocation(childProj.getFile(), propertyDeclaration, mavenProperty.getKey());
 	}
 
