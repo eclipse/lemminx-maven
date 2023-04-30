@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021-2022 Red Hat Inc. and others.
+ * Copyright (c) 2021, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -31,6 +31,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.ArtifactUtils;
@@ -295,7 +296,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 			.filter(File::isFile)
 			.filter(file -> !workspaceArtifacts.values().contains(file)) // ignore already processed
 			.forEach(toProcess::add);
-		for (File file : toProcess) {
+		for (File file : toProcess.stream().collect(Collectors.toSet())) {
 			executor.execute(new ResolveArtifactsAndPopulateWorkspaceRunnable(file));
 		}
 	}
