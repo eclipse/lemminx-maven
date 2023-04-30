@@ -268,16 +268,20 @@ public class ParticipantUtils {
 
 		return allProps;
 	}
-	
+
 	public static Map.Entry<Range, String> getMavenPropertyInRequest(IPositionRequest request) {
-		DOMNode tag = request.getNode();
-		String tagText = tag.getNodeValue();
-		if (tagText == null) {
+		return getMavenProperty(request.getNode(), request.getOffset());
+	}
+	
+	public static Map.Entry<Range, String> getMavenProperty(DOMNode tag, int offset) {
+		DOMElement element = tag.isElement() ? (DOMElement)tag : tag.getParentElement();
+		String tagText = DOMUtils.findElementText(element).orElse(null);
+		if (tagText == null || tagText.indexOf("${") == -1) {
 			return null;
 		}
 
-		int hoverLocation = request.getOffset();
-		int propertyOffset = request.getNode().getStart();
+		int hoverLocation = offset;
+		int propertyOffset = tag.getStart();
 		int beforeHover = hoverLocation - propertyOffset;
 
 		String beforeHoverText = tagText.substring(0, beforeHover);
@@ -289,9 +293,9 @@ public class ParticipantUtils {
 		if (indexOpen > indexCloseBefore) {
 
 			String propertyText = tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
-			int textStart = request.getNode().getStart();
+			int textStart = tag.getStart();
 			Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
-					textStart + indexCloseAfter - 1, request.getXMLDocument());
+					textStart + indexCloseAfter - 1, tag.getOwnerDocument());
 			return Map.entry(propertyRange, propertyText);
 		}
 		return null;

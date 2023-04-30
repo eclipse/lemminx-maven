@@ -25,6 +25,8 @@ import java.util.Properties;
 
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
+import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationRootSettings;
 import org.eclipse.lemminx.extensions.contentmodel.uriresolver.XMLCacheResolverExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.uriresolver.CacheResourceDownloadingException;
@@ -125,5 +127,16 @@ public interface MavenLemminxTestsUtils {
 				e.printStackTrace();
 			}	
 		});
+	}
+	
+	public static ContentModelSettings  createContentModelSettings(boolean ignoreNoGrammar) {
+		ContentModelSettings settings = new ContentModelSettings();
+		settings.setUseCache(false);
+		XMLValidationRootSettings problems = new XMLValidationRootSettings();
+		if (ignoreNoGrammar) {
+			problems.setNoGrammar("ignore");
+		}
+		settings.setValidation(problems);
+		return settings;
 	}
 }
