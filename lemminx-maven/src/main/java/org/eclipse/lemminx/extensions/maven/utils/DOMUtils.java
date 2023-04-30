@@ -20,8 +20,11 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMText;
+import org.eclipse.lemminx.extensions.contentmodel.utils.XMLGenerator;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
+import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionRequest;
 import org.eclipse.lemminx.services.extensions.completion.ICompletionRequest;
+import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.w3c.dom.Text;
 
 public class DOMUtils {
@@ -107,11 +110,24 @@ public class DOMUtils {
 				.map(DOMText.class::cast)
 				.collect(Collectors.toList());
 	}
-	
-	public static String getOneLevelIndent(ICompletionRequest request) throws BadLocationException {
-		String oneLevelIndent = request.getLineIndentInfo().getWhitespacesIndent();
+
+	public static String getOneLevelIndent(ICodeActionRequest request) throws BadLocationException {
+		int startOffset =  request.getDocument().offsetAt(request.getRange().getStart());
+		DOMNode node = request.getDocument().findNodeAt(startOffset);
+		if (!node.isElement()) {
+			node = node.getParentNode();
+		}
+		return getOneLevelIndent(node.getParentElement(), request.getXMLGenerator().getWhitespacesIndent());
+	}
+
+	public static String getOneLevelIndent(IPositionRequest request) throws BadLocationException {
+		return getOneLevelIndent(request.getParentElement(), request.getLineIndentInfo().getWhitespacesIndent());
+	}
+
+	public static String getOneLevelIndent(DOMElement parentElement, String lineIndent) throws BadLocationException {
+		String oneLevelIndent = lineIndent;
 		int nodeDepth = 0;
-		DOMElement element = request.getParentElement();
+		DOMElement element = parentElement;
 		while (element != null) {
 			nodeDepth++;
 			element = element.getParentElement();

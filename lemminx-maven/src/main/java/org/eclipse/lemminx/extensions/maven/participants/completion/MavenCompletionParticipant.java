@@ -699,21 +699,21 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				String newText = "";
 				String suffix = "";
 				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
+				String oneLevelIndent = DOMUtils.getOneLevelIndent(request);
+				String lineDelimiter = request.getLineIndentInfo().getLineDelimiter();
 				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy nodeWithChildren) {
 					String elementName = nodeWithChildren.elementName;
-					gavElementsIndent += DOMUtils.getOneLevelIndent(request);
-					newText += "<" + elementName + ">" + request.getLineIndentInfo().getLineDelimiter()
-							+ gavElementsIndent;
-					suffix = request.getLineIndentInfo().getLineDelimiter()
-							+ request.getLineIndentInfo().getWhitespacesIndent() + "</" + elementName + ">";
+					newText += "<" + elementName + ">" + lineDelimiter + gavElementsIndent + oneLevelIndent; 
+					suffix = lineDelimiter + gavElementsIndent + "</" + elementName + ">";
+					gavElementsIndent += oneLevelIndent;
 				}
 				if (insertGroupId) {
 					newText += "<groupId>" + artifactInfo.artifact.getGroupId() + "</groupId>"
-							+ request.getLineIndentInfo().getLineDelimiter() + gavElementsIndent;
+							+ lineDelimiter + gavElementsIndent;
 				}
 				newText += "<artifactId>" + artifactInfo.artifact.getArtifactId() + "</artifactId>";
 				if (insertVersion) {
-					newText += request.getLineIndentInfo().getLineDelimiter() + gavElementsIndent;
+					newText += lineDelimiter + gavElementsIndent;
 					newText += "<version>" + artifactInfo.artifact.getVersion() + "</version>";
 				}
 				newText += suffix;
