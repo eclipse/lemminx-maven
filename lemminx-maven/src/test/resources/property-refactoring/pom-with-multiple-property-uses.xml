@@ -1,0 +1,35 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.test</groupId>
+	<artifactId>test</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+
+	<properties>
+		<myPropertyGroupId>my-property-group-value</myPropertyGroupId>
+		<myPropertyArtifactId_1>my-property-group-value</myPropertyArtifactId_1>
+		<myPropertyArtifactId_2>my-property-group-value</myPropertyArtifactId_2>
+		<myPropertyArtifactId_3>my-property-group-value</myPropertyArtifactId_3>
+		<myPropertyVersion>my-property-group-value</myPropertyVersion>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>${myPropertyGroupId}</groupId>
+			<artifactId>${myPropertyArtifactId_1}</artifactId>
+			<version>${myPropertyVersion}</version>
+		</dependency>
+		<dependency>
+			<groupId>${myPropertyGroupId}</groupId>
+			<artifactId>${myPropertyArtifactId_2}</artifactId>
+			<version>${myPropertyVersion}</version>
+		</dependency>
+		<dependency>
+			<groupId>${myPropertyGroupId}</groupId>
+			<artifactId>${myPropertyArtifactId_3}</artifactId>
+			<version>${myPropertyVersion}</version>
+		</dependency>
+	</dependencies>
+</project>

@@ -19,6 +19,7 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.dom.DOMText;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.services.extensions.completion.ICompletionRequest;
 import org.w3c.dom.Text;
@@ -98,6 +99,13 @@ public class DOMUtils {
 				.map(Text.class::cast)
 				.map(Text::getData)
 				.findFirst();
+	}
+
+	public static List<DOMText> findElementTextChildren(DOMElement element) {
+		return element.getChildren().stream()
+				.filter(DOMText.class::isInstance)
+				.map(DOMText.class::cast)
+				.collect(Collectors.toList());
 	}
 	
 	public static String getOneLevelIndent(ICompletionRequest request) throws BadLocationException {
