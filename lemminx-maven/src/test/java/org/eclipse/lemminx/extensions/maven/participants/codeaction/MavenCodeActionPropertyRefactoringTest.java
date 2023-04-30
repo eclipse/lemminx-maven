@@ -42,7 +42,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 	//
 	// Inline maven properties
 	//
-
+	
 	@Test
 	public void testCodeActionsInlineSinglePropertyUse() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/property-refactoring/pom-with-property.xml", xmlLanguageService);
