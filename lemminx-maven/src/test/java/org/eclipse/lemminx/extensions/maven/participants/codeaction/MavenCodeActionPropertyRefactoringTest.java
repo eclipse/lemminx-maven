@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.dom.LineIndentInfo;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -37,7 +38,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public class MavenCodeActionPropertyRefactoringTest {
 	private XMLLanguageService xmlLanguageService = new XMLLanguageService();
 	private SharedSettings sharedSettings = new SharedSettings();
-	
+
+	//
+	// Inline maven properties
+	//
+
 	@Test
 	public void testCodeActionsInlineSinglePropertyUse() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/property-refactoring/pom-with-property.xml", xmlLanguageService);
@@ -60,7 +65,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
 				expectedCodeAction);
 	}
-	
+
 	@Test
 	public void testCodeActionsInlineMultiplePropertyUses() throws Exception {
 		DOMDocument xmlDocument = createDOMDocument("/property-refactoring/pom-with-multiple-property-uses.xml", xmlLanguageService);
@@ -106,4 +111,120 @@ public class MavenCodeActionPropertyRefactoringTest {
 				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
 				expectedCodeAction_1, expectedCodeAction_2);
 	}
+
+	//
+	// Extract maven properties
+	//
+
+	@Test
+	public void testCodeActionsExtractSingleProperty() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/property-refactoring/pom-with-value.xml", xmlLanguageService);
+		String text = xmlDocument.getText();
+		TextDocument document = xmlDocument.getTextDocument();
+		
+		// <version>0.0.1</version>
+		String valueUse = "<version>0.0.1</version>";
+
+		// We'll try getting a code action from a cursor position 
+		// somewhere in the middle of the value
+		int valueStart = text.indexOf(valueUse);
+		int valueEnd = valueStart + valueUse.length();
+		Position valueStartPosition = document.positionAt(valueStart + "<version>".length());
+		Position valueEndPosition = document.positionAt(valueEnd - "/<version>".length());
+
+		Position position = document.positionAt((valueStart + valueEnd) / 2);
+		
+		// Code action for extracting a single value into a property
+
+		// TextEdit to add a header properties
+		int propertiesOffset = xmlDocument.getDocumentElement().getStartTagCloseOffset() + 1;
+		Position propertiesPosition = xmlDocument.positionAt(propertiesOffset);
+		LineIndentInfo indentInfo = xmlDocument.getLineIndentInfo(propertiesPosition.getLine());
+		String lineDelimiter = indentInfo.getLineDelimiter();
+		String indent = indentInfo.getWhitespacesIndent();
+		
+		StringBuilder propertiesValue = new StringBuilder(); 
+		propertiesValue.append(lineDelimiter)
+			.append(indent).append("<properties>").append(lineDelimiter)
+			.append(indent).append(indent)
+			.append("<test-1-version>0.0.1</test-1-version>").append(lineDelimiter)
+			.append(indent).append("</properties>").append(lineDelimiter);
+		
+		List<TextEdit> textEdits = new ArrayList<>();
+		textEdits.add(new TextEdit(new Range(propertiesPosition, propertiesPosition), propertiesValue.toString()));
+		textEdits.add(new TextEdit(new Range(valueStartPosition, valueEndPosition), "${test-1-version}"));
+		assertTrue(textEdits.size() == 2, "The TextEdits size should be 2");
+		CodeAction expectedCodeAction = ca(null,  
+				teOp(xmlDocument.getDocumentURI(), textEdits.toArray(new TextEdit[textEdits.size()])));
+		
+		// Test for expected code actions returned
+		testCodeActionsFor(xmlDocument.getText(), null, new Range(position, position), 
+				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
+				expectedCodeAction);
+	}	
+
+	@Test
+	public void testCodeActionsExtracMultiplePropertyUses() throws Exception {
+		DOMDocument xmlDocument = createDOMDocument("/property-refactoring/pom-with-multiple-values.xml", xmlLanguageService);
+		String text = xmlDocument.getText();
+		TextDocument document = xmlDocument.getTextDocument();
+		
+		// <version>0.0.1</version>
+		String valueUse = "<version>0.0.1</version>";
+		List<Range> ranges = new ArrayList<>();
+
+		int index = 0;
+		for (index = text.indexOf(valueUse); index != -1; index = text.indexOf(valueUse, index + valueUse.length())) {
+			try {
+				int valueStart = index;
+				int valueEnd = valueStart + valueUse.length();
+
+				Position valueStartPosition = document.positionAt(valueStart + "<version>".length());
+				Position valueEndPosition = document.positionAt(valueEnd - "/<version>".length());
+				ranges.add(new Range(valueStartPosition, valueEndPosition));
+			} catch (BadLocationException e) {
+				fail("Cannot find all value uses in test data", e);
+			}
+		}
+		assertTrue(ranges.size() > 1, "There should be more than one value use");
+
+		// Code action for extracting a single value into a property
+
+		// TextEdit to add a header properties
+		int propertiesOffset = xmlDocument.getDocumentElement().getStartTagCloseOffset() + 1;
+		Position propertiesPosition = xmlDocument.positionAt(propertiesOffset);
+		LineIndentInfo indentInfo = xmlDocument.getLineIndentInfo(propertiesPosition.getLine());
+		String lineDelimiter = indentInfo.getLineDelimiter();
+		String indent = indentInfo.getWhitespacesIndent();
+		
+		StringBuilder propertiesValue = new StringBuilder(); 
+		propertiesValue.append(lineDelimiter)
+			.append(indent).append("<properties>").append(lineDelimiter)
+			.append(indent).append(indent)
+			.append("<test-1-version>0.0.1</test-1-version>").append(lineDelimiter)
+			.append(indent).append("</properties>").append(lineDelimiter);
+		
+		List<TextEdit> singleTextEdits = new ArrayList<>();
+		singleTextEdits.add(new TextEdit(new Range(propertiesPosition, propertiesPosition), propertiesValue.toString()));
+		singleTextEdits.add(new TextEdit(ranges.get(0), "${test-1-version}"));
+		assertTrue(singleTextEdits.size() == 2, "The TextEdits size should be 2");
+		CodeAction expectedCodeAction_1 = ca(null,  
+				teOp(xmlDocument.getDocumentURI(), singleTextEdits.toArray(new TextEdit[singleTextEdits.size()])));
+		
+		// Code action for extracting all the value uses to a property 
+
+		List<TextEdit> multipleTextEdits = new ArrayList<>();
+		multipleTextEdits.add(new TextEdit(new Range(propertiesPosition, propertiesPosition), propertiesValue.toString()));
+		multipleTextEdits.addAll(ranges.stream().map(range -> 
+		te(range.getStart().getLine(), range.getStart().getCharacter(), 
+			range.getEnd().getLine(), range.getEnd().getCharacter(), 
+			"${test-1-version}")).collect(Collectors.toList())) ;
+		assertTrue(multipleTextEdits.size() == ranges.size() + 1, "The TextEdits size should be equl to the size of ranges");
+		CodeAction expectedCodeAction_2 = ca(null,  teOp(xmlDocument.getDocumentURI(), multipleTextEdits.toArray(new TextEdit[multipleTextEdits.size()])));
+
+		// Test for expected code actions returned
+		testCodeActionsFor(xmlDocument.getText(), null, ranges.get(0), 
+				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
+				expectedCodeAction_1, expectedCodeAction_2);
+	}	
 }

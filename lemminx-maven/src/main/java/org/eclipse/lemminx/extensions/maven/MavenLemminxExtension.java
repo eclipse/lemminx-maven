@@ -75,6 +75,7 @@ import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMParser;
+import org.eclipse.lemminx.extensions.maven.participants.codeaction.ExtractPropertyCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.InlinePropertyCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenIdPartRemovalCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenManagedVersionRemovalCodeAction;
@@ -590,6 +591,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 				// Refactoring 
 				codeActionParticipants.add(new InlinePropertyCodeAction(this));
+				codeActionParticipants.add(new ExtractPropertyCodeAction(this));
 				
 				codeActionParticipants.stream().forEach(registry::registerCodeActionParticipant);
 			}
