@@ -18,7 +18,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -76,25 +75,20 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 		
 		Deque<DOMNode> nodes = new ArrayDeque<>();
-		for (DOMNode node : documentElement.getChildren()) {
-			nodes.push(node);
-		}
+		documentElement.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 		while (!nodes.isEmpty()) {
 			DOMNode node = nodes.pop();
-			for (Entry<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> entry : tagDiagnostics
-					.entrySet()) {
-				if (node.getLocalName() != null && node.getLocalName().equals(entry.getKey())) {
-					entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)).ifPresent(diagnosticList -> {
-						// Don't add a diagnostic if it already exists
+			String nodeName = node.getLocalName(); 
+			if (nodeName != null) {
+				tagDiagnostics.entrySet().stream().filter(entry -> nodeName.equals(entry.getKey()))
+					.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
+					.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
 						diagnostics.addAll(diagnosticList.stream()
 								.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
-					});
-				}
+					});;
 			}
 			if (node.hasChildNodes()) {
-				for (DOMNode childNode : node.getChildren()) {
-					nodes.push(childNode);
-				}
+				node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 			}
 		}
 	}
