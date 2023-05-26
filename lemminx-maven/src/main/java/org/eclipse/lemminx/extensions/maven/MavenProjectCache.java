@@ -126,7 +126,7 @@ public class MavenProjectCache {
 
 	private void check(File pomFile) {
 		Integer last = lastCheckedVersion.get(pomFile.toURI().normalize());
-		if (last == null || last.intValue() < 1) {
+		if (last == null || last.intValue() < 0) {
 			parseAndCache(pomFile);
 		}
 	}
@@ -237,7 +237,7 @@ public class MavenProjectCache {
 	private void parseAndCache(File pomFile) {
 		URI uri = pomFile.toURI().normalize();
 		FileModelSource source = new FileModelSource(pomFile);
-		parseAndCache(uri, 1, source);
+		parseAndCache(uri, 0, source);
 	}
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {

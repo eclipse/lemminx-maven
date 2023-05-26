@@ -84,6 +84,7 @@ import org.eclipse.lemminx.extensions.maven.participants.completion.MavenComplet
 import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinitionParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
+import org.eclipse.lemminx.extensions.maven.participants.rename.MavenPropertyRenameParticipant;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -94,6 +95,7 @@ import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant
 import org.eclipse.lemminx.services.extensions.completion.ICompletionParticipant;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lemminx.services.extensions.hover.IHoverParticipant;
+import org.eclipse.lemminx.services.extensions.rename.IRenameParticipant;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext;
 import org.eclipse.lemminx.services.extensions.save.ISaveContext.SaveContextType;
 import org.eclipse.lemminx.settings.AllXMLSettings;
@@ -119,6 +121,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private MavenDefinitionParticipant definitionParticipant;
 	private MavenWorkspaceService workspaceServiceParticipant;
 	private List<ICodeActionParticipant> codeActionParticipants = new ArrayList<>();
+	private IRenameParticipant propertyRenameParticipant;
 
 	private MavenProjectCache cache;
 	private RemoteCentralRepositorySearcher centralSearcher;
@@ -178,6 +181,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 			definitionParticipant = new MavenDefinitionParticipant(this);
 			registry.registerDefinitionParticipant(definitionParticipant);
 			registerCodeActionParticipants(registry);
+			propertyRenameParticipant = new MavenPropertyRenameParticipant(this);
+			registry.registerRenameParticipant(propertyRenameParticipant);
 		} catch (Exception ex) {
 			LOGGER.log(Level.SEVERE, ex.getCause().toString(), ex);
 		}
@@ -360,6 +365,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 	@Override
 	public void stop(XMLExtensionsRegistry registry) {
+		registry.unregisterRenameParticipant(propertyRenameParticipant);
+		this.propertyRenameParticipant = null;
 		unregisterCodeActionParticipants(registry);
 		registry.unregisterCompletionParticipant(completionParticipant);
 		this.completionParticipant = null;
