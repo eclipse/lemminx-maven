@@ -1,0 +1,21 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.test</groupId>
+		<artifactId>test-parent</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>./parent/pom.xml</relativePath>
+	</parent>
+	<artifactId>test-child</artifactId>
+	<packaging>pom</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>${test-group-id}</groupId>
+			<artifactId>test-dependency-2</artifactId>
+			<version>${test-version}</version>
+		</dependency>
+	</dependencies>
+</project>

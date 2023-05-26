@@ -20,11 +20,8 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMText;
-import org.eclipse.lemminx.extensions.contentmodel.utils.XMLGenerator;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionRequest;
-import org.eclipse.lemminx.services.extensions.completion.ICompletionRequest;
-import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.w3c.dom.Text;
 
 public class DOMUtils {

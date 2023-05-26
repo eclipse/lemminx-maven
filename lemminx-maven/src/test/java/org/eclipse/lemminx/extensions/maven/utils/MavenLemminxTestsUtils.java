@@ -92,7 +92,7 @@ public interface MavenLemminxTestsUtils {
 				contents = contents.replaceAll((String)entry.getKey(), (String)entry.getValue());
 			}
 		}
-		return new TextDocumentItem(uri.toString(), "xml", 1, contents);
+		return new TextDocumentItem(uri.toString(), "xml", 0, contents);
 	}
 
 	public static boolean completionContains(List<CompletionItem> completionItems, String searchString) {
