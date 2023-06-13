@@ -72,7 +72,11 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				skipFlushBeforeResult.set(true); // avoid deadlock as building project will go through this workspace reader
 				Optional<MavenProject> snapshotProject = Optional.empty();
 				try {
-					snapshotProject = plugin.getProjectCache().getSnapshotProject(pomFile);
+					// Just getting a snapshot project using `getSnapshotProject` is not enough here
+					// because it doesn't adds the read projects to the projects cache.
+					// So we need to parse and cache the project here
+					//
+					snapshotProject = Optional.of(plugin.getProjectCache().getLastSuccessfulMavenProject(pomFile));
 				} catch (Exception e) {
 					// We shouldn't fail here, otherwise, the pomFile will never be processed 
 					// causing a possible deadlock in "Flush Before Result" loops
@@ -296,7 +300,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 			.filter(File::isFile)
 			.filter(file -> !workspaceArtifacts.values().contains(file)) // ignore already processed
 			.forEach(toProcess::add);
-		for (File file : toProcess.stream().collect(Collectors.toSet())) {
+		for (File file : toProcess.stream().collect(Collectors.toList())) {
 			executor.execute(new ResolveArtifactsAndPopulateWorkspaceRunnable(file));
 		}
 	}

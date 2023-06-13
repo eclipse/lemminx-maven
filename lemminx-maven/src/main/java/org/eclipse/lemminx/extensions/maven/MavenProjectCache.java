@@ -77,8 +77,10 @@ public class MavenProjectCache {
 	}
 
 	/**
-	 *
-	 * @param document
+	 * Returns the last successfully parsed and cached Maven Project for the 
+	 * given document
+	 * 
+	 * @param document A given Document
 	 * @return the last MavenDocument that could be build for the more recent
 	 *         version of the provided document. If document fails to build a
 	 *         MavenProject, a former version will be returned. Can be
@@ -87,6 +89,21 @@ public class MavenProjectCache {
 	public MavenProject getLastSuccessfulMavenProject(DOMDocument document) {
 		check(document);
 		return projectCache.get(URI.create(document.getTextDocument().getUri()).normalize());
+	}
+
+	/**
+	 * Returns the last successfully parsed and cached Maven Project for the 
+	 * given POM file
+	 * 
+	 * @param pomFile A given POM File
+	 * @return the last MavenDocument that could be build for the more recent
+	 *         version of the provided document. If document fails to build a
+	 *         MavenProject, a former version will be returned. Can be
+	 *         <code>null</code>.
+	 */
+	public MavenProject getLastSuccessfulMavenProject(File pomFile) {
+		check(pomFile);
+		return projectCache.get(pomFile.toURI().normalize());
 	}
 
 	/**
@@ -104,6 +121,13 @@ public class MavenProjectCache {
 		Integer last = lastCheckedVersion.get(URI.create(document.getTextDocument().getUri()).normalize());
 		if (last == null || last.intValue() < document.getTextDocument().getVersion()) {
 			parseAndCache(document);
+		}
+	}
+
+	private void check(File pomFile) {
+		Integer last = lastCheckedVersion.get(pomFile.toURI().normalize());
+		if (last == null || last.intValue() < 1) {
+			parseAndCache(pomFile);
 		}
 	}
 
@@ -129,16 +153,10 @@ public class MavenProjectCache {
 		return Optional.empty();
 	}
 
-	private void parseAndCache(DOMDocument document) {
-		URI uri = URI.create(document.getDocumentURI()).normalize();
+	private void parseAndCache(URI uri, int version, FileModelSource source) {
 		Collection<ModelProblem> problems = new ArrayList<>();
 		try {
-			ProjectBuildingResult buildResult = projectBuilder.build(new FileModelSource(new File(uri)) {
-				@Override
-				public InputStream getInputStream() throws IOException {
-					return new ByteArrayInputStream(document.getText().getBytes());
-				}
-			}, newProjectBuildingRequest());
+			ProjectBuildingResult buildResult = projectBuilder.build(source, newProjectBuildingRequest());
 			problems.addAll(buildResult.getProblems());
 			if (buildResult.getProject() != null) {
 				// setFile should ideally be invoked during project build, but related methods
@@ -147,7 +165,7 @@ public class MavenProjectCache {
 				projectCache.put(uri, buildResult.getProject());
 				projectParsedListeners.forEach(listener -> listener.accept(buildResult.getProject()));
 			}
-			lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
+			lastCheckedVersion.put(uri, version);
 			problemCache.put(uri, problems);
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
@@ -156,8 +174,7 @@ public class MavenProjectCache {
 					// errors and to have something usable in cache for most basic operations
 					problems.addAll(modelBuildingException.getProblems());
 					File file = new File(uri);
-					try (ByteArrayInputStream documentStream = new ByteArrayInputStream(
-							document.getText().getBytes())) {
+					try (InputStream documentStream = source.getInputStream()) {
 						Model model = mavenReader.read(documentStream);
 						MavenProject project = new MavenProject(model);
 						project.setRemoteArtifactRepositories(model.getRepositories().stream()
@@ -195,7 +212,7 @@ public class MavenProjectCache {
 					}
 				}
 			}
-			lastCheckedVersion.put(uri, document.getTextDocument().getVersion());
+			lastCheckedVersion.put(uri, version);
 			problemCache.put(uri, problems);
 		} catch (Exception e) {
 			// Do not add any info, like lastCheckedVersion or problems, to the cache 
@@ -203,6 +220,24 @@ public class MavenProjectCache {
 			// 
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
+	}
+
+	private void parseAndCache(DOMDocument document) {
+		URI uri = URI.create(document.getDocumentURI()).normalize();
+		int version = document.getTextDocument().getVersion();
+		FileModelSource source = new FileModelSource(new File(uri)) {
+			@Override
+			public InputStream getInputStream() throws IOException {
+				return new ByteArrayInputStream(document.getText().getBytes());
+			}
+		};
+		parseAndCache(uri, version, source);
+	}
+
+	private void parseAndCache(File pomFile) {
+		URI uri = pomFile.toURI().normalize();
+		FileModelSource source = new FileModelSource(pomFile);
+		parseAndCache(uri, 1, source);
 	}
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {
