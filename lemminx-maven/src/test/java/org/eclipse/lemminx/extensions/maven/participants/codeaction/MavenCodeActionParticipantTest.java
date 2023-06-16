@@ -247,7 +247,7 @@ public class MavenCodeActionParticipantTest {
 		assertDiagnostics(actual, Arrays.asList(expectedDiagnostic), true);		
 
 		// Test for expected code action is returned
-		testCodeActionsFor(xmlDocument.getText(), expectedDiagnostic, (String) null, "pom.xml", 
+		testCodeActionsFor(xmlDocument.getText(), expectedDiagnostic, null, (String) null, "pom.xml", 
 				sharedSettings, xmlLanguageService, -1, expectedCodeAction);
 	}
 	
