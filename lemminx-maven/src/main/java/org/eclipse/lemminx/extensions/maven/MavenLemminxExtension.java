@@ -135,7 +135,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	XMLMavenSettings settings = new XMLMavenSettings();
 	private URIResolverExtensionManager resolverExtensionManager;
 	private List<WorkspaceFolder> initialWorkspaceFolders = List.of();
-	
+	private LinkedHashSet<URI> currentWorkspaceFolders = new LinkedHashSet<>();
+
 	@Override
 	public void doSave(ISaveContext context) {
 		if (context.getType() == SaveContextType.SETTINGS) {
@@ -445,8 +446,14 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return resolverExtensionManager;
 	}
 
+	public LinkedHashSet<URI> getCurrentWorkspaceFolders() {
+		return currentWorkspaceFolders;
+	}
+	
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		initialize();
+		currentWorkspaceFolders.addAll(List.of(added != null? added : new URI[0]));
+		currentWorkspaceFolders.removeAll(List.of(removed != null ? removed : new URI[0]));
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
 		if (workspaceReader instanceof MavenLemminxWorkspaceReader reader) {
 			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
@@ -516,18 +523,42 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return null;
 	}
 
-	private static String key(Dependency artifact) {
+	/**
+	 * Creates a GAV key for a given Artifact
+	 * 
+	 * @param artifact
+	 * @return GAV key string
+	 */
+	public static String key(Dependency artifact) {
 		return Optional.ofNullable(artifact.getGroupId()).orElse("") + ':' 
 			+ Optional.ofNullable(artifact.getArtifactId()).orElse("") + ':' 
 			+ Optional.ofNullable(artifact.getVersion()).orElse("");
 	}
-	
-	private static String key(Parent parent) {
+
+	/**
+	 * Creates a GAV key for a given Parent
+	 * 
+	 * @param artifact
+	 * @return GAV key string
+	 */
+	public static String key(Parent parent) {
 		return Optional.ofNullable(parent.getGroupId()).orElse("") + ':' 
 			+ Optional.ofNullable(parent.getArtifactId()).orElse("") + ':' 
 			+ Optional.ofNullable(parent.getVersion()).orElse("");
 	}
-	
+
+	/**
+	 * Creates a GAV key for a given Maven Project
+	 * 
+	 * @param artifact
+	 * @return GAV key string
+	 */
+	public static String key(MavenProject project) {
+		return Optional.ofNullable(project.getGroupId()).orElse("") + ':' 
+			+ Optional.ofNullable(project.getArtifactId()).orElse("") + ':' 
+			+ Optional.ofNullable(project.getVersion()).orElse("");
+	}
+
 	private void adUrisdParentFirst(String artifactKey, 
 			LinkedHashMap<String, String> parentByDep,
 			HashMap<String, URI> uriByDep,

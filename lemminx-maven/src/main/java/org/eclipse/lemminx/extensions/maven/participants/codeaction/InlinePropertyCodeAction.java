@@ -11,6 +11,7 @@ package org.eclipse.lemminx.extensions.maven.participants.codeaction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,6 +28,7 @@ import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionRequest;
 import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
@@ -63,19 +65,28 @@ public class InlinePropertyCodeAction implements ICodeActionParticipant {
 				String value = properties.get(mavenProperty.getValue());
 				if (value != null) {
 					cancelChecker.checkCanceled();
-					// Replace the property with its value only in current node
-					codeActions.add(CodeActionFactory.replace( 
-							"Replace property with its value",
-							range, value, document.getTextDocument(),  null));
 					
-					// Replace the property with its value in entire document
 					List<TextEdit> textEdits = new ArrayList<>();
 					collectInlinePropertyTextEdits(document.getDocumentElement(), 
 							"${" + mavenProperty.getValue() + "}", 
 							value, textEdits, cancelChecker);
+
+					if (textEdits.size() > 0) {
+						// Replace the property with its value only in current node
+						TextEdit thisEdit = textEdits.stream()
+								.filter(e -> rangeContains(e.getRange(), range.getStart()))
+								.findFirst().orElse(null);
+						if (thisEdit != null) {
+							codeActions.add(CodeActionFactory.replace( 
+									"Inline Property", thisEdit.getRange(), thisEdit.getNewText(), 
+									document.getTextDocument(),  null));
+						}
+					} 
+					
 					if (textEdits.size() > 1) {
+						// Replace the property with its value in entire document
 						codeActions.add(CodeActionFactory.replace(
-								"Replace all property entries with its value", 
+								"Inline all Properties", 
 								textEdits, document.getTextDocument(),  null));
 					}
 				}
@@ -87,6 +98,24 @@ public class InlinePropertyCodeAction implements ICodeActionParticipant {
 		}
 	}
 	
+	private static boolean rangeContains(Range range, Position position) {
+		Position start = range.getStart();
+		if (start.getLine() > position.getLine()) {
+			return false;
+		}
+		if (start.getLine() == position.getLine() && start.getCharacter() > position.getCharacter()) {
+			return false;
+		}
+		Position end = range.getEnd();
+		if (end.getLine() < position.getLine()) {
+			return false;
+		}
+		if (end.getLine() == position.getLine() && end.getCharacter() < position.getLine()) {
+			return false;
+		}
+		
+		return true;
+	}
 	void collectInlinePropertyTextEdits(DOMElement rootElement, String property, String value,
 			List<TextEdit> textEditss, CancelChecker cancelChecker) throws CancellationException {
 		cancelChecker.checkCanceled();

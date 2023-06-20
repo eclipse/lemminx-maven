@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.test</groupId>
 		<artifactId>test-parent</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
+		<version>0.0.1</version>
 		<relativePath>./parent/pom.xml</relativePath>
 	</parent>
 	<artifactId>test-child</artifactId>
@@ -15,7 +15,7 @@
 		<dependency>
 			<groupId>${test-group-id}</groupId>
 			<artifactId>test-dependency-2</artifactId>
-			<version>${test-version}</version>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 </project>
