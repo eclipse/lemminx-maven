@@ -150,33 +150,34 @@ public class MavenProjectCache {
 			// an IllegalStateException in case of fail to acquire write lock for an artifact
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
+
 		return Optional.empty();
 	}
 
 	private void parseAndCache(URI uri, int version, FileModelSource source) {
 		Collection<ModelProblem> problems = new ArrayList<>();
+		uri = uri.normalize();
+		final File file = new File(uri);
+		MavenProject project = null; 
 		try {
 			ProjectBuildingResult buildResult = projectBuilder.build(source, newProjectBuildingRequest());
+			project = buildResult.getProject();
 			problems.addAll(buildResult.getProblems());
-			if (buildResult.getProject() != null) {
+			
+			if (project != null) {
 				// setFile should ideally be invoked during project build, but related methods
 				// to pass modelSource and pomFile are private
-				buildResult.getProject().setFile(new File(uri));
-				projectCache.put(uri, buildResult.getProject());
-				projectParsedListeners.forEach(listener -> listener.accept(buildResult.getProject()));
+				project.setFile(new File(uri));
 			}
-			lastCheckedVersion.put(uri, version);
-			problemCache.put(uri, problems);
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
 				if (e.getCause() instanceof ModelBuildingException modelBuildingException) {
 					// Try to manually build a minimal project from the document to collect lower-level
 					// errors and to have something usable in cache for most basic operations
 					problems.addAll(modelBuildingException.getProblems());
-					File file = new File(uri);
 					try (InputStream documentStream = source.getInputStream()) {
 						Model model = mavenReader.read(documentStream);
-						MavenProject project = new MavenProject(model);
+						project = new MavenProject(model);
 						project.setRemoteArtifactRepositories(model.getRepositories().stream()
 								.map(repo -> new MavenArtifactRepository(repo.getId(), repo.getUrl(),
 										new DefaultRepositoryLayout(),
@@ -189,8 +190,6 @@ public class MavenProjectCache {
 								.distinct().collect(Collectors.toList()));
 						project.setFile(file);
 						project.setBuild(new Build());
-						projectCache.put(uri, project);
-						projectParsedListeners.forEach(listener -> listener.accept(project));
 					} catch (XmlPullParserException parserException) {
 						// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
 						// exceptions
@@ -204,22 +203,31 @@ public class MavenProjectCache {
 			} else {
 				e.getResults().stream().flatMap(result -> result.getProblems().stream()).forEach(problems::add);
 				if (e.getResults().size() == 1) {
-					MavenProject project = e.getResults().get(0).getProject();
+					project = e.getResults().get(0).getProject();
 					if (project != null) {
 						project.setFile(new File(uri));
-						projectCache.put(uri, project);
-						projectParsedListeners.forEach(listener -> listener.accept(project));
 					}
 				}
 			}
-			lastCheckedVersion.put(uri, version);
-			problemCache.put(uri, problems);
 		} catch (Exception e) {
 			// Do not add any info, like lastCheckedVersion or problems, to the cache 
 			// In case of project/problems etc. is not available due to an exception happened.
 			// 
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			return; // Nothing to be cached
 		}
+		
+		cacheProject(project, file, uri, version, problems);
+	}
+
+	private void cacheProject(final MavenProject project, File file, URI uri, 
+			int version, Collection<ModelProblem> problems) {
+		if (project != null) {
+			projectCache.put(uri, project);
+			projectParsedListeners.forEach(listener -> listener.accept(project));
+		}
+		lastCheckedVersion.put(uri, version);
+		problemCache.put(uri, problems);
 	}
 
 	private void parseAndCache(DOMDocument document) {
@@ -253,6 +261,9 @@ public class MavenProjectCache {
 		// TODO more to transfer from mavenRequest to ProjectBuildingRequest?
 		request.setRepositorySession(lemminxMavenPlugin.getMavenSession().getRepositorySession());
 		request.setResolveDependencies(resolveDependencies);
+
+		// See: https://issues.apache.org/jira/browse/MRESOLVER-374
+		request.getUserProperties().setProperty("aether.syncContext.named.factory", "noop");
 		return request;
 	}
 

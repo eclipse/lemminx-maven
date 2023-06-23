@@ -114,7 +114,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
 	private XMLExtensionsRegistry currentRegistry;
-
+	private MavenLemminxWorkspaceReader workspaceReader = new MavenLemminxWorkspaceReader(this);
+	
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
@@ -269,7 +270,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		mavenRequest.setSystemProperties(systemProperties);
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
-		mavenRequest.setWorkspaceReader(new MavenLemminxWorkspaceReader(this));
+		mavenRequest.setWorkspaceReader(workspaceReader);
 		return mavenRequest;
 	}
 
@@ -576,13 +577,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 	
 	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
-		Collection<MavenProject> cachedProjects = getProjectCache().getProjects();
-		return cachedProjects.stream().filter(p -> {
-			return Arrays.stream(removed).anyMatch(uri -> {
-				Path removedPath = new File(uri).toPath();
-				return p.getFile().toPath().startsWith(removedPath);
-			});
-		}).map(p -> p.getFile().toURI()).collect(Collectors.toUnmodifiableList());
+		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
+			.filter(f -> Arrays.stream(removed).anyMatch(uri -> {
+						Path removedPath = new File(uri).toPath();
+						return f.toPath().startsWith(removedPath);
+					}))
+			.map(File::toURI)
+			.collect(Collectors.toUnmodifiableList());
 	}
 
 	private List<URI> computeAddedWorkspaceProjects(URI[] added) {
@@ -615,6 +616,27 @@ public class MavenLemminxExtension implements IXMLExtension {
 		});
 
 		return projectsToAdd;
+	}
+	
+	/**
+	 * Returns the list of Maven Projects currently added to the Workspace
+	 * 
+	 * @return List of Maven Projects
+	 */
+	public List<MavenProject> getCurrentWorkspaceProjects() {
+		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
+			.map(f -> getProjectCache().getLastSuccessfulMavenProject(f))
+			.filter(Objects::nonNull).toList();
+	}
+	
+	/**
+	 * Returns the list of Maven Project files currently added to the Workspace
+	 * 
+	 * @return List of Maven Project files
+	 */
+	public List<File> getCurrentWorkspaceProjectFiles() {
+		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
+			.filter(Objects::nonNull).toList();
 	}
 	
 	private void registerCodeActionParticipants(XMLExtensionsRegistry registry) {

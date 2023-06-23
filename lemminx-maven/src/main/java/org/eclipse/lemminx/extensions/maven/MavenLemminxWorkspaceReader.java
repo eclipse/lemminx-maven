@@ -10,6 +10,7 @@ package org.eclipse.lemminx.extensions.maven;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -30,12 +31,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.ArtifactUtils;
+import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
+import org.apache.maven.artifact.repository.MavenArtifactRepository;
+import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.building.FileModelSource;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.WorkspaceReader;
@@ -57,6 +67,8 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	
+	private static MavenXpp3Reader mavenReader = new MavenXpp3Reader();
+	
 	private final class ResolveArtifactsAndPopulateWorkspaceRunnable implements Runnable {
 		final File pomFile;
 
@@ -69,14 +81,10 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 			// already processed, don't repeat operation
 			if (!workspaceArtifacts.containsValue(pomFile)) {
 				LOGGER.finest("Trying to add " + pomFile + "to workspace...");
-				skipFlushBeforeResult.set(true); // avoid deadlock as building project will go through this workspace reader
 				Optional<MavenProject> snapshotProject = Optional.empty();
+				skipFlushBeforeResult.set(true); // avoid deadlock as building project will go through this workspace reader
 				try {
-					// Just getting a snapshot project using `getSnapshotProject` is not enough here
-					// because it doesn't adds the read projects to the projects cache.
-					// So we need to parse and cache the project here
-					//
-					snapshotProject = Optional.of(plugin.getProjectCache().getLastSuccessfulMavenProject(pomFile));
+					snapshotProject = getMinimalMavenProject(pomFile);
 				} catch (Exception e) {
 					// We shouldn't fail here, otherwise, the pomFile will never be processed 
 					// causing a possible deadlock in "Flush Before Result" loops
@@ -95,10 +103,9 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 						propagateProcessed(pom);
 						project = project.getParent();
 					}
-				}, () -> { // try reading GAV at least
+				}, () -> { // Fallback to try reading GAV at least
 					try {
 						String fileContent = String.join(System.lineSeparator(), Files.readAllLines(pomFile.toPath()));
-						
 						DOMDocument doc = DOMParser.getInstance().parse(new TextDocument(fileContent, pomFile.toURI().toString()), null);
 						doc.getChildren().stream() //
 							.filter(DOMElement.class::isInstance) //
@@ -129,8 +136,36 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 			propagateProcessed(pomFile);
 		}
 
+		private Optional<MavenProject> getMinimalMavenProject(File file) {
+			// Try to manually build a minimal project from the document to collect lower-level
+			// errors and to have something usable in cache for most basic operations
+			try (InputStream documentStream = new FileModelSource(file).getInputStream()) {
+				Model model = mavenReader.read(documentStream);
+				MavenProject project = new MavenProject(model);
+				project.setRemoteArtifactRepositories(model.getRepositories().stream()
+						.map(repo -> new MavenArtifactRepository(repo.getId(), repo.getUrl(),
+								new DefaultRepositoryLayout(),
+								new ArtifactRepositoryPolicy(true,
+										ArtifactRepositoryPolicy.UPDATE_POLICY_INTERVAL,
+										ArtifactRepositoryPolicy.CHECKSUM_POLICY_WARN),
+								new ArtifactRepositoryPolicy(true,
+										ArtifactRepositoryPolicy.UPDATE_POLICY_INTERVAL,
+										ArtifactRepositoryPolicy.CHECKSUM_POLICY_WARN)))
+						.distinct().collect(Collectors.toList()));
+				project.setFile(file);
+				project.setBuild(new Build());
+				return Optional.of(project);
+			} catch (XmlPullParserException parserException) {
+				// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
+				// exceptions
+			} catch (IOException ex) {
+				LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+			}
+			return Optional.empty();
+		}
+	
 		private void propagateProcessed(File pom) {
-			toProcess.remove(pom); // mark this pom done 
+			toProcess.remove(pom); // mark this POM done 
 			// remove all other scheduled runnable for the given file
 			runnables.removeIf(runnable -> ((ResolveArtifactsAndPopulateWorkspaceRunnable)runnable).pomFile.equals(pom));
 		}
@@ -307,5 +342,10 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
 	public void remove(URI uri) {
 		workspaceArtifacts.values().remove(new File(uri));
+	}
+	
+	List<File> getCurrentWorkspaceArtifactFiles() {
+		return workspaceArtifacts.values().stream()
+				.filter(Objects::nonNull).toList();
 	}
 }
