@@ -70,5 +70,12 @@
 			<type>pom</type>
 			<scope>import</scope>
 		</dependency>
+		<dependency>
+			<groupId>ch.ringler.tools</groupId>
+			<artifactId>m2cachecleanup</artifactId>
+			<version>1.0.4</version>
+			<type>pom</type>
+			<scope>import</scope>
+		</dependency>
 	</dependencies>
 </project>
