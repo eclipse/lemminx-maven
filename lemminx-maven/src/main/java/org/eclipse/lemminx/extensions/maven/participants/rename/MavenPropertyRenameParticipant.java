@@ -94,7 +94,7 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 		cancelChecker.checkCanceled();
 		LinkedHashSet<MavenProject> projects = new LinkedHashSet<>();
 		projects.add(thisProject);
-		plugin.getProjectCache().getProjects().stream().forEach(child -> 
+		plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
 			projects.addAll(findParentsOfChildProject(thisProject, child)));
 
 		String propertyName = element.getNodeName();
