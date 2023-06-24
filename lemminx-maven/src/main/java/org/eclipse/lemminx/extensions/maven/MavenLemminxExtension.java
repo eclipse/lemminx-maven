@@ -198,6 +198,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			this.container = newPlexusContainer();
 			mavenRequest = initMavenRequest(container, settings);
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
+			mavenRequest.getUserProperties().setProperty("aether.syncContext.named.factory", "noop");
 			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
