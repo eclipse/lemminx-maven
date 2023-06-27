@@ -99,7 +99,7 @@ public interface MavenLemminxTestsUtils {
 		return completionItems.stream().map(CompletionItem::getLabel).anyMatch(label -> label.contains(searchString));
 	}
 
-	public static void prefetchDavenXSD() {
+	public static void prefetchMavenXSD() {
 		// In order to prevent the appearance of Downloading Operation Information Diagnostic
 		// we need the 'http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd'
 		// schema to be cached  so it won' t be downloaded during the test
