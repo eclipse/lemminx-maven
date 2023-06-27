@@ -70,7 +70,7 @@ public class SimpleModelTest {
 	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
-		MavenLemminxTestsUtils.prefetchDavenXSD();
+		MavenLemminxTestsUtils.prefetchMavenXSD();
 	}
 
 	@AfterEach
@@ -312,6 +312,20 @@ public class SimpleModelTest {
 	
 	@Test
 	public void testModulesCompletionInDependency() throws IOException, URISyntaxException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+		
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
 				createDOMDocument("/modules/module-a-pom.xml", languageService), 
 				new XMLValidationSettings(), Map.of(), () -> {});
@@ -342,6 +356,20 @@ public class SimpleModelTest {
 
 	@Test
 	public void testModulesCompletionInParent() throws IOException, URISyntaxException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource("/modules").toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
 				createDOMDocument("/modules/module-a-pom.xml", languageService), 
 				new XMLValidationSettings(), Map.of(), () -> {});
