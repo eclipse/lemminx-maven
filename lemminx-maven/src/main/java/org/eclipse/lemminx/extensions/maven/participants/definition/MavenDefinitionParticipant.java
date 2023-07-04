@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2023 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 
 import org.apache.maven.Maven;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.InputLocation;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.lemminx.dom.DOMDocument;
@@ -92,14 +93,22 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 				// Find in workspace
 				if (ParticipantUtils.isWellDefinedDependency(dependency)) {
 					cancelChecker.checkCanceled();
-					Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
-					if (artifact != null && artifact.getFile() != null) {
-						LocationLink location = toLocationNoRange(artifact.getFile(), element);
-						if (location != null) {
-							cancelChecker.checkCanceled();
-							locations.add(location);
-							return;
+					
+					LocationLink location = null;
+					Optional<Dependency> managed = ParticipantUtils.findManagedDependency(p, dependency);
+					if (managed.isPresent()) {
+						location = toLocation(managed.get().getLocation("artifactId"), 
+								XMLPositionUtility.createRange(element));
+					} else {
+						Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+						if (artifact != null && artifact.getFile() != null) {
+							location = toLocationNoRange(artifact.getFile(), element);
 						}
+					}
+					if (location != null) {
+						cancelChecker.checkCanceled();
+						locations.add(location);
+						return;
 					}
 				}
 				
@@ -139,10 +148,21 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 				cancelChecker.checkCanceled();
 				// Find in workspace
 				if (ParticipantUtils.isWellDefinedDependency(dependency)) {
-					Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
-					if (artifact != null && artifact.getFile() != null) {
+					LocationLink location = null;
+					Optional<Dependency> managed = ParticipantUtils.isManagedDependency(element) ?
+							Optional.empty() : ParticipantUtils.findManagedDependency(p, dependency);
+					if (managed.isPresent()) {
+						location = toLocation(managed.get().getLocation("artifactId"), 
+								XMLPositionUtility.createRange(element));
+					} else {
+						Artifact artifact = ParticipantUtils.findWorkspaceArtifact(plugin, request, dependency);
+						if (artifact != null && artifact.getFile() != null) {
+							location = toLocationNoRange(artifact.getFile(), element);
+						}
+					}
+					if (location != null) {
 						cancelChecker.checkCanceled();
-						locations.add(toLocationNoRange(artifact.getFile(), element));
+						locations.add(location);
 						return;
 					}
 				}
@@ -228,5 +248,15 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 	private static LocationLink toLocation(File target, DOMNode targetNode, Range originRange) {
 		Range targetRange = XMLPositionUtility.createRange(targetNode);
 		return new LocationLink(target.toURI().toString(), targetRange, targetRange, originRange);
+	}
+	
+	private static LocationLink toLocation(InputLocation target, Range originRange) {
+		if (target == null || target.getSource() == null || target.getSource().getLocation() == null) {
+			return null;
+		}
+		Position position = new Position(target.getLineNumber(), target.getColumnNumber());
+		Range targetRange = new Range(position, position);
+		File file = new File(target.getSource().getLocation());
+		return new LocationLink(file.toURI().toString(), targetRange, targetRange, originRange);
 	}
 }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2023 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -68,6 +68,7 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
@@ -292,18 +293,30 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	private static String createVersionMessage(boolean supportsMarkdown, String version, InputLocation location) {
 		String sourceModelId = null;
 		String uri = null;
+		Range range = null;
 		if (location != null) {
 			InputSource source = location.getSource();
 			if (source != null) {
 				sourceModelId = source.getModelId();
 				uri = source.getLocation();
 			}
+		
+			int lineNumber = location.getLineNumber();
+			if (lineNumber != -1) {
+				int columnNumber = location.getColumnNumber();
+				Position position = new Position(lineNumber, columnNumber != -1 ? columnNumber : 0);
+				range = new Range(position, position);
+			}
 		}
 		
-		return createVersionMessage(supportsMarkdown, version, sourceModelId, uri);
+		return createVersionMessage(supportsMarkdown, version, sourceModelId, uri, range);
 	}
 	
 	private static String createVersionMessage(boolean supportsMarkdown, String version, String sourceModelId, String uri) {
+		return createVersionMessage(supportsMarkdown, version, sourceModelId, uri, null);
+	}	
+
+	private static String createVersionMessage(boolean supportsMarkdown, String version, String sourceModelId, String uri, Range range) {
 		UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold : UnaryOperator.identity();
 
 		String message = (version != null) 
@@ -312,7 +325,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 		if (sourceModelId != null) {
 			message += ' ' + toBold.apply(MessageFormat.format(PomTextHover_managed_location, 
-					supportsMarkdown ? MarkdownUtils.toLink(uri, sourceModelId, null) : sourceModelId));
+					supportsMarkdown ? MarkdownUtils.toLink(uri, range, sourceModelId, sourceModelId) : sourceModelId));
 		} else {
 			message += ' ' + toBold.apply(PomTextHover_managed_location_missing);
 		}
@@ -361,14 +374,29 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		boolean wellDefined = ParticipantUtils.isWellDefinedDependency(dependency);
 		DOMElement element = ParticipantUtils.findInterestingElement(request.getNode());
 		dependency = ParticipantUtils.resolveDependency(p, dependency, element, plugin);
-
+		Optional<Dependency> managed = ParticipantUtils.isManagedDependency(element) ?
+				Optional.empty() : ParticipantUtils.findManagedDependency(p, dependency);
+		
+		Dependency originalDependency = dependency; // To get the scope
 		cancelChecker.checkCanceled();
 		try {
-			ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
 			// Find in local repository
-			File localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
+			File localArtifactLocation = null;
+			if (managed.isPresent()) {
+				// Use managed dependency
+				dependency = managed.get();
+				InputLocation inputLocation = dependency.getLocation(ARTIFACT_ID_ELT);
+				if (inputLocation != null && inputLocation.getSource() != null) {
+					String url = inputLocation.getSource().getLocation();
+					localArtifactLocation = new File(url);
+				}
+			} else {
+				localArtifactLocation = plugin.getLocalRepositorySearcher().findLocalFile(dependency);
+			}
+
 			if (localArtifactLocation != null && localArtifactLocation.isFile()) {
 				cancelChecker.checkCanceled();
+				ModelBuilder builder = plugin.getProjectCache().getPlexusContainer().lookup(ModelBuilder.class);
 				Model model = builder.buildRawModel(localArtifactLocation, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, true).get();
 				if (model != null) {
 					UnaryOperator<String> toBold = supportsMarkdown ? MarkdownUtils::toBold
@@ -385,7 +413,9 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					}
 
 					if (!wellDefined) {
-						String managedVersion = getManagedVersionText(request, cancelChecker);
+						String managedVersion = managed.isPresent() ? 
+								createVersionMessage(request.canSupportMarkupKind(MarkupKind.MARKDOWN), dependency.getVersion(), dependency.getLocation(ARTIFACT_ID_ELT))
+								: getManagedVersionText(request, cancelChecker);
 						if (managedVersion == null) {
 							managedVersion = getActualVersionText(supportsMarkdown, model);
 						}
@@ -394,9 +424,13 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						}
 					}
 					
-					// Add dependency scope info
-					if (dependency.getScope() != null) {
-						message += lineBreak + toBold.apply(MessageFormat.format(PomTextHover_managed_scope, dependency.getScope()));
+					// Dependency scope info from original dependency has higher priority
+					String scope = dependency.getScope();
+					if (originalDependency.getScope() != null) {
+						scope = originalDependency.getScope();
+					}
+					if (scope != null) {
+						message += lineBreak + toBold.apply(MessageFormat.format(PomTextHover_managed_scope, scope));
 					}
 					
 					if (message.length() > 2) {
@@ -549,7 +583,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 
 					if (propertyDeclaration != null) {
 						cancelChecker.checkCanceled();
-						String uri = childProj.getFile().toURI().toString();
+						String uri = childProj.getFile().getAbsolutePath();
 						Range targetRange = XMLPositionUtility.createRange(propertyDeclaration);
 						String sourceModelId = childProj.getGroupId() + ':' + childProj.getArtifactId() + ':' + childProj.getVersion();
 						message.append(toBold.apply(MessageFormat.format(PomTextHover_property_location, 

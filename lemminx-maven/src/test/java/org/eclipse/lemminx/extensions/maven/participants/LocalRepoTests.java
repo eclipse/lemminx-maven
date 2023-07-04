@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019-2022 Red Hat Inc. and others.
+ * Copyright (c) 2019, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -71,6 +71,7 @@ public class LocalRepoTests {
 	@Test
 	public void testDefinitionManagedDependency() throws IOException, URISyntaxException {
 		assertTrue(languageService.findDefinition(createDOMDocument("/pom-dependencyManagement-child.xml", languageService), new Position(17, 6), () -> {})
-				.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("maven-surefire-plugin-2.22.2.pom")));
+				.stream().map(LocationLink::getTargetUri)
+				.anyMatch(uri -> uri.endsWith("/pom-dependencyManagement-parent.xml")));
 	}
 }

@@ -62,9 +62,6 @@ public class WorkspaceProjectsHyperlinkDetectorTest {
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_ARTIFACT = "spring-boot-dependencies";
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_GROUP = "org.springframework.boot";
 
-	public static String TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_ARTIFACT = "tools.retry.springframework.interface";
-	public static String TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_GROUP = "mygroup";
-
 	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
@@ -392,8 +389,8 @@ public class WorkspaceProjectsHyperlinkDetectorTest {
 		for (DOMElement d : dependencyList) {
 			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
 			String group = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
-			if (TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_ARTIFACT.equals(artifactId)
-					&& TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_GROUP.equals(group)) {
+			if ("tools.retry.springframework.interface".equals(artifactId)
+					&& "mygroup".equals(group)) {
 				targetDependency = d;
 				break;
 			}
@@ -411,12 +408,131 @@ public class WorkspaceProjectsHyperlinkDetectorTest {
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uriiRawPathEndsWith(uri, "/issue-345/tools/modules/retry-springframework-interface/pom.xml")));
 	}
 
-	private static final boolean uriiRawPathEndsWith(String uri, String rawRelativePath) {
-		try {
-			return new URI(uri).getRawPath().endsWith(rawRelativePath);
-		} catch (URISyntaxException e) {
-			e.printStackTrace();
+	/**
+	 * Test Ctrl-clicking on external dependency of artifact 'spring-context' in project
+	 * 'issue-345.tools.retry.springframework.impl.dummy'.
+	 * The resulting URI should lead to dependency artifact 
+	 * 'org.springframework:spring-framework-bom:5.3.3'
+	 * 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws URISyntaxException
+	 * @throws BadLocationException
+	 */
+	@Test
+	public void testHyperlinkFromToolsRetrySpringFrameworImlDummyToSpringContextDependency()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource(WORKSPACE_PATH).toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+	
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+	
+		DOMDocument document = createDOMDocument(WORKSPACE_PATH 
+				+ "/tools/modules/retry-springframework-impl-dummy/pom.xml", languageService);
+		DOMElement parent = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.PARENT_ELT).orElse(null);
+		assertNotNull(parent, "Parent element not found!");
+		
+		DOMElement dependencies = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.DEPENDENCIES_ELT).orElse(null);
+		assertNotNull(dependencies, "Dependencies element not found!");
+
+		List<DOMElement> dependencyList = DOMUtils.findChildElements(dependencies, DOMConstants.DEPENDENCY_ELT);
+		DOMElement targetDependency = null;
+		for (DOMElement d : dependencyList) {
+			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+			String groupId = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
+			if ("spring-context".equals(artifactId)
+					&& "org.springframework".equals(groupId)) {
+				targetDependency = d;
+				break;
+			}
 		}
-		return false;
+		assertNotNull(targetDependency, "Target Dependency element not found!");
+		 
+		DOMElement targetDependencyArtifactId = DOMUtils.findChildElement(targetDependency, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+		assertNotNull(targetDependencyArtifactId, "Target Dependency ArtifactId element not found!");
+		int offset = (targetDependencyArtifactId.getStart() + targetDependencyArtifactId.getEnd()) / 2;
+	
+		TextDocument textDocument = document.getTextDocument();
+		Position offsetPosition = textDocument.positionAt(offset);
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, ()->{});
+		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testHyperlinkFromToolsRetrySpringFrameworImlDummyToSpringContextDependency(): " + uri));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
+				.anyMatch(uri -> uriiRawPathEndsWith(uri, "/org/springframework/spring-framework-bom/5.3.3/spring-framework-bom-5.3.3.pom")));
+	}
+
+	/**
+	 * Test Ctrl-clicking on external dependency of artifact 'tools.retry.springframework.interface' 
+	 * in project 'issue-345.tools.retry.springframework.impl.dummy'.
+	 * The resulting URI should lead to dependency artifact 
+	 * 'tools.retry.springframework:0.0.1-SNAPSHOT'
+	 * 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws URISyntaxException
+	 * @throws BadLocationException
+	 */
+	@Test
+	public void testHyperlinkFromToolsRetrySpringFrameworImlDummyToToolsRetrySpringframeworkInterfaceDependency()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource(WORKSPACE_PATH).toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+	
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+	
+		DOMDocument document = createDOMDocument(WORKSPACE_PATH 
+				+ "/tools/modules/retry-springframework-impl-dummy/pom.xml", languageService);
+		DOMElement parent = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.PARENT_ELT).orElse(null);
+		assertNotNull(parent, "Parent element not found!");
+		
+		DOMElement dependencies = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.DEPENDENCIES_ELT).orElse(null);
+		assertNotNull(dependencies, "Dependencies element not found!");
+
+		List<DOMElement> dependencyList = DOMUtils.findChildElements(dependencies, DOMConstants.DEPENDENCY_ELT);
+		DOMElement targetDependency = null;
+		for (DOMElement d : dependencyList) {
+			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+			String groupId = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
+			if ("tools.retry.springframework.interface".equals(artifactId)
+					&& "mygroup".equals(groupId)) {
+				targetDependency = d;
+				break;
+			}
+		}
+		assertNotNull(targetDependency, "Target Dependency element not found!");
+		 
+		DOMElement targetDependencyArtifactId = DOMUtils.findChildElement(targetDependency, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+		assertNotNull(targetDependencyArtifactId, "Target Dependency ArtifactId element not found!");
+		int offset = (targetDependencyArtifactId.getStart() + targetDependencyArtifactId.getEnd()) / 2;
+
+		TextDocument textDocument = document.getTextDocument();
+		Position offsetPosition = textDocument.positionAt(offset);
+		List<? extends LocationLink> definitions = languageService.findDefinition(document, offsetPosition, ()->{});
+		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testHyperlinkFromToolsRetrySpringFrameworImlDummyToSpringContextDependency(): " + uri));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
+				.anyMatch(uri -> uriiRawPathEndsWith(uri, "/issue-345/tools/modules/retry-springframework/pom.xml")));
+	}
+	
+	private static final boolean uriiRawPathEndsWith(String uri, String rawRelativePath) {
+		return uri.replace("\\", "/").endsWith(rawRelativePath.replace("\\", "/"));
 	}
 }

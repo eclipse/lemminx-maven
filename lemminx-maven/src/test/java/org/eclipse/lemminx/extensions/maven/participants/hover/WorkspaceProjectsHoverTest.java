@@ -10,9 +10,11 @@ package org.eclipse.lemminx.extensions.maven.participants.hover;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.eclipse.lemminx.XMLAssert.assertHover;
 import static org.eclipse.lemminx.XMLAssert.r;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -32,6 +34,7 @@ import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -42,6 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(NoMavenCentralExtension.class)
 public class WorkspaceProjectsHoverTest {
 	private XMLLanguageService languageService;
+	private File localRepoDirectory;
 
 	public static String WORKSPACE_PATH = "/issue-345";
 	public static String ROOT_PATH = "/root/pom.xml";
@@ -62,14 +66,16 @@ public class WorkspaceProjectsHoverTest {
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_ARTIFACT = "spring-boot-dependencies";
 	public static String TOOLS_RETRY_SPRINGFRAMEWORK_SPRING_BOOT_DEPENDENCIES_TARGET_GROUP = "org.springframework.boot";
 
-	public static String TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_ARTIFACT = "tools.retry.springframework.interface";
-	public static String TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_GROUP = "mygroup";
-
 	private static String NL = MarkdownUtils.getLineBreak(true);
-
+	
 	@BeforeEach
 	public void setUp() throws IOException {
 		languageService = new XMLLanguageService();
+		
+		localRepoDirectory = System.getProperty("maven.repo.local") != null ?
+				new File(System.getProperty("maven.repo.local")).getAbsoluteFile() :
+				new File("target/testlocalrepo").getAbsoluteFile();
+		assertTrue(localRepoDirectory.exists() && localRepoDirectory.isDirectory(), "Local Repo doesn't exist or not a directory: " + localRepoDirectory.getAbsolutePath());
 	}
 
 	@AfterEach
@@ -409,8 +415,8 @@ public class WorkspaceProjectsHoverTest {
 		for (DOMElement d : dependencyList) {
 			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
 			String group = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
-			if (TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_ARTIFACT.equals(artifactId)
-					&& TOOLS_RETRY_SPRINGFRAMEWORK_TOOLS_SPRINGFRAMEWORK_INTERFACE_TARGET_GROUP.equals(group)) {
+			if ("tools.retry.springframework.interface".equals(artifactId)
+					&& "mygroup".equals(group)) {
 				targetDependency = d;
 				break;
 			}
@@ -430,4 +436,150 @@ public class WorkspaceProjectsHoverTest {
 				r(33, 16, 33, 53), settings);
 	}
 
+	/**
+	 * Test hover on local dependency of artifact `spring-context` in 
+	 * 'issue-345.tools.retry.springframework.impl.dummy'
+	 * The resulting hover should show managed dependency artifact 
+	 * 'org.springframework:spring-framework-bom:5.3.3'
+	 * 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws URISyntaxException
+	 * @throws BadLocationException
+	 */
+	@Test
+	public void testHoverFromToolsRetrySpringFrameworImlDummyToSpringContextDependency()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource(WORKSPACE_PATH).toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+	
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+	
+		DOMDocument document = createDOMDocument(WORKSPACE_PATH 
+				+ "/tools/modules/retry-springframework-impl-dummy/pom.xml", languageService);
+		DOMElement parent = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.PARENT_ELT).orElse(null);
+		assertNotNull(parent, "Parent element not found!");
+		
+		DOMElement dependencies = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.DEPENDENCIES_ELT).orElse(null);
+		assertNotNull(dependencies, "Dependencies element not found!");
+
+		List<DOMElement> dependencyList = DOMUtils.findChildElements(dependencies, DOMConstants.DEPENDENCY_ELT);
+		DOMElement targetDependency = null;
+		for (DOMElement d : dependencyList) {
+			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+			String groupId = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
+			if ("spring-context".equals(artifactId)
+					&& "org.springframework".equals(groupId)) {
+				targetDependency = d;
+				break;
+			}
+		}
+		assertNotNull(targetDependency, "Target Dependency element not found!");
+		 
+		DOMElement targetDependencyArtifactId = DOMUtils.findChildElement(targetDependency, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+		assertNotNull(targetDependencyArtifactId, "Target Dependency ArtifactId element not found!");
+		int offset = (targetDependencyArtifactId.getStart() + targetDependencyArtifactId.getEnd()) / 2;
+	
+		String text = document.getText();
+		text = text.substring(0, offset) + '|' + text.substring(offset);
+		ContentModelSettings settings = new ContentModelSettings();
+		settings.setUseCache(false);
+		
+		assertNotNull(localRepoDirectory, "Local Repository directory cannot be null!");
+		String expectedHoverText = "**Spring Framework (Bill of Materials)**" + NL //
+				+ "Spring Framework (Bill of Materials)" + NL //
+				+ "**The managed version is 5.3.3.** " //
+				+ "**The artifact is managed in [org.springframework:spring-framework-bom:5.3.3](" //
+				+ localRepoDirectory.toURI().toString()  //
+				+ "org/springframework/spring-framework-bom/5.3.3/spring-framework-bom-5.3.3.pom#L63,22-L63,22" //
+				+ " \"org.springframework:spring-framework-bom:5.3.3\")**" + NL //
+				+ "**The managed scope is: \"compile\"**";
+		Range expectedHoverRange = r(34, 15, 34, 29);
+		
+		assertHover(languageService, text, null, document.getDocumentURI(), 
+				expectedHoverText, expectedHoverRange, settings);
+	}
+	
+	/**
+	 * Test hover on local dependency of artifact `tools.retry.springframework.interface` 
+	 * in  project 'issue-345.tools.retry.springframework.impl.dummy'
+	 * The resulting hover should show managed dependency artifact 
+	 * 'org.springframework:spring-framework-bom:5.3.3'
+	 * 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws URISyntaxException
+	 * @throws BadLocationException
+	 */
+	@Test
+	public void testHoverFromToolsRetrySpringFrameworImlDummyToToolsRetrySpringframeworkInterfaceDependency()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
+		// We need the WORKSPACE projects to be placed to MavenProjectCache
+		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
+		assertNotNull(workspaceService);
+		
+		URI folderUri = getClass().getResource(WORKSPACE_PATH).toURI();
+		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
+	
+		// Add folders to MavenProjectCache
+		workspaceService.didChangeWorkspaceFolders(
+				new DidChangeWorkspaceFoldersParams(
+						new WorkspaceFoldersChangeEvent (
+								Arrays.asList(new WorkspaceFolder[] {wsFolder}), 
+								Arrays.asList(new WorkspaceFolder[0]))));
+	
+		DOMDocument document = createDOMDocument(WORKSPACE_PATH 
+				+ "/tools/modules/retry-springframework-impl-dummy/pom.xml", languageService);
+		DOMElement parent = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.PARENT_ELT).orElse(null);
+		assertNotNull(parent, "Parent element not found!");
+		
+		DOMElement dependencies = DOMUtils.findChildElement(document.getDocumentElement(), DOMConstants.DEPENDENCIES_ELT).orElse(null);
+		assertNotNull(dependencies, "Dependencies element not found!");
+
+		List<DOMElement> dependencyList = DOMUtils.findChildElements(dependencies, DOMConstants.DEPENDENCY_ELT);
+		DOMElement targetDependency = null;
+		for (DOMElement d : dependencyList) {
+			String artifactId = DOMUtils.findChildElementText(d, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+			String groupId = DOMUtils.findChildElementText(d, DOMConstants.GROUP_ID_ELT).orElse(null);
+			if ("tools.retry.springframework.interface".equals(artifactId)
+					&& "mygroup".equals(groupId)) {
+				targetDependency = d;
+				break;
+			}
+		}
+		assertNotNull(targetDependency, "Target Dependency element not found!");
+		 
+		DOMElement targetDependencyArtifactId = DOMUtils.findChildElement(targetDependency, DOMConstants.ARTIFACT_ID_ELT).orElse(null);
+		assertNotNull(targetDependencyArtifactId, "Target Dependency ArtifactId element not found!");
+		int offset = (targetDependencyArtifactId.getStart() + targetDependencyArtifactId.getEnd()) / 2;
+	
+		String text = document.getText();
+		text = text.substring(0, offset) + '|' + text.substring(offset);
+		ContentModelSettings settings = new ContentModelSettings();
+		settings.setUseCache(false);
+		
+		assertNotNull(wsFolder, "WORKSPACE directory cannot be null!");
+		String expectedHoverText = "" + NL //
+				+ "**The managed version is 0.0.1-SNAPSHOT.** " //
+				+ "**The artifact is managed in [mygroup:tools.retry.springframework:0.0.1-SNAPSHOT](" // 
+				+ new File(getClass().getResource(WORKSPACE_PATH).getFile()).toURI().toString()  //
+				+ "tools/modules/retry-springframework/pom.xml#L35,18-L35,18" //
+				+" \"mygroup:tools.retry.springframework:0.0.1-SNAPSHOT\")**" + NL //
+				+ "**The managed scope is: \"compile\"**";
+		Range expectedHoverRange = r(20, 15, 20, 52);
+		
+		assertHover(languageService, text, null, document.getDocumentURI(), 
+				expectedHoverText, expectedHoverRange, settings);
+	}
 }

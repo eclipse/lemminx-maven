@@ -13,7 +13,9 @@
 package org.eclipse.lemminx.extensions.maven.utils;
 
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_MANAGEMENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
@@ -23,16 +25,20 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
@@ -194,6 +200,24 @@ public class ParticipantUtils {
 				(element.getParentElement() != null && DEPENDENCY_ELT.equals(element.getParentElement().getLocalName()));
 	}
 
+	public static boolean isManagedDependency(DOMElement element) {
+		DOMElement parent = element;
+		// Find dependency element
+		while (parent != null &&  !DEPENDENCY_ELT.equals(parent.getLocalName())) {
+			parent = parent.getParentElement();
+		}
+		if (parent == null) {
+			return false;
+		}
+		// Check if parent is dependencies element
+		parent = parent.getParentElement();
+		if (parent == null || !DEPENDENCIES_ELT.equals(parent.getLocalName())) {
+			return false;
+		}
+		// Check if parent is dependencyManagement element
+		parent = parent.getParentElement();
+		return (parent != null  && DEPENDENCY_MANAGEMENT_ELT.equals(parent.getLocalName()));
+	}
 	
 	public static boolean isPlugin(DOMElement element) {
 		return  PLUGIN_ELT.equals(element.getLocalName()) || 
@@ -355,5 +379,36 @@ public class ParticipantUtils {
 		}
 		return (lineDelimiter == null || lineDelimiter.isEmpty()) 
 				? System.lineSeparator() : lineDelimiter;
+	}
+	
+	public static Optional<Dependency> findManagedDependency(MavenProject project, Dependency dependency) {
+		// Search in Managed Demendencies
+		// collect the managed dep ids
+		List<Dependency> managed = new  ArrayList<>();
+		DependencyManagement dm = project.getDependencyManagement();
+		if (dm != null) {
+			List<Dependency> deps = dm.getDependencies();
+			if (deps != null) {
+				// #335366
+				// 355882 use dep.getManagementKey() to prevent false positives
+				// when type or classifier doesn't match
+				deps.stream()
+				.filter(dep -> dep.getLocation("artifactId") != null)
+				.filter(dep -> dependency.getGroupId() != null && dependency.getGroupId().equals(dep.getGroupId()))
+				.filter(dep -> dependency.getArtifactId() != null && dependency.getArtifactId().equals(dep.getArtifactId()))
+				.filter(dep -> dependency.getVersion() != null && dependency.getVersion().equals(dep.getVersion()))
+				.forEach(managed::add);
+			}
+		}
+		
+		return managed.stream()
+				.sorted(new Comparator<Dependency>() {
+				// Backward order
+				@Override
+				public int compare(Dependency o1, Dependency o2) {
+					return new DefaultArtifactVersion(o2.getVersion())
+							.compareTo(new DefaultArtifactVersion(o1.getVersion()));
+				}
+			}).findFirst();
 	}
 }
