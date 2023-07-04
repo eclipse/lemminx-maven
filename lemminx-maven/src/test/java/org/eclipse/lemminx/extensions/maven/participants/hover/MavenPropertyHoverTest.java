@@ -47,7 +47,7 @@ public class MavenPropertyHoverTest {
 	}
 	
 	@Test
-	public void testHpverForVariablePropertyDefinedInSameDocument()
+	public void testHoverForVariablePropertyDefinedInSameDocument()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		String text = document.getText();
@@ -65,7 +65,7 @@ public class MavenPropertyHoverTest {
 	}
 
 	@Test
-	public void testHpverForVariablePropertyDefinedInParentDocument()
+	public void testHoverForVariablePropertyDefinedInParentDocument()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, BadLocationException {
 		DOMDocument document = createDOMDocument("/pom-with-properties-in-parent-for-definition.xml", languageService);
 		String text = document.getText();

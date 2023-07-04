@@ -127,14 +127,13 @@ class ManagedVersionHoverTest {
     @Test
     @Timeout(90000)
     void testManagedVersionHoverForBomProvidedDependency() throws IOException, URISyntaxException {
-        System.out.println(">>> testManagedVersionHoverForBomProvidedDependency");
         DOMDocument document = createDOMDocument("/eclipse-bom-tester/pom.xml", languageService);
         Position position = new Position(26, 30);
         
         // Find Definition links
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, position, ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(u -> System.out.println("Definition Link: " + u));
-		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("jakarta.jakartaee-api-8.0.0.pom")));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("/fish/payara/api/payara-bom/5.2022.3/payara-bom-5.2022.3.pom")));
 
         // Find Hover with managed version
         Hover hover = languageService.doHover(document, position, createSharedSettings());
@@ -144,8 +143,8 @@ class ManagedVersionHoverTest {
         assertTrue(value.contains("The managed version is"));
         assertTrue(value.contains("8.0.0"));
         assertTrue(value.contains("The artifact is managed in"));
-        assertTrue(value.contains("jakarta.platform:jakarta.jakartaee-api:8.0.0"));
-        assertTrue(value.contains("jakarta.jakartaee-api-8.0.0.pom"));
+        assertTrue(value.contains("fish.payara.api:payara-bom:5.2022.3"));
+        assertTrue(value.contains("/fish/payara/api/payara-bom/5.2022.3/payara-bom-5.2022.3.pom"));
         
         // Compare the links from definition and hover
 		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
@@ -158,14 +157,13 @@ class ManagedVersionHoverTest {
     @Test
     @Timeout(90000)
     void testManagedVersionHoverForBomProvidedDependencyWithProperty() throws IOException, URISyntaxException {
-        System.out.println(">>> testManagedVersionHoverForBomProvidedDependencyWithProperty");
         DOMDocument document = createDOMDocument("/eclipse-bom-tester/pom.xml", languageService);
         Position position = new Position(32, 30);
 
         // Find Definition links
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, position, ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(u -> System.out.println("Definition Link: " + u));
-		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("commons-lang3-3.12.0.pom")));
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri).anyMatch(uri -> uri.endsWith("/eclipse-bom-tester/parent/pom.xml")));
 
         // Find Hover with managed version
         Hover hover = languageService.doHover(document, position, createSharedSettings());
@@ -177,8 +175,12 @@ class ManagedVersionHoverTest {
         assertTrue(value.contains("The artifact is managed in"));
         assertTrue(value.contains("org.eclipse.test:bom-import-parent:1.0.0"));
         assertTrue(value.contains("eclipse-bom-tester/parent/pom.xml"));
-		assertTrue(value.contains("The managed scope is: \"compile\""));
-        System.out.println("<<< testManagedVersionHoverForBomProvidedDependencyWithProperty");
+
+        // Compare the links from definition and hover
+		assertTrue(definitions.stream().map(LocationLink::getTargetUri)
+				.anyMatch(uri -> value.replace('\\', '/').contains(uri.substring("file:/".length()))));
+
+        assertTrue(value.contains("The managed scope is: \"compile\""));
     }
 
     // Enable MARKDOWN format

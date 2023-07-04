@@ -8,6 +8,7 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -62,7 +63,7 @@ public class MarkdownUtils {
 		// [Message](http://example.com/ "Title")
 		link.append('[').append(message != null ? message : "This link").append(']');   
 		if (uri != null) {
-			link.append('(').append(uri);
+			link.append('(').append(new File(uri).toURI().toString());
 			if(range != null && (range.getStart() != null || range.getEnd() != null)) {
 				// #L34,1-L35,3
 				StringBuilder selection = new StringBuilder();
