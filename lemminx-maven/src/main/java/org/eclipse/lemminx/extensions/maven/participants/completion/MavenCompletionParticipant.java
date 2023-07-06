@@ -356,12 +356,16 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
 				nonArtifactCollector.entrySet().stream()
 				.map(entry -> entry.getValue())
+				.filter(Objects::nonNull)
+				.filter(item -> item.getSortText() != null || item.getLabel() != null)
 				.sorted(new Comparator<CompletionItem>() {
 					// Backward order
 					@Override
 					public int compare(CompletionItem o1, CompletionItem o2) {
-						return new DefaultArtifactVersion(o2.getSortText())
-								.compareTo(new DefaultArtifactVersion(o1.getSortText()));
+						String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
+						String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
+						return new DefaultArtifactVersion(sortText2)
+								.compareTo(new DefaultArtifactVersion(sortText1));
 					}
 				})
 				.forEach(response::addCompletionItem);
