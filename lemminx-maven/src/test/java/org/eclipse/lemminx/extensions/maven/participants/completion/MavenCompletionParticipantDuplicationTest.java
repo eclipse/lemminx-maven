@@ -29,7 +29,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.eclipse.lemminx.XMLAssert;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
@@ -112,8 +111,9 @@ public class MavenCompletionParticipantDuplicationTest {
 					// Backward order
 					@Override
 					public int compare(CompletionItem o1, CompletionItem o2) {
-						return new DefaultArtifactVersion(o2.getSortText())
-								.compareTo(new DefaultArtifactVersion(o1.getSortText()));
+						String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
+						String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
+						return new DefaultArtifactVersion(sortText2).compareTo(new DefaultArtifactVersion(sortText1));
 					}
 				}).toList();
 		assertEquals(orderedCompletions, completions);
