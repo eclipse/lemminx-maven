@@ -94,11 +94,8 @@ public class DOMUtils {
 	}
 	
 	public static Optional<String> findElementText(DOMElement element) {
-		return element.getChildren().stream() //
-				.filter(Text.class::isInstance)
-				.map(Text.class::cast)
-				.map(Text::getData)
-				.findFirst();
+		return element == null ? Optional.empty() : element.getChildren().stream() //
+				.filter(Text.class::isInstance).map(Text.class::cast).map(Text::getData).findFirst();
 	}
 
 	public static List<DOMText> findElementTextChildren(DOMElement element) {
