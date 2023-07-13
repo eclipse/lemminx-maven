@@ -110,12 +110,12 @@ public class InlinePropertyCodeAction implements ICodeActionParticipant {
 		if (end.getLine() < position.getLine()) {
 			return false;
 		}
-		if (end.getLine() == position.getLine() && end.getCharacter() < position.getLine()) {
+		if (end.getLine() == position.getLine() && end.getCharacter() < position.getCharacter()) {
 			return false;
 		}
-		
 		return true;
 	}
+	
 	void collectInlinePropertyTextEdits(DOMElement rootElement, String property, String value,
 			List<TextEdit> textEditss, CancelChecker cancelChecker) throws CancellationException {
 		cancelChecker.checkCanceled();
