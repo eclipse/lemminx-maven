@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -70,6 +71,8 @@ public class MavenCodeActionPropertyRefactoringTest {
 		CodeAction expectedCodeAction = ca(null, 
 				teOp(xmlDocument.getDocumentURI(), positionStart.getLine(), positionStart.getCharacter(), 
 						positionEnd.getLine(), positionEnd.getCharacter(), "my-property-group-value"));
+		expectedCodeAction.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
+		
 		// Test for expected code actions returned
 		testCodeActionsFor(xmlDocument.getText(), null, new Range(positionStart, positionEnd), 
 				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
@@ -107,6 +110,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 						ranges.get(0).getStart().getLine(), ranges.get(0).getStart().getCharacter(), 
 						ranges.get(0).getEnd().getLine(), ranges.get(0).getEnd().getCharacter(), 
 						"my-property-group-value"));
+		expectedCodeAction_1.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 		
 		// Inline for all the property uses in pom.xml 
 		List<TextEdit> textEdits = ranges.stream().map(range -> 
@@ -115,6 +119,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 				"my-property-group-value")).collect(Collectors.toList()) ;
 		assertTrue(textEdits.size() == ranges.size(), "The TextEdits size should be equl to the size of ranges");
 		CodeAction expectedCodeAction_2 = ca(null,  teOp(xmlDocument.getDocumentURI(), textEdits.toArray(new TextEdit[textEdits.size()])));
+		expectedCodeAction_2.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 
 		// Test for expected code actions returned
 		testCodeActionsFor(xmlDocument.getText(), null, ranges.get(0), 
@@ -166,7 +171,8 @@ public class MavenCodeActionPropertyRefactoringTest {
 		assertTrue(textEdits.size() == 2, "The TextEdits size should be 2");
 		CodeAction expectedCodeAction = ca(null,  
 				teOp(xmlDocument.getDocumentURI(), textEdits.toArray(new TextEdit[textEdits.size()])));
-		
+		expectedCodeAction.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
+
 		// Test for expected code actions returned
 		testCodeActionsFor(xmlDocument.getText(), null, new Range(position, position), 
 				(String) null, xmlDocument.getDocumentURI(),  sharedSettings, xmlLanguageService, -1, 
@@ -220,6 +226,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 		assertTrue(singleTextEdits.size() == 2, "The TextEdits size should be 2");
 		CodeAction expectedCodeAction_1 = ca(null,  
 				teOp(xmlDocument.getDocumentURI(), singleTextEdits.toArray(new TextEdit[singleTextEdits.size()])));
+		expectedCodeAction_1.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 		
 		// Code action for extracting all the value uses to a property 
 
@@ -231,6 +238,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 			"${test-1-version}")).collect(Collectors.toList())) ;
 		assertTrue(multipleTextEdits.size() == ranges.size() + 1, "The TextEdits size should be equl to the size of ranges");
 		CodeAction expectedCodeAction_2 = ca(null,  teOp(xmlDocument.getDocumentURI(), multipleTextEdits.toArray(new TextEdit[multipleTextEdits.size()])));
+		expectedCodeAction_2.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 
 		// Test for expected code actions returned
 		testCodeActionsFor(xmlDocument.getText(), null, ranges.get(0), 
@@ -299,6 +307,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 		assertTrue(singleTextEdits.size() == 2, "The TextEdits size should be 2");
 		CodeAction expectedCodeAction_1 = ca(null,  
 				teOp(xmlDocument.getDocumentURI(), singleTextEdits.toArray(new TextEdit[singleTextEdits.size()])));
+		expectedCodeAction_1.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 
 		// Code action for replacing a single value with an existing property
 
@@ -307,6 +316,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 		assertTrue(singleReplaceTextEdits.size() == 1, "The TextEdits size should be 1");
 		CodeAction expectedCodeAction_2 = ca(null,  
 				teOp(xmlDocument.getDocumentURI(), singleReplaceTextEdits.toArray(new TextEdit[singleReplaceTextEdits.size()])));
+		expectedCodeAction_2.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 	
 		// Code action for extracting a single value into a property in parent project
 
@@ -336,6 +346,7 @@ public class MavenCodeActionPropertyRefactoringTest {
 		CodeAction expectedCodeAction_3 = ca(null,  
 				teOp(parentXmlDocument.getDocumentURI(), headerTextEdits.toArray(new TextEdit[headerTextEdits.size()])),
 				teOp(xmlDocument.getDocumentURI(), bodyTextEdits.toArray(new TextEdit[bodyTextEdits.size()])));
+		expectedCodeAction_3.setDiagnostics(Collections.emptyList()); // No diagnostic should be provided
 
 		// Test for expected code actions returned
 		testCodeActionsFor(xmlDocument.getText(), null, ranges.get(0), 
