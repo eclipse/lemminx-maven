@@ -9,6 +9,8 @@
 package org.eclipse.lemminx.extensions.maven.participants.codeaction;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,17 +79,21 @@ public class InlinePropertyCodeAction implements ICodeActionParticipant {
 								.filter(e -> rangeContains(e.getRange(), range.getStart()))
 								.findFirst().orElse(null);
 						if (thisEdit != null) {
-							codeActions.add(CodeActionFactory.replace( 
+							CodeAction ca = CodeActionFactory.replace( 
 									"Inline Property", thisEdit.getRange(), thisEdit.getNewText(), 
-									document.getTextDocument(),  null));
+									document.getTextDocument(),  null);
+							ca.setDiagnostics(Collections.emptyList());
+							codeActions.add(ca);
 						}
 					} 
 					
 					if (textEdits.size() > 1) {
 						// Replace the property with its value in entire document
-						codeActions.add(CodeActionFactory.replace(
+						CodeAction ca = CodeActionFactory.replace( 
 								"Inline all Properties", 
-								textEdits, document.getTextDocument(),  null));
+								textEdits, document.getTextDocument(),  null);
+						ca.setDiagnostics(Collections.emptyList());
+						codeActions.add(ca);
 					}
 				}
 			}

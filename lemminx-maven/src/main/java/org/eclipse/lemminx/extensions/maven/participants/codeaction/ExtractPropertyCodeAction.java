@@ -18,6 +18,7 @@ import static org.eclipse.lemminx.extensions.maven.MavenLemminxExtension.key;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -166,17 +167,21 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 					List<TextEdit> singleTextEdits = new ArrayList<>();
 					singleTextEdits.add(headerTextEdit);
 					singleTextEdits.add(new TextEdit(singleRange, "${" + propertyName + "}"));
-					codeActions.add(CodeActionFactory.replace(
+					CodeAction extractCodeAction = CodeActionFactory.replace( 
 							"Extract as new property in current module", 
-							singleTextEdits, document.getTextDocument(),  null));
+							singleTextEdits, document.getTextDocument(),  null);
+					extractCodeAction.setDiagnostics(Collections.emptyList());
+					codeActions.add(extractCodeAction);
 
 					//	Replace with existing "${already.existing.property}" property
 					exactValueProperties.stream().forEach(p -> {
 						List<TextEdit> singleReplaceTextEdits = new ArrayList<>();
 						singleReplaceTextEdits.add(new TextEdit(singleRange, "${" + p + "}"));
-						codeActions.add(CodeActionFactory.replace(
+						CodeAction replaceCodeAction = CodeActionFactory.replace( 
 								"Replace with existing \"$" + p + "}\" property", 
-								singleReplaceTextEdits, document.getTextDocument(),  null));
+								singleReplaceTextEdits, document.getTextDocument(),  null);
+						replaceCodeAction.setDiagnostics(Collections.emptyList());
+						codeActions.add(replaceCodeAction);
 					});
 					
 					//	Extract as new property in parent ggg:aaa:vvv
@@ -186,8 +191,10 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 							TextDocumentEdit singleBodyEdit = createProjectTextDocumentEdit(document.getTextDocument(), 
 									Arrays.asList(new TextEdit(singleRange, "${" + propertyName + "}")));
 							
-							codeActions.add(createReplaceCodeActione("Extract as new property in  parent \"" + key(p) + "\"",
-									Arrays.asList(projectHeaderEdit, singleBodyEdit), null));
+							CodeAction extractAsNewCodeAction = createReplaceCodeActione("Extract as new property in  parent \"" + key(p) + "\"",
+									Arrays.asList(projectHeaderEdit, singleBodyEdit), null);
+							extractAsNewCodeAction.setDiagnostics(Collections.emptyList());
+							codeActions.add(extractAsNewCodeAction);
 						}
 					});
 				}
@@ -205,9 +212,11 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 					multipleRanges.stream().forEach(r -> {
 						multipleTextEdits.add(new TextEdit(r, "${" + propertyName + "}"));
 					});
-					codeActions.add(CodeActionFactory.replace(
+					CodeAction multipleExtractCodeAction = CodeActionFactory.replace( 
 							"Extract all values as new property in current module", 
-							multipleTextEdits, document.getTextDocument(),  null));
+							multipleTextEdits, document.getTextDocument(),  null);
+					multipleExtractCodeAction.setDiagnostics(Collections.emptyList());
+					codeActions.add(multipleExtractCodeAction);
 
 					// Replace all values with existing "${already.existing.property}" property
 					exactValueProperties.stream().forEach(p -> {
@@ -215,9 +224,11 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 						multipleRanges.stream().forEach(r -> {
 							multipleReplaceTextEdits.add(new TextEdit(r, "${" + p + "}"));
 						});
-						codeActions.add(CodeActionFactory.replace(
+						CodeAction multipleReplaceCodeAction = CodeActionFactory.replace( 
 								"Replace all values with existing \"$" + p + "}\" property", 
-								multipleReplaceTextEdits, document.getTextDocument(),  null));
+								multipleReplaceTextEdits, document.getTextDocument(),  null);
+						multipleReplaceCodeAction.setDiagnostics(Collections.emptyList());
+						codeActions.add(multipleReplaceCodeAction);
 					});
 	
 					// Extract all values as new property in parent ggg:aaa:vvv
@@ -228,9 +239,12 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 							multipleBodyEdits.add(new TextEdit(r, "${" + propertyName + "}"));
 						});
 						if (projectHeaderEdit != null) {
-							codeActions.add(createReplaceCodeActione("Extract all values as new property in  parent \"" + key(p) + "\"",
+							CodeAction multipleExtractAsNewCodeAction = 
+									createReplaceCodeActione("Extract all values as new property in  parent \"" + key(p) + "\"",
 									Arrays.asList(projectHeaderEdit, 
-											createProjectTextDocumentEdit(document.getTextDocument(), multipleBodyEdits)), null));
+											createProjectTextDocumentEdit(document.getTextDocument(), multipleBodyEdits)), null);
+							multipleExtractAsNewCodeAction.setDiagnostics(Collections.emptyList());
+							codeActions.add(multipleExtractAsNewCodeAction);
 						}
 					});
 				}
