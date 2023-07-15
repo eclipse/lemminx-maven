@@ -13,6 +13,7 @@ import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.
 import static org.eclipse.lemminx.utils.TextEditUtils.creatTextDocumentEdit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -47,7 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenPropertyRenameParticipantTest {
 	private XMLLanguageService xmlLanguageService = new XMLLanguageService();
-	
+
 	@Test
 	public void testRenameMavenProperty() throws Exception {
 		String propertyName = "myPropertyGroupId"; 
@@ -56,13 +57,13 @@ public class MavenPropertyRenameParticipantTest {
 
 		Optional<DOMElement> properties = DOMUtils.findChildElement(xmlDocument.getDocumentElement(), PROPERTIES_ELT);
 		assertTrue(properties.isPresent(), "'<properties>'  Element doesn't exist!");
-		
+
 		Optional<DOMElement> property = DOMUtils.findChildElement(properties.get(), propertyName);
 		assertTrue(properties.isPresent(), "'<" + propertyName + ">' Element doesn't exist!");
-	
+
 		DOMElement propertyElement = property.get();
-		
-		// Save property use ranges for testing
+
+		// Save property definition ranges for testing
 		int startTagOpenOffset = propertyElement.getStartTagOpenOffset() + 1;
 		int startTagCloseOffset = propertyElement.getStartTagCloseOffset();
 		int endTagOpenOffset = propertyElement.getEndTagOpenOffset() + 2;
@@ -73,6 +74,8 @@ public class MavenPropertyRenameParticipantTest {
 		Range expectedEndTagRange = 
 				new Range(xmlDocument.positionAt(endTagOpenOffset), xmlDocument.positionAt(endTagCloseOffset));
 		List<Range> propertyUseRanges =collectMavenPropertyUsages(xmlDocument, propertyName);
+		assertFalse(propertyUseRanges.isEmpty(), "Property use entries not found!");
+		Range expectedFirstUseRange = propertyUseRanges.get(0);
 
 		// Expected changes:
 		// - Start and and tags of maven property definition 
@@ -85,7 +88,7 @@ public class MavenPropertyRenameParticipantTest {
 		// final List<Either<TextDocumentEdit, ResourceOperation>> documentChanges
 		WorkspaceEdit expectedRenameResult = new WorkspaceEdit(Arrays.asList(
 				Either.forLeft(creatTextDocumentEdit(xmlDocument, expectedTextEdits))));
-		
+
 		// Test renaming start tag of maven property definition
 		Position startTagMiddle = xmlDocument.positionAt((startTagOpenOffset + startTagCloseOffset) / 2);
 
@@ -99,29 +102,40 @@ public class MavenPropertyRenameParticipantTest {
 
 		WorkspaceEdit renameReult = xmlLanguageService.doRename(xmlDocument, startTagMiddle, newPropertyName, () -> {});
 		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
 		assertEquals(expectedRenameResult, renameReult);
-		
+
 		// Test renaming end tag of maven property definition
 		Position endTagMiddle = xmlDocument.positionAt((endTagOpenOffset + endTagCloseOffset) / 2);
 
-		prepareResult = 
-				xmlLanguageService.prepareRename(xmlDocument, endTagMiddle, () -> {});
+		prepareResult = xmlLanguageService.prepareRename(xmlDocument, endTagMiddle, () -> {});
 		assertNotNull(prepareResult, "Prepare Result is null!");
 		assertNotNull(prepareResult.getLeft(), "Prepare Result Range is null!");
 
 		prepareResultRange = prepareResult.getLeft();
 		assertEquals(expectedEndTagRange, prepareResultRange);
-		
-		WorkspaceEdit workspaceEdit = xmlLanguageService.doRename(xmlDocument, startTagMiddle, newPropertyName, () -> {});
-		assertNotNull(workspaceEdit, "Rename result is null!");
-		assertNotNull(workspaceEdit.getDocumentChanges(), "Rename result document changes is null!");
-
-		workspaceEdit = xmlLanguageService.doRename(xmlDocument, endTagMiddle, newPropertyName, () -> {});
-		assertNotNull(workspaceEdit, "Rename result is null!");
-		assertNotNull(workspaceEdit.getDocumentChanges(), "Rename result document changes is null!");
 
 		renameReult = xmlLanguageService.doRename(xmlDocument, endTagMiddle, newPropertyName, () -> {});
 		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
+		assertEquals(expectedRenameResult, renameReult);
+
+		// Test renaming maven property from first use
+		Range firstUse = propertyUseRanges.get(0);
+		Position firstUseMiddle = new Position(
+				(firstUse.getStart().getLine() + firstUse.getEnd().getLine()) / 2,
+				(firstUse.getStart().getCharacter() + firstUse.getEnd().getCharacter()) / 2);				
+
+		prepareResult = xmlLanguageService.prepareRename(xmlDocument, firstUseMiddle, () -> {});
+		assertNotNull(prepareResult, "Prepare Result is null!");
+		assertNotNull(prepareResult.getLeft(), "Prepare Result Range is null!");
+
+		prepareResultRange = prepareResult.getLeft();
+		assertEquals(expectedFirstUseRange, prepareResultRange);
+
+		renameReult = xmlLanguageService.doRename(xmlDocument, firstUseMiddle, newPropertyName, () -> {});
+		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
 		assertEquals(expectedRenameResult, renameReult);
 	}
 	
@@ -130,7 +144,7 @@ public class MavenPropertyRenameParticipantTest {
 		// We need the WORKSPACE projects to be placed to MavenProjectCache
 		IWorkspaceServiceParticipant workspaceService = xmlLanguageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
-		
+
 		URI folderUri = getClass().getResource("/property-refactoring/child").toURI();
 		WorkspaceFolder wsFolder = new WorkspaceFolder(folderUri.toString());
 
@@ -148,12 +162,12 @@ public class MavenPropertyRenameParticipantTest {
 
 		Optional<DOMElement> properties = DOMUtils.findChildElement(xmlDocument.getDocumentElement(), PROPERTIES_ELT);
 		assertTrue(properties.isPresent(), "'<properties>'  Element doesn't exist!");
-		
+
 		Optional<DOMElement> property = DOMUtils.findChildElement(properties.get(), propertyName);
 		assertTrue(properties.isPresent(), "'<" + propertyName + ">' Element doesn't exist!");
-	
+
 		DOMElement propertyElement = property.get();
-		
+
 		// Save property use ranges for parent (this) document
 		int startTagOpenOffset = propertyElement.getStartTagOpenOffset() + 1;
 		int startTagCloseOffset = propertyElement.getStartTagCloseOffset();
@@ -165,12 +179,14 @@ public class MavenPropertyRenameParticipantTest {
 		Range expectedEndTagRange = 
 				new Range(xmlDocument.positionAt(endTagOpenOffset), xmlDocument.positionAt(endTagCloseOffset));
 		List<Range> propertyUseRanges =collectMavenPropertyUsages(xmlDocument, propertyName);
+		assertFalse(propertyUseRanges.isEmpty(), "Property use entries not found!");
+		Range expectedFirstUseRange = propertyUseRanges.get(0);
 
 		// Save property use ranges for child document
 		DOMDocument childXmlDocument = createDOMDocument("/property-refactoring/child/pom.xml", xmlLanguageService);
 		assertNotNull(childXmlDocument, "Child document not found!");
 		List<Range> childPropertyUseRanges =collectMavenPropertyUsages(childXmlDocument, propertyName);
-		
+
 		// Expected changes:
 		// - Start and and tags of maven property definition 
 		// - one use of maven property
@@ -179,16 +195,16 @@ public class MavenPropertyRenameParticipantTest {
 		expectedParentTextEdits.add(new TextEdit(expectedEndTagRange, newPropertyName));
 		propertyUseRanges.stream().map(r -> new TextEdit(r,newPropertyName))
 			.forEach(expectedParentTextEdits::add);
-		
+
 		List<TextEdit> expectedChildTextEdits = new ArrayList<>();
 		childPropertyUseRanges.stream().map(r -> new TextEdit(r,newPropertyName))
 			.forEach(expectedChildTextEdits::add);
-		
+
 		// final List<Either<TextDocumentEdit, ResourceOperation>> documentChanges
 		WorkspaceEdit expectedRenameResult = new WorkspaceEdit(Arrays.asList(
 				Either.forLeft(creatTextDocumentEdit(xmlDocument, expectedParentTextEdits)),
 				Either.forLeft(creatTextDocumentEdit(childXmlDocument, expectedChildTextEdits))));
-		
+
 		// Test renaming start tag of maven property definition
 		Position startTagMiddle = xmlDocument.positionAt((startTagOpenOffset + startTagCloseOffset) / 2);
 
@@ -202,29 +218,40 @@ public class MavenPropertyRenameParticipantTest {
 
 		WorkspaceEdit renameReult = xmlLanguageService.doRename(xmlDocument, startTagMiddle, newPropertyName, () -> {});
 		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
 		assertEquals(expectedRenameResult, renameReult);
-		
+
 		// Test renaming end tag of maven property definition
 		Position endTagMiddle = xmlDocument.positionAt((endTagOpenOffset + endTagCloseOffset) / 2);
 
-		prepareResult = 
-				xmlLanguageService.prepareRename(xmlDocument, endTagMiddle, () -> {});
+		prepareResult = xmlLanguageService.prepareRename(xmlDocument, endTagMiddle, () -> {});
 		assertNotNull(prepareResult, "Prepare Result is null!");
 		assertNotNull(prepareResult.getLeft(), "Prepare Result Range is null!");
 
 		prepareResultRange = prepareResult.getLeft();
 		assertEquals(expectedEndTagRange, prepareResultRange);
-		
-		WorkspaceEdit workspaceEdit = xmlLanguageService.doRename(xmlDocument, startTagMiddle, newPropertyName, () -> {});
-		assertNotNull(workspaceEdit, "Rename result is null!");
-		assertNotNull(workspaceEdit.getDocumentChanges(), "Rename result document changes is null!");
-
-		workspaceEdit = xmlLanguageService.doRename(xmlDocument, endTagMiddle, newPropertyName, () -> {});
-		assertNotNull(workspaceEdit, "Rename result is null!");
-		assertNotNull(workspaceEdit.getDocumentChanges(), "Rename result document changes is null!");
 
 		renameReult = xmlLanguageService.doRename(xmlDocument, endTagMiddle, newPropertyName, () -> {});
 		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
+		assertEquals(expectedRenameResult, renameReult);
+
+		// Test renaming maven property from first use
+		Range firstUse = propertyUseRanges.get(0);
+		Position firstUseMiddle = new Position(
+				(firstUse.getStart().getLine() + firstUse.getEnd().getLine()) / 2,
+				(firstUse.getStart().getCharacter() + firstUse.getEnd().getCharacter()) / 2);				
+
+		prepareResult = xmlLanguageService.prepareRename(xmlDocument, firstUseMiddle, () -> {});
+		assertNotNull(prepareResult, "Prepare Result is null!");
+		assertNotNull(prepareResult.getLeft(), "Prepare Result Range is null!");
+
+		prepareResultRange = prepareResult.getLeft();
+		assertEquals(expectedFirstUseRange, prepareResultRange);
+
+		renameReult = xmlLanguageService.doRename(xmlDocument, firstUseMiddle, newPropertyName, () -> {});
+		assertNotNull(renameReult, "Prepare Result is null!");
+		assertNotNull(renameReult.getDocumentChanges(), "Rename result document changes is null!");
 		assertEquals(expectedRenameResult, renameReult);
 	}
 	

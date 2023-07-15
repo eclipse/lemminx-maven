@@ -61,7 +61,7 @@ public class MavenPropertyHoverTest {
 		settings.setUseCache(false);
 		assertHover(languageService, text, null, document.getDocumentURI(), 
 				String.format(expectedHoverText, document.getDocumentURI()),
-				r(28, 15,28, 27), settings);
+				r(28, 15,28, 30), settings);
 	}
 
 	@Test
@@ -81,6 +81,6 @@ public class MavenPropertyHoverTest {
 		settings.setUseCache(false);
 		assertHover(languageService, text, null, document.getDocumentURI(), 
 				String.format(expectedHoverText, expectedFile.toURI().toString()), 
-				r(23, 15, 23, 22), settings);
+				r(23, 15, 23, 25), settings);
 	}
 }

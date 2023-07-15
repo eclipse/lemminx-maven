@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants.rename;
 
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
+import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.getMavenProperty;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -26,6 +27,8 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
+import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.dom.DOMText;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
@@ -56,38 +59,79 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 	@Override
 	public Either<Range, PrepareRenameResult> prepareRename(IPrepareRenameRequest request,
 			CancelChecker cancelChecker) {
-		if (!(request.getNode() instanceof DOMElement element)) {
+		DOMDocument document = request.getXMLDocument();
+		DOMNode node = request.getNode();
+		int offset = request.getOffset();
+
+		String propertyName = null;
+		Range propertyRange = null;
+		if (node instanceof DOMText textNode) {
+			Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
+			if (mavenProperty != null) {
+				cancelChecker.checkCanceled();
+				propertyName = mavenProperty.getValue();
+				propertyRange = mavenProperty.getKey();
+			}
+		} else if (node instanceof DOMElement element) {
+			Range range = getMavenPropertyDefinitionRange(offset, element);
+			if (range != null) {
+				cancelChecker.checkCanceled();
+				propertyName = element.getNodeName();
+				propertyRange =range;
+			}
+		}
+
+		if (propertyName == null || propertyRange == null) {
 			return null;
 		}
-		
+
+		// Check Maven property
 		cancelChecker.checkCanceled();
-		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
 
 		cancelChecker.checkCanceled();
-		Range range = getMavenPropertyRange(request.getOffset(), element,  project);
+		Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(project);
 
 		cancelChecker.checkCanceled();
-		return range == null ? null : Either.forLeft(range);
+		return properties.get(propertyName) == null ? null : Either.forLeft(propertyRange);
 	}
 
 	@Override
 	public void doRename(IRenameRequest request, IRenameResponse renameResponse, CancelChecker cancelChecker) {
 		DOMDocument document = request.getXMLDocument();
+		DOMNode node = request.getNode();
+		int offset = request.getOffset();
 		String newPropertyName = request.getNewText();
 		
-		if (!(request.getNode() instanceof DOMElement element)) {
+		String propertyName = null;
+		if (node instanceof DOMText textNode) {
+			Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
+			if (mavenProperty != null) {
+				cancelChecker.checkCanceled();
+				propertyName = mavenProperty.getValue();
+			}
+		} else if (node instanceof DOMElement element) {
+			Range range = getMavenPropertyDefinitionRange(offset, element);
+			if (range != null) {
+				cancelChecker.checkCanceled();
+				propertyName = element.getNodeName();
+			}
+		}
+
+		if (propertyName == null) {
 			return;
 		}
 
+		// Check Maven property
 		cancelChecker.checkCanceled();
 		MavenProject thisProject = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
 		if (thisProject == null) {
 			return;
 		}
-		
+
 		cancelChecker.checkCanceled();
-		Range range = getMavenPropertyRange(request.getOffset(), element,  thisProject);
-		if (range == null) {
+		Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(thisProject);
+		if (properties.get(propertyName) == null) {
 			return;
 		}
 
@@ -97,8 +141,8 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 		plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
 			projects.addAll(findParentsOfChildProject(thisProject, child)));
 
-		String propertyName = element.getNodeName();
 		URI thisProjectUri = ParticipantUtils.normalizedUri(document.getDocumentURI());
+		final String oldPropertyName = propertyName;
 		projects.stream().forEach(project -> {
 			cancelChecker.checkCanceled();
 			URI projectUri = ParticipantUtils.normalizedUri(project.getFile().toURI().toString());
@@ -114,14 +158,12 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 			cancelChecker.checkCanceled();
 			// Collect Text Edits for the document
 			List<TextEdit> projectTextEdits = new ArrayList<>();
-			collectPropertyElementTextEdits(projectDocumentt, propertyName, newPropertyName, projectTextEdits, cancelChecker);
-			collectPropertyUseTextEdits(projectDocumentt.getDocumentElement(), propertyName, newPropertyName, projectTextEdits, cancelChecker);
+			collectPropertyElementTextEdits(projectDocumentt, oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
+			collectPropertyUseTextEdits(projectDocumentt.getDocumentElement(), oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
 			VersionedTextDocumentIdentifier projectVersionedTextDocumentIdentifier = new VersionedTextDocumentIdentifier(
 					projectDocumentt.getTextDocument().getUri(), projectDocumentt.getTextDocument().getVersion());
 			renameResponse.addTextDocumentEdit(new TextDocumentEdit(projectVersionedTextDocumentIdentifier, projectTextEdits));
 		});
-
-		cancelChecker.checkCanceled();
 	}
 
 	/*
@@ -205,8 +247,8 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 			});
 	}
 
-	private static Range getMavenPropertyRange(int offset, DOMElement propertyElement, MavenProject project) {
-		if (propertyElement == null || project == null) {
+	private static Range getMavenPropertyDefinitionRange(int offset, DOMElement propertyElement) {
+		if (propertyElement == null) {
 			return null;
 		}
 		DOMElement parentElement = propertyElement.getParentElement();
@@ -230,20 +272,11 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 				range = new Range(document.positionAt(startTagOpenOffset), document.positionAt(startTagCloseOffset));
 			} else if (offset >= endTagOpenOffset && offset < endTagCloseOffset) {
 				range = new Range(document.positionAt(endTagOpenOffset), document.positionAt(endTagCloseOffset));
-			} else {
-				return null;
 			}
 		} catch (BadLocationException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			return null;
 		}
 
-		String mavenProperty = propertyElement.getNodeName();
-		Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(project);
-		String value = properties.get(mavenProperty);
-		if (value == null) {
-			return null;
-		}
 		return range;
 	}
 }
