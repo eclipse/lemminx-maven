@@ -315,11 +315,10 @@ public class ParticipantUtils {
 		int indexCloseBefore = beforeHoverText.lastIndexOf('}');
 		int indexCloseAfter = afterHoverText.indexOf('}');
 		if (indexOpen > indexCloseBefore) {
-
 			String propertyText = tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
 			int textStart = tag.getStart();
 			Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
-					textStart + indexCloseAfter - 1, tag.getOwnerDocument());
+					textStart + beforeHover + indexCloseAfter, tag.getOwnerDocument());
 			return Map.entry(propertyRange, propertyText);
 		}
 		return null;
