@@ -212,6 +212,59 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<profile>
+			<id>generate-vscode-jars</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-dependency-plugin</artifactId>
+						<version>3.6.0</version>
+						<executions>
+							<execution>
+								<id>copy-vscode-jar-dependencies</id>
+								<phase>package</phase>
+								<goals>
+									<goal>copy-dependencies</goal>
+								</goals>
+							</execution>
+							<execution>
+								<id>copy-lemminx-maven-to-vscode-jars</id>
+								<phase>package</phase>
+								<configuration>
+									<artifactItems>
+										<artifactItem>
+											<groupId>${project.groupId}</groupId>
+											<artifactId>${project.artifactId}</artifactId>
+											<version>${project.version}</version>
+											<type>jar</type>
+											<overWrite>true</overWrite>
+										</artifactItem>
+									</artifactItems>
+								</configuration>
+								<goals>
+									<goal>copy</goal>
+								</goals>
+
+							</execution>
+						</executions>
+						<configuration>
+							<outputDirectory>
+								${project.build.directory}/vscode-lemminx-maven-jars</outputDirectory>
+							<overWriteReleases>true</overWriteReleases>
+							<overWriteSnapshots>true</overWriteSnapshots>
+							<overWriteIfNewer>true</overWriteIfNewer>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 	<repositories>
 		<repository>
 			<id>lemminx-releases</id>
