@@ -66,6 +66,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
@@ -303,7 +304,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 			// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
 			nonArtifactCollector.entrySet().stream()
-//			.sorted(null)
 			.map(entry -> entry.getValue()).forEach(response::addCompletionItem);
 			nonArtifactCollector.clear();
 			break;
@@ -354,21 +354,23 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
 			} else {
 				// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
+				final AtomicInteger sortIndex = new AtomicInteger(0);
 				nonArtifactCollector.entrySet().stream()
-				.map(entry -> entry.getValue())
-				.filter(Objects::nonNull)
-				.filter(item -> item.getSortText() != null || item.getLabel() != null)
-				.sorted(new Comparator<CompletionItem>() {
-					// Backward order
-					@Override
-					public int compare(CompletionItem o1, CompletionItem o2) {
-						String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
-						String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
-						return new DefaultArtifactVersion(sortText2)
-								.compareTo(new DefaultArtifactVersion(sortText1));
-					}
-				})
-				.forEach(response::addCompletionItem);
+					.map(entry -> entry.getValue())
+					.filter(Objects::nonNull)
+					.filter(item -> item.getSortText() != null || item.getLabel() != null)
+					.sorted(new Comparator<CompletionItem>() {
+						// Sort in reverse order to correctly fill 'sortText' 
+						@Override
+						public int compare(CompletionItem o1, CompletionItem o2) {
+							String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
+							String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
+							return new DefaultArtifactVersion(sortText2)
+									.compareTo(new DefaultArtifactVersion(sortText1));
+						}
+					})
+					.peek(item -> item.setSortText(String.format("%06d", (sortIndex.getAndIncrement())) + '.' + item.getLabel()))
+					.forEach(response::addCompletionItem);
 				nonArtifactCollector.clear();
 			}
 			break;
