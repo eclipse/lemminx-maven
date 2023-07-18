@@ -25,7 +25,7 @@ pipeline{
 				branch 'master'
 			}
 			steps {
-				sh 'mvn -B deploy  --file lemminx-maven/pom.xml -DskipTests -Dcbi.jarsigner.skip=false'
+				sh 'mvn -B deploy  --file lemminx-maven/pom.xml -Pgenerate-vscode-jars  -DskipTests -Dcbi.jarsigner.skip=false'
 			}
 		}
 	}
