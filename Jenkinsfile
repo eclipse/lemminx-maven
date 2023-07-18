@@ -11,7 +11,7 @@ pipeline{
 	stages{
 		stage("Maven Build"){
 			steps {
-				sh 'mvn -B verify --file lemminx-maven/pom.xml -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
+				sh 'mvn -B verify --file lemminx-maven/pom.xml -Pgenerate-vscode-jars -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
 			}
 			post {
 				always {

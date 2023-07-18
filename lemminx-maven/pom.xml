@@ -194,15 +194,15 @@
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.6.0</version>
-				<configuration>
-					<descriptors>
-						<descriptor>src/assembly/deps.xml</descriptor>
-					</descriptors>
-				</configuration>
 				<executions>
 					<execution>
 						<id>zip-with-dependencies</id>
 						<phase>package</phase>
+						<configuration>
+							<descriptors>
+								<descriptor>src/assembly/deps.xml</descriptor>
+							</descriptors>
+						</configuration>
 						<goals>
 							<goal>single</goal>
 						</goals>
@@ -249,7 +249,6 @@
 								<goals>
 									<goal>copy</goal>
 								</goals>
-
 							</execution>
 						</executions>
 						<configuration>
@@ -259,6 +258,24 @@
 							<overWriteSnapshots>true</overWriteSnapshots>
 							<overWriteIfNewer>true</overWriteIfNewer>
 						</configuration>
+					</plugin>
+					<plugin>
+						<artifactId>maven-assembly-plugin</artifactId>
+						<version>3.6.0</version>
+						<executions>
+							<execution>
+								<id>lemminx-maven-vscode-uber-zip</id>
+								<phase>package</phase>
+								<configuration>
+									<descriptors>
+										<descriptor>src/assembly/vscode-uber.xml</descriptor>
+									</descriptors>
+								</configuration>
+								<goals>
+									<goal>single</goal>
+								</goals>
+							</execution>
+						</executions>
 					</plugin>
 				</plugins>
 			</build>

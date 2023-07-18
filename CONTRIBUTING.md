@@ -48,11 +48,13 @@ The LemMinX-Maven extension must be debugged remotely as it's most useful when c
 	$ mvnw.cmd verify -DskipTests -Pgenerate-vscode-jars
 	```
 
-2. Clone and build VSCode-XML extension, See: [VSCode-XML Extension Contribution Guide](https://github.com/redhat-developer/vscode-xml/blob/main/CONTRIBUTING.md#steps)
+This produces the `<LemMinX-Maven>/lemminx-maven/target/vscode-lemminx-maven-jars` directory containing all the Jars required to run LemMinX-Maven extension in VSCode XML as well as the `lemminx-maven-<version>-vscode-uber-jars.zip` Zip-archive with the contents of this directory.
 
-3. Try running the VSCode-XML extension to make sure everything is correctly installed and XML editor works (validation, content assist, hovers, etc. for XML tags and attributes)
+2. Clone and build VSCode-XML extension, See: [VSCode-XML Extension Contribution Guide](https://github.com/redhat-developer/vscode-xml/blob/main/CONTRIBUTING.md#steps).
 
-4. Copy `<LemMinX-Maven>/lemminx-maven/target/vscode-lemminx-maven-jars` directory to VSCode-XML extension project directory and make sure it's visible in `vscode-xml`project in VSCode 
+3. Try running the VSCode-XML extension to make sure everything is correctly installed and XML editor works (validation, content assist, hovers, etc. for XML tags and attributes).
+
+4. Copy `<LemMinX-Maven>/lemminx-maven/target/vscode-lemminx-maven-jars` directory to VSCode-XML extension project directory and make sure it's visible in `vscode-xml`project in VSCode .
 
 5. In VSCode modify `vscode-xml/package.json` adding the following configuration to the `contributes` section:
 
