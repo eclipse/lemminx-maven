@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
@@ -100,20 +99,32 @@ public class MavenCompletionParticipantDuplicationTest {
 
 	@Test
 	public void testDuplicateCompletionVersionOrder() throws IOException, URISyntaxException {
-		// Check Content Assist result
+		// Check Content Assist result - accept only version items:
+		// they have sortText != null && sortText starts with 6 decimal digits followed by '.'
+		//
 		List<CompletionItem> completions = languageService.doComplete(
 					createDOMDocument("/pom-duplicate-version-completion.xml", languageService),
 					new Position(15, 13), new SharedSettings())
-				.getItems();
-		
+				.getItems().stream().filter(i -> {
+					String sortText = i.getSortText();
+					if (sortText == null || sortText.indexOf('.') != 6) {
+						return false;
+					}
+					try {
+						Integer.valueOf(sortText.substring(0, 6), 10);
+					} catch (NumberFormatException | IndexOutOfBoundsException e) {
+						return false;
+					}
+					return true;
+				}).toList();
 		List<CompletionItem> orderedCompletions = completions.stream()
 				.sorted(new Comparator<CompletionItem>() {
-					// Backward order
+					// Sort in direct order using sortText/label values
 					@Override
 					public int compare(CompletionItem o1, CompletionItem o2) {
 						String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
 						String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
-						return new DefaultArtifactVersion(sortText2).compareTo(new DefaultArtifactVersion(sortText1));
+						return sortText1.compareTo(sortText2);
 					}
 				}).toList();
 		assertEquals(orderedCompletions, completions);
