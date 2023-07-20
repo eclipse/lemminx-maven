@@ -159,7 +159,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 				// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
 				// exceptions
 			} catch (IOException ex) {
-				LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+				LOGGER.log(Level.SEVERE, "Couldn't read Maven project: " + file.getAbsolutePath() + " : " + ex.getMessage(), ex);
 			}
 			return Optional.empty();
 		}
