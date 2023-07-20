@@ -108,7 +108,12 @@ public class MavenPluginUtils {
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
 			MavenLemminxExtension plugin)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
-		PluginDescriptor pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
+		PluginDescriptor pluginDescriptor = null;
+		try {
+			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
+		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
 		if (pluginDescriptor == null) {
 			return Collections.emptySet();
 		}
@@ -127,8 +132,9 @@ public class MavenPluginUtils {
 			return Collections.emptySet();
 		}
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
+		final var finalPluginDescriptor = pluginDescriptor;
 		return mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
-				.loadMojoParameters(pluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
+				.loadMojoParameters(finalPluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
 				.stream()).collect(Collectors.toSet());
 	}
 
@@ -139,6 +145,12 @@ public class MavenPluginUtils {
 
 	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node,
 			MavenLemminxExtension lemminxMavenPlugin)
+			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+		return getContainingPluginDescriptor(node, lemminxMavenPlugin, false);
+	}
+
+	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node,
+			MavenLemminxExtension lemminxMavenPlugin, boolean reThrowPluginDescriptorExceptions)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
 		MavenProject project = lemminxMavenPlugin.getProjectCache()
 				.getLastSuccessfulMavenProject(node.getOwnerDocument());
@@ -192,8 +204,13 @@ public class MavenPluginUtils {
 			pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
 				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
 				lemminxMavenPlugin.getMavenSession().getRepositorySession());
-		} catch (PluginResolutionException ex) {
-			LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException ex) {
+			LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+			if (reThrowPluginDescriptorExceptions) {
+				throw ex; // Needed for plugin validation
+			}
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE, "An error occured while getting a plugin descriptor: " + e.getMessage(), e);
 		}
 		if (pluginDescriptor == null && "0.0.1-SNAPSHOT".equals(plugin.getVersion())) { // probably missing or not parsed version
 			Optional<DefaultArtifactVersion> version;

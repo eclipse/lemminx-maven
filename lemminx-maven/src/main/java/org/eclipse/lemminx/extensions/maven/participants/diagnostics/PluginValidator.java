@@ -42,7 +42,7 @@ class PluginValidator {
 
 	public Optional<List<Diagnostic>> validatePluginResolution(DiagnosticRequest diagnosticRequest) {
 		try {
-			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest.getNode(), plugin);
+			MavenPluginUtils.getContainingPluginDescriptor(diagnosticRequest.getNode(), plugin, true);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.WARNING, "Could not resolve plugin description", e);
 
