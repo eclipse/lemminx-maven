@@ -123,6 +123,15 @@ public class SimpleModelTest {
 	}
 
 	@Test
+	public void testDoNotReportNonParseablePomError()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		TextDocument textDocument = new TextDocument("<project> < </project>", "file:///pom.xml");
+		DOMDocument document = DOMParser.getInstance().parse(textDocument, languageService.getResolverExtensionManager());
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {});
+		assertFalse(diagnostics.stream().anyMatch(diag -> diag.getMessage().contains("Non-parseable POM")));
+	}
+
+	@Test
 	public void testMissingArtifactIdError()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
 		DOMDocument document = createDOMDocument("/pom-without-artifactId.xml", languageService);
