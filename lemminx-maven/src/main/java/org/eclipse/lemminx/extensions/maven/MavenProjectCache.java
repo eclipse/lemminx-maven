@@ -36,6 +36,7 @@ import org.apache.maven.model.building.ModelBuildingException;
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.model.building.ModelProblem.Version;
+import org.apache.maven.model.io.ModelParseException;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.project.DefaultProjectBuilder;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
@@ -174,7 +175,9 @@ public class MavenProjectCache {
 				if (e.getCause() instanceof ModelBuildingException modelBuildingException) {
 					// Try to manually build a minimal project from the document to collect lower-level
 					// errors and to have something usable in cache for most basic operations
-					problems.addAll(modelBuildingException.getProblems());
+					modelBuildingException.getProblems().stream()
+						.filter(p -> !(p.getException() instanceof ModelParseException))
+						.forEach(problems::add);
 					try (InputStream documentStream = source.getInputStream()) {
 						Model model = mavenReader.read(documentStream);
 						project = new MavenProject(model);
