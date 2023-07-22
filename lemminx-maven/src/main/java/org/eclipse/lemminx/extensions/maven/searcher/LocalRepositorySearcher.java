@@ -8,6 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.searcher;
 
+import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.isWellDefinedDependency;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.ClosedWatchServiceException;
@@ -127,11 +129,15 @@ public class LocalRepositorySearcher {
 		return groupIdArtifactIdToVersion.values();
 	}
 
-
 	// TODO consider using directly ArtifactRepository for those 2 methods
 	public File findLocalFile(Dependency dependency) {
-		return new File(localRepository, dependency.getGroupId().replace('.', File.separatorChar) + File.separatorChar + dependency.getArtifactId() + File.separatorChar + dependency.getVersion() + File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom");
+		return isWellDefinedDependency(dependency)
+				? new File(localRepository, dependency.getGroupId().replace('.', File.separatorChar)
+						+ File.separatorChar + dependency.getArtifactId() + File.separatorChar + dependency.getVersion()
+						+ File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom")
+				: null;
 	}
+	
 	public File findLocalFile(Artifact gav) {
 		return new File(localRepository, gav.getGroupId().replace('.', File.separatorChar) + File.separatorChar + gav.getArtifactId() + File.separatorChar + gav.getVersion() + File.separatorChar + gav.getArtifactId() + '-' + gav.getVersion() + ".pom");
 	}

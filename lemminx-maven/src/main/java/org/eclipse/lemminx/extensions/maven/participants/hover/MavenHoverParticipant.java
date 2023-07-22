@@ -102,17 +102,21 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			return null;
 		}
 		try {
-			DOMNode tag = request.getNode();
-			DOMElement parent = tag.getParentElement();
-	
-			boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
 	
 			Map.Entry<Range, String> mavenProperty = ParticipantUtils.getMavenPropertyInRequest(request);
 			if (mavenProperty != null) {
 				return collectProperty(request, mavenProperty, cancelChecker);
 			}
 			
+			DOMNode tag = request.getNode();
+			DOMElement parent = tag.getParentElement();
+			if (ParticipantUtils.isProject(parent)) {
+				// Do not show hover for the project itself
+				return null;
+			}
+		
 			cancelChecker.checkCanceled();
+			boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
 			MavenProject p = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 			Dependency artifactToSearch = ParticipantUtils.getArtifactToSearch(p, tag);
 	
