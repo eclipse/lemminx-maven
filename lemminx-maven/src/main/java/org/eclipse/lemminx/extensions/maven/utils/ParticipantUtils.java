@@ -20,6 +20,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROJECT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.RELATIVE_PATH_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
@@ -141,6 +142,19 @@ public class ParticipantUtils {
 							.findFirst().orElse(dependency);
 				}
 			}
+		} else if (isProject(element)) {
+			DOMNode projectNode = DOMUtils.findClosestParentNode(element, PROJECT_ELT);
+			if (projectNode != null) {
+				Optional<DOMElement> parent = DOMUtils.findChildElement(projectNode, PARENT_ELT);
+				if (parent.isPresent()) {
+					if (dependency.getGroupId() == null) {
+						dependency.setGroupId(DOMUtils.findChildElementText(parent.get(), GROUP_ID_ELT).orElse(null));
+					}
+					if (dependency.getVersion() == null) {
+						dependency.setVersion(DOMUtils.findChildElementText(parent.get(), VERSION_ELT).orElse(null));
+					}
+				}
+			}
 		}
 		return dependency;
 	}
@@ -222,6 +236,11 @@ public class ParticipantUtils {
 	public static boolean isPlugin(DOMElement element) {
 		return  PLUGIN_ELT.equals(element.getLocalName()) || 
 					(element.getParentElement() != null && PLUGIN_ELT.equals(element.getParentElement().getLocalName()));
+	}
+
+	public static boolean isProject(DOMElement element) {
+		return  PROJECT_ELT.equals(element.getLocalName()) || 
+					(element.getParentElement() != null && PROJECT_ELT.equals(element.getParentElement().getLocalName()));
 	}
 	
 	public static boolean isParentDeclaration(DOMElement element) {
