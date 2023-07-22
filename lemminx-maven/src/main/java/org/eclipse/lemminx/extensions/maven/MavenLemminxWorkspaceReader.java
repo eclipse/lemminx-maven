@@ -222,7 +222,8 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	@Override
 	public File findArtifact(Artifact artifact) {
 		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-		return plugin.getProjectCache().getProjects().stream()
+		List<MavenProject> projectsCopy = plugin.getProjectCache().getProjects().stream().toList();
+		return projectsCopy.stream()
 				.filter(p -> p.getArtifact() != null && projectKey.equals(ArtifactUtils.key(p.getArtifact())))
 				.map(project -> {
 					File file = find(project, artifact);
