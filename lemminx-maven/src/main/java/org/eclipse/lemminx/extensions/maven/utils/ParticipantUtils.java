@@ -323,22 +323,30 @@ public class ParticipantUtils {
 			return null;
 		}
 
-		int hoverLocation = offset;
 		int propertyOffset = tag.getStart();
-		int beforeHover = hoverLocation - propertyOffset;
-
-		String beforeHoverText = tagText.substring(0, beforeHover);
-		String afterHoverText = tagText.substring(beforeHover);
-
-		int indexOpen = beforeHoverText.lastIndexOf("${");
-		int indexCloseBefore = beforeHoverText.lastIndexOf('}');
-		int indexCloseAfter = afterHoverText.indexOf('}');
-		if (indexOpen > indexCloseBefore) {
-			String propertyText = tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
-			int textStart = tag.getStart();
-			Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
-					textStart + beforeHover + indexCloseAfter, tag.getOwnerDocument());
-			return Map.entry(propertyRange, propertyText);
+		int beforeHover = offset - propertyOffset;
+		try {
+			String beforeHoverText = tagText.substring(0, beforeHover);
+			String afterHoverText = tagText.substring(beforeHover);
+	
+			int indexOpen = beforeHoverText.lastIndexOf("${");
+			int indexCloseBefore = beforeHoverText.lastIndexOf('}');
+			if (indexOpen < indexCloseBefore) {
+				return null; // outside of the maven property use 
+			}
+			int indexCloseAfter = afterHoverText.indexOf('}');
+			if (indexCloseAfter == -1) {
+				return null; //incomplete maven property use
+			}
+			if (indexOpen > indexCloseBefore) {
+				String propertyText = tagText.substring(indexOpen + 2, indexCloseAfter + beforeHover);
+				int textStart = tag.getStart();
+				Range propertyRange = XMLPositionUtility.createRange(textStart + indexOpen + 2,
+						textStart + beforeHover + indexCloseAfter, tag.getOwnerDocument());
+				return Map.entry(propertyRange, propertyText);
+			}
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE, e.toString(), e);
 		}
 		return null;
 	}
