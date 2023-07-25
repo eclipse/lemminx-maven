@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collection;
-import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.model.Dependency;
@@ -23,7 +23,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class RemoteCentralRepoTest {
-	private static RemoteCentralRepositorySearcher repoSearcher = new RemoteCentralRepositorySearcher(null);
+	private static RemoteCentralRepositorySearcher repoSearcher = new RemoteCentralRepositorySearcher();
 	
 	@BeforeAll
 	static void setup() {
@@ -31,7 +31,7 @@ class RemoteCentralRepoTest {
 	}	
 	
 	@Test
-	void testGetArtifacts() {
+	void testGetArtifacts() throws Exception {
 		String G = null;
 		String A = null;
 		String V = null;
@@ -40,12 +40,20 @@ class RemoteCentralRepoTest {
 		dep.setArtifactId(A);
 		dep.setGroupId(G);
 		dep.setVersion(V);
-		
 		System.out.println("\nDep: " + dep.toString());
-		Collection<Artifact> artifactInfos = repoSearcher.getArtifacts(dep);
+		
+		Collection<Artifact> artifactInfos = null;
+		try {
+			artifactInfos = repoSearcher.getArtifacts(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactInfos = (Collection<Artifact>)future.get();
+			}
+		}
+		
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
-	
 		artifactInfos.forEach(a -> {System.out.println("g: " + a.getGroupId() + ". a: " + a.getArtifactId() + ", v: " + a.getVersion());});
 		
 		G = "org.fujion.webjars";
@@ -58,16 +66,23 @@ class RemoteCentralRepoTest {
 		dep.setVersion(V);
 		System.out.println("\nDep: " + dep.toString());
 		
-		artifactInfos = repoSearcher.getArtifacts(dep);
+		artifactInfos = null;
+		try {
+			artifactInfos = repoSearcher.getArtifacts(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactInfos = (Collection<Artifact>)future.get();
+			}
+		}
+
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
-	
 		artifactInfos.forEach(a -> {System.out.println("g: " + a.getGroupId() + ". a: " + a.getArtifactId() + ", v: " + a.getVersion());});
 	}
 	
 	@Test
-	void testGetArtifactVersionss() {
-
+	void testGetArtifactVersionss() throws Exception {
 		String G = "org.fujion.webjars";
 		String A = "webjar-angular";
 		String V = "1";
@@ -78,27 +93,42 @@ class RemoteCentralRepoTest {
 		dep.setVersion(V);
 		System.out.println("\nDep: " + dep.toString());
 		
-		Set<ArtifactVersion> artifactVersions = repoSearcher.getArtifactVersions(dep);
+		Collection<ArtifactVersion> artifactVersions = null;
+		try {
+			artifactVersions = repoSearcher.getArtifactVersions(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactVersions= (Collection<ArtifactVersion>)future.get();
+			}
+		}
+
 		assertNotNull(artifactVersions);
 		assertFalse(artifactVersions.isEmpty());
-	
-		artifactVersions.forEach(v -> {System.out.println("v: " + v.toString());});
 		assertTrue(artifactVersions.size() > 1);
+		artifactVersions.forEach(v -> {System.out.println("v: " + v.toString());});
 	}	
 	
 	@Test
-	void testGetGroupIdss() {
-
+	void testGetGroupIdss() throws Exception {
 		String G = "org.fujion";
 		
 		Dependency dep = new Dependency();
 		dep.setGroupId(G);
 		System.out.println("\nDep: " + dep.toString());
 		
-		Set<String> artifactGroups = repoSearcher.getGroupIds(dep);
+		Collection<String> artifactGroups = null;
+		try {
+			artifactGroups = repoSearcher.getGroupIds(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactGroups = (Collection<String>)future.get();
+			}
+		}
+
 		assertNotNull(artifactGroups);
 		assertFalse(artifactGroups.isEmpty());
-	
 		artifactGroups.forEach(v -> {System.out.println("g: " + v.toString());});
 
 		G = "org.fuj*";
@@ -107,16 +137,23 @@ class RemoteCentralRepoTest {
 		dep.setGroupId(G);
 		System.out.println("\nDep: " + dep.toString());
 		
-		artifactGroups = repoSearcher.getGroupIds(dep);
+		artifactGroups = null;
+		try {
+			artifactGroups = repoSearcher.getGroupIds(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactGroups = (Collection<String>)future.get();
+			}
+		}
+		
 		assertNotNull(artifactGroups);
 		assertFalse(artifactGroups.isEmpty());
-	
 		artifactGroups.forEach(v -> {System.out.println("g: " + v.toString());});
 	}	
 		
 	@Test
-	void testGetPlugiArtifacts() {
-
+	void testGetPlugiArtifacts() throws Exception {
 		String G = null;
 		String A = null;
 		String V = null;
@@ -125,12 +162,20 @@ class RemoteCentralRepoTest {
 		dep.setArtifactId(A);
 		dep.setGroupId(G);
 		dep.setVersion(V);
-		
 		System.out.println("\nDep: " + dep.toString());
-		Collection<Artifact> artifactInfos = repoSearcher.getPluginArtifacts(dep);
+		
+		Collection<Artifact> artifactInfos = null;
+		try {
+			artifactInfos = repoSearcher.getPluginArtifacts(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactInfos = (Collection<Artifact>)future.get();
+			}
+		}
+
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
-	
 		artifactInfos.forEach(a -> {System.out.println("g: " + a.getGroupId() + ". a: " + a.getArtifactId() + ", v: " + a.getVersion());});
 		
 		G = "com.github.gianttreelp.proguardservicesmapper";
@@ -143,16 +188,23 @@ class RemoteCentralRepoTest {
 		dep.setVersion(V);
 		System.out.println("\nDep: " + dep.toString());
 		
-		artifactInfos = repoSearcher.getPluginArtifacts(dep);
+		artifactInfos = null;
+		try {
+			artifactInfos = repoSearcher.getPluginArtifacts(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactInfos = (Collection<Artifact>)future.get();
+			}
+		}
+		
 		assertNotNull(artifactInfos);
 		assertFalse(artifactInfos.isEmpty());
-	
 		artifactInfos.forEach(a -> {System.out.println("g: " + a.getGroupId() + ". a: " + a.getArtifactId() + ", v: " + a.getVersion());});
 	}
 	
 	@Test
-	void testGetPluginArtifactVersionss() {
-
+	void testGetPluginArtifactVersionss() throws Exception {
 		String G = "com.github.gianttreelp.proguardservicesmapper";
 		String A = "proguard-services-mapper-maven";
 		String V = "1";
@@ -161,29 +213,43 @@ class RemoteCentralRepoTest {
 		dep.setArtifactId(A);
 		dep.setGroupId(G);
 		dep.setVersion(V);
-		
 		System.out.println("\nDep: " + dep.toString());
 		
-		Set<ArtifactVersion> artifactVersions = repoSearcher.getPluginArtifactVersions(dep);
+		Collection<ArtifactVersion> artifactVersions = null;
+		try {
+			artifactVersions = repoSearcher.getPluginArtifactVersions(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactVersions = (Collection<ArtifactVersion>)future.get();
+			}
+		}
+
 		assertNotNull(artifactVersions);
 		assertFalse(artifactVersions.isEmpty());
-
 		artifactVersions.forEach(v -> {System.out.println("v: " + v.toString());});
 	}	
 	
 	@Test
-	void testGetPluginGroupIdss() {
-
+	void testGetPluginGroupIdss() throws Exception {
 		String G = "com.github.gianttreelp.proguardservicesmapper";
 		
 		Dependency dep = new Dependency();
 		dep.setGroupId(G);
 		System.out.println("\nDep: " + dep.toString());
 		
-		Set<String> artifactGroups = repoSearcher.getPluginGroupIds(dep);
+		Collection<String> artifactGroups = null;
+		try {
+			artifactGroups = repoSearcher.getPluginGroupIds(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactGroups = (Collection<String>)future.get();
+			}
+		}
+
 		assertNotNull(artifactGroups);
 		assertFalse(artifactGroups.isEmpty());
-	
 		artifactGroups.forEach(v -> {System.out.println("g: " + v.toString());});
 
 		G = "com.github.giant*";
@@ -192,12 +258,18 @@ class RemoteCentralRepoTest {
 		dep.setGroupId(G);
 		System.out.println("\nDep: " + dep.toString());
 		
-		artifactGroups = repoSearcher.getGroupIds(dep);
+		artifactGroups = null;
+		try {
+			artifactGroups = repoSearcher.getPluginGroupIds(dep);
+		} catch (RemoteCentralRepositorySearcher.OngoingOperationException e) {
+			CompletableFuture future = e.getFuture();
+			if (future != null) {
+				artifactGroups = (Collection<String>)future.get();
+			}
+		}
+
 		assertNotNull(artifactGroups);
 		assertFalse(artifactGroups.isEmpty());
-	
 		artifactGroups.forEach(v -> {System.out.println("g: " + v.toString());});
 	}	
-		
-
 }

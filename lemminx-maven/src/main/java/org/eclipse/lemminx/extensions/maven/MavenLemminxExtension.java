@@ -73,7 +73,6 @@ import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
-import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.ExtractPropertyCodeAction;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.InlinePropertyCodeAction;
@@ -206,7 +205,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			cache = new MavenProjectCache(this);
 			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
 			if (!settings.getCentral().isSkip()) {
-				centralSearcher = new RemoteCentralRepositorySearcher(this);
+				centralSearcher = new RemoteCentralRepositorySearcher();
 			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
