@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
@@ -87,14 +88,19 @@ public class MavenCompletionParticipantDuplicationTest {
 	}
 	
 	@Test
-	public void testDuplicateCompletionVersionWithRemoteRepo() throws IOException, URISyntaxException {
+	public void testDuplicateCompletionVersionWithRemoteRepo() throws IOException, URISyntaxException, InterruptedException {
 		// Check Content Assist result
-		List<CompletionItem> completions = languageService.doComplete(
-					createDOMDocument("/pom-duplicate-version-completion.xml", languageService),
-					new Position(15, 17), new SharedSettings())
+		DOMDocument document = createDOMDocument("/pom-duplicate-version-completion.xml", languageService);
+		List<CompletionItem> completions = null;
+		// The items collected from Maven Search API cannot be immediately obtained,
+		// so, we need to wait until all the required data  received and ready for use
+		do {
+			completions = languageService.doComplete(
+					document, new Position(15, 17), new SharedSettings())
 				.getItems();
+			Thread.sleep(1000);
+		} while (completions.stream().map(CompletionItem::getLabel).noneMatch("3.8.1"::equals));
 		assertDuplications(completions);
-		assertTrue(completions.stream().filter(i -> "3.8.1".equals(i.getLabel())).findFirst().isPresent());
 	}
 
 	@Test
