@@ -222,31 +222,18 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	@Override
 	public File findArtifact(Artifact artifact) {
 		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-		List<MavenProject> projectsCopy = plugin.getProjectCache().getProjects().stream().toList();
-		return projectsCopy.stream()
-				.filter(p -> p.getArtifact() != null && projectKey.equals(ArtifactUtils.key(p.getArtifact())))
-				.map(project -> {
-					File file = find(project, artifact);
-					if (file == null && project != project.getExecutionProject()) {
-						file = find(project.getExecutionProject(), artifact);
-					}
-					return file;
-				}).filter(Objects::nonNull)
-				.findAny()
-				.or(() -> {
-					if (skipFlushBeforeResult.get() != Boolean.TRUE) {
-						LOGGER.finest("Waiting for " + projectKey + " to be avilable; processing workspace in the meantime...");
-						while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(projectKey).isEmpty()) {
-							try {
-								Thread.sleep(POLLING_INTERVAL);
-							} catch (InterruptedException e) {
-								LOGGER.severe(e.getMessage());
-							}
-						}
-						LOGGER.finest("Done waiting from " + projectKey + ". Either found, or all workspace processed.");
-					}
-					return getCurrentWorkspaceArtifact(projectKey);
-				}).orElse(null);
+		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
+			LOGGER.finest("Waiting for " + projectKey + " to be avilable; processing workspace in the meantime...");
+			while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(projectKey).isEmpty()) {
+				try {
+					Thread.sleep(POLLING_INTERVAL);
+				} catch (InterruptedException e) {
+					LOGGER.severe(e.getMessage());
+				}
+			}
+			LOGGER.finest("Done waiting from " + projectKey + ". Either found, or all workspace processed.");
+		}
+		return getCurrentWorkspaceArtifact(projectKey).orElse(null);
 	}
 
 	private Optional<File> getCurrentWorkspaceArtifact(String projectKey) {
