@@ -173,26 +173,28 @@ public class ProjectValidator {
 		String currentProjectKey = mavenProject.getGroupId() + ":" + mavenProject.getArtifactId() + ":" //$NON-NLS-1$//$NON-NLS-2$
 				+ mavenProject.getVersion();
 		List<String> activeprofiles = mavenProject.getInjectedProfileIds().get(currentProjectKey);
-		// remember what profile we found the dependency in.
 		Map<DOMElement, String> candidateProfile = new HashMap<>();
-		Optional<DOMElement> profiles = DOMUtils.findChildElement(node, PROFILES_ELT);
-		profiles.ifPresent(profilesElement -> {
-			DOMUtils.findChildElements(profilesElement, PROFILE_ELT).stream().forEach(profile -> {
-				Optional<String> idString = DOMUtils.findChildElementText(profile, ID_ELT);
-				if (idString.isPresent() && activeprofiles.contains(idString.get())) {
-					Optional<DOMElement> profileDependencies = DOMUtils.findChildElement(profile, DEPENDENCIES_ELT);
-					profileDependencies.ifPresent(dependenciesElement -> {
-						DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT).stream()
-								.filter(dependency -> DOMUtils.findChildElement(dependency, VERSION_ELT).isPresent())
-								.forEach(dependency -> {
-									candidates.add(dependency);
-									candidateProfile.put(dependency, idString.get());
-								});
-					});
-				}
+		if (activeprofiles != null && !activeprofiles.isEmpty()) {
+			// remember what profile we found the dependency in.
+			Optional<DOMElement> profiles = DOMUtils.findChildElement(node, PROFILES_ELT);
+			profiles.ifPresent(profilesElement -> {
+				DOMUtils.findChildElements(profilesElement, PROFILE_ELT).stream().forEach(profile -> {
+					Optional<String> idString = DOMUtils.findChildElementText(profile, ID_ELT);
+					if (idString.isPresent() && activeprofiles.contains(idString.get())) {
+						Optional<DOMElement> profileDependencies = DOMUtils.findChildElement(profile, DEPENDENCIES_ELT);
+						profileDependencies.ifPresent(dependenciesElement -> {
+							DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT).stream()
+									.filter(dependency -> DOMUtils.findChildElement(dependency, VERSION_ELT).isPresent())
+									.forEach(dependency -> {
+										candidates.add(dependency);
+										candidateProfile.put(dependency, idString.get());
+									});
+						});
+					}
+				});
 			});
-		});
-
+		}
+		
 		// collect the managed dep ids
 		Map<String, Dependency> managed = new HashMap<>();
 		DependencyManagement dm = mavenProject.getDependencyManagement();
