@@ -258,11 +258,6 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 		}
 		String key = ArtifactUtils.versionlessKey(artifact.getGroupId(), artifact.getArtifactId());
 		SortedSet<String> res = new TreeSet<>(Comparator.reverseOrder());
-		plugin.getProjectCache().getProjects().stream() //
-				.filter(p -> p.getArtifact() != null && key.equals(ArtifactUtils.versionlessKey(p.getArtifact()))) //
-				.filter(p -> find(p, artifact) != null) //
-				.map(MavenProject::getVersion) //
-				.forEach(res::add);
 		workspaceArtifacts.entrySet().stream() //
 				.filter(entry -> Objects.equals(key, ArtifactUtils.versionlessKey(entry.getKey().getGroupId(), entry.getKey().getArtifactId())))
 				.map(Entry::getKey)
