@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
@@ -51,6 +52,7 @@ import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class ProjectValidator {
 	private static final Logger LOGGER = Logger.getLogger(ProjectValidator.class.getName());
@@ -66,9 +68,11 @@ public class ProjectValidator {
 	public static String MARKER_IGNORE_MANAGED = "$NO-MVN-MAN-VER$";//$NON-NLS-1$
 
 	private MavenLemminxExtension plugin;
+	private CancelChecker cancelChecker;
 
-	public ProjectValidator(MavenLemminxExtension plugin) {
+	public ProjectValidator(MavenLemminxExtension plugin, @Nonnull CancelChecker cancelChecker) {
 		this.plugin = plugin;
+		this.cancelChecker = cancelChecker;
 	}
 
 	/**
@@ -77,7 +81,8 @@ public class ProjectValidator {
 	 * @param diagnosticRequest
 	 * @return
 	 */
-	public Optional<List<Diagnostic>> validateProject(DiagnosticRequest diagnosticRequest) {
+	public Optional<List<Diagnostic>> validateProject(DiagnosticRequest diagnosticRequest) throws CancellationException {
+		cancelChecker.checkCanceled();
 		DOMNode node = diagnosticRequest.getNode();
 		if (node == null) {
 			return Optional.empty();
@@ -85,6 +90,7 @@ public class ProjectValidator {
 
 		MavenProject project = plugin.getProjectCache()
 				.getLastSuccessfulMavenProject(diagnosticRequest.getXMLDocument());
+		cancelChecker.checkCanceled();
 		List<Diagnostic> diagnostics = new ArrayList<>();
 		diagnostics.addAll(validateParentMatchingGroupIdVersion(diagnosticRequest).get());
 		if (project != null) {
@@ -152,14 +158,17 @@ public class ProjectValidator {
 	 */
 	private Optional<List<Diagnostic>> validateManagedDependencies(DiagnosticRequest diagnosticRequest,
 			MavenProject mavenProject) {
+		cancelChecker.checkCanceled();
 		DOMNode node = diagnosticRequest.getNode();
 		if (node == null) {
 			return Optional.empty();
 		}
 
+		cancelChecker.checkCanceled();
 		List<DOMElement> candidates = new ArrayList<>();
 		Optional<DOMElement> dependencies = DOMUtils.findChildElement(node, DEPENDENCIES_ELT);
 		dependencies.ifPresent(dependenciesElement -> {
+			cancelChecker.checkCanceled();
 			DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT).stream()
 					.filter(dependency -> DOMUtils.findChildElement(dependency, VERSION_ELT).isPresent())
 					.forEach(candidates::add);
@@ -170,22 +179,29 @@ public class ProjectValidator {
 		// dependencyManagement section.. that makes handling our markers more complex.
 		// see MavenProject.getInjectedProfileIds() for a list of currently active
 		// profiles in effective pom
+		cancelChecker.checkCanceled();
 		String currentProjectKey = mavenProject.getGroupId() + ":" + mavenProject.getArtifactId() + ":" //$NON-NLS-1$//$NON-NLS-2$
 				+ mavenProject.getVersion();
 		List<String> activeprofiles = mavenProject.getInjectedProfileIds().get(currentProjectKey);
 		Map<DOMElement, String> candidateProfile = new HashMap<>();
 		if (activeprofiles != null && !activeprofiles.isEmpty()) {
 			// remember what profile we found the dependency in.
+			cancelChecker.checkCanceled();
 			Optional<DOMElement> profiles = DOMUtils.findChildElement(node, PROFILES_ELT);
 			profiles.ifPresent(profilesElement -> {
+				cancelChecker.checkCanceled();
 				DOMUtils.findChildElements(profilesElement, PROFILE_ELT).stream().forEach(profile -> {
+					cancelChecker.checkCanceled();
 					Optional<String> idString = DOMUtils.findChildElementText(profile, ID_ELT);
 					if (idString.isPresent() && activeprofiles.contains(idString.get())) {
+						cancelChecker.checkCanceled();
 						Optional<DOMElement> profileDependencies = DOMUtils.findChildElement(profile, DEPENDENCIES_ELT);
 						profileDependencies.ifPresent(dependenciesElement -> {
+							cancelChecker.checkCanceled();
 							DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT).stream()
 									.filter(dependency -> DOMUtils.findChildElement(dependency, VERSION_ELT).isPresent())
 									.forEach(dependency -> {
+										cancelChecker.checkCanceled();
 										candidates.add(dependency);
 										candidateProfile.put(dependency, idString.get());
 									});
@@ -196,6 +212,7 @@ public class ProjectValidator {
 		}
 		
 		// collect the managed dep ids
+		cancelChecker.checkCanceled();
 		Map<String, Dependency> managed = new HashMap<>();
 		DependencyManagement dm = mavenProject.getDependencyManagement();
 		if (dm != null) {
@@ -204,14 +221,17 @@ public class ProjectValidator {
 				// #335366
 				// 355882 use dep.getManagementKey() to prevent false positives
 				// when type or classifier doesn't match
+				cancelChecker.checkCanceled();
 				deps.stream().filter(dep -> dep.getVersion() != null)
 						.forEach(dep -> managed.put(dep.getManagementKey(), dep));
 			}
 		}
 
 		// now we have all the candidates, match them against the effective managed set
+		cancelChecker.checkCanceled();
 		List<Diagnostic> diagnostics = new ArrayList<>();
 		candidates.stream().forEach(dep -> {
+			cancelChecker.checkCanceled();
 			Optional<DOMElement> version = DOMUtils.findChildElement(dep, VERSION_ELT);
 			version.ifPresent(v -> {
 				String grpString = DOMUtils.findChildElementText(dep, GROUP_ID_ELT).orElse(null);
@@ -223,6 +243,7 @@ public class ProjectValidator {
 					String classifier = DOMUtils.findChildElementText(dep, CLASSIFIER_ELT).orElse(null);
 					String id = getDependencyKey(grpString, artString, typeString, classifier);
 					if (managed.containsKey(id)) {
+						cancelChecker.checkCanceled();
 						Dependency managedDep = managed.get(id);
 						String managedVersion = managedDep == null ? null : managedDep.getVersion();
 						String msg = versionString.equals(managedVersion) ? "Duplicating managed version %s for %s"
@@ -243,6 +264,7 @@ public class ProjectValidator {
 						if (profile != null) {
 							addDiagnocticData(diagnostic, PROFILE_ELT, profile);
 						}
+						cancelChecker.checkCanceled();
 						diagnostics.add(diagnostic);
 					}
 				}
@@ -261,6 +283,7 @@ public class ProjectValidator {
 	 */
 	private Optional<List<Diagnostic>> validateManagedPlugins(DiagnosticRequest diagnosticRequest,
 			MavenProject mavenProject) {
+		cancelChecker.checkCanceled();
 		DOMNode node = diagnosticRequest.getNode();
 		if (node == null) {
 			return Optional.empty();
@@ -269,6 +292,7 @@ public class ProjectValidator {
 		List<DOMElement> candidates = new ArrayList<>();
 		Optional<DOMElement> build = DOMUtils.findChildElement(node, BUILD_ELT);
 		build.ifPresent(buildElement -> {
+			cancelChecker.checkCanceled();
 			Optional<DOMElement> plugins = DOMUtils.findChildElement(buildElement, PLUGINS_ELT);
 			plugins.ifPresent(pluginsElement -> {
 				DOMUtils.findChildElements(pluginsElement, PLUGIN_ELT).stream()
@@ -282,6 +306,7 @@ public class ProjectValidator {
 		// pluginManagement section.. that makes handling our markers more complex.
 		// see MavenProject.getInjectedProfileIds() for a list of currently active
 		// profiles in effective pom
+		cancelChecker.checkCanceled();
 		String currentProjectKey = mavenProject.getGroupId() + ":" + mavenProject.getArtifactId() + ":" //$NON-NLS-1$//$NON-NLS-2$
 				+ mavenProject.getVersion();
 		List<String> activeprofiles = mavenProject.getInjectedProfileIds().get(currentProjectKey);
@@ -289,7 +314,9 @@ public class ProjectValidator {
 		Map<DOMElement, String> candidateProfile = new HashMap<>();
 		Optional<DOMElement> profiles = DOMUtils.findChildElement(node, PROFILES_ELT);
 		profiles.ifPresent(profilesElement -> {
+			cancelChecker.checkCanceled();
 			DOMUtils.findChildElements(profilesElement, PROFILE_ELT).stream().forEach(profile -> {
+				cancelChecker.checkCanceled();
 				Optional<String> idString = DOMUtils.findChildElementText(profile, ID_ELT);
 				if (idString.isPresent() && activeprofiles.contains(idString.get())) {
 					Optional<DOMElement> profileBuild = DOMUtils.findChildElement(profile, BUILD_ELT);
@@ -299,6 +326,7 @@ public class ProjectValidator {
 							DOMUtils.findChildElements(pluginsElement, PLUGIN_ELT).stream()
 									.filter(plugin -> DOMUtils.findChildElement(plugin, VERSION_ELT).isPresent())
 									.forEach(plugin -> {
+										cancelChecker.checkCanceled();
 										candidates.add(plugin);
 										candidateProfile.put(plugin, idString.get());
 									});
@@ -309,11 +337,13 @@ public class ProjectValidator {
 		});
 
 		// collect the managed plugin ids
+		cancelChecker.checkCanceled();
 		Map<String, Plugin> managed = new HashMap<>();
 		PluginManagement pm = mavenProject.getPluginManagement();
 		if (pm != null) {
 			List<Plugin> plgs = pm.getPlugins();
 			if (plgs != null) {
+				cancelChecker.checkCanceled();
 				plgs.stream().filter(plg -> {
 					InputLocation loc = plg.getLocation("version");
 					if (loc == null || loc.getSource() == null) {
@@ -328,8 +358,10 @@ public class ProjectValidator {
 		}
 
 		// now we have all the candidates, match them against the effective managed set
+		cancelChecker.checkCanceled();
 		List<Diagnostic> diagnostics = new ArrayList<>();
 		candidates.stream().forEach(dep -> {
+			cancelChecker.checkCanceled();
 			String grpString = DOMUtils.findChildElementText(dep, GROUP_ID_ELT).orElse(null);
 			if (grpString == null) {
 				grpString = "org.apache.maven.plugins"; //$NON-NLS-1$
@@ -338,8 +370,10 @@ public class ProjectValidator {
 			DOMElement version = DOMUtils.findChildElement(dep, VERSION_ELT).orElse(null);
 			String versionString = DOMUtils.findChildElementText(dep, VERSION_ELT).orElse(null);
 			if (artString != null && versionString != null && !lookForIgnoreMarker(version, MARKER_IGNORE_MANAGED)) {
+				cancelChecker.checkCanceled();
 				String id = Plugin.constructKey(grpString, artString);
 				if (managed.containsKey(id)) {
+					cancelChecker.checkCanceled();
 					Plugin managedPlugin = managed.get(id);
 					String managedVersion = managedPlugin == null ? null : managedPlugin.getVersion();
 					String msg = versionString.equals(managedVersion) ? "Duplicating managed version %s for %s"
@@ -359,6 +393,7 @@ public class ProjectValidator {
 					if (profile != null) {
 						addDiagnocticData(diagnostic, PROFILE_ELT, profile);
 					}
+					cancelChecker.checkCanceled();
 					diagnostics.add(diagnostic);
 				}
 			}
@@ -402,8 +437,9 @@ public class ProjectValidator {
 		return null;
 	}
 
-	private static void setManagedVersionAttributes(Diagnostic diagnostic, MavenProject mavenproject,
+	private void setManagedVersionAttributes(Diagnostic diagnostic, MavenProject mavenproject,
 			InputLocationTracker dependencyOrPlugin) {
+		cancelChecker.checkCanceled();
 		InputLocation location = dependencyOrPlugin == null ? null : dependencyOrPlugin.getLocation("version");
 		if (location != null) {
 			InputSource source = location.getSource();
@@ -439,9 +475,11 @@ public class ProjectValidator {
 	 * @param ignoreString
 	 * @return
 	 */
-	private static boolean lookForIgnoreMarker(@Nonnull DOMElement version, String ignoreString) {
+	private boolean lookForIgnoreMarker(@Nonnull DOMElement version, String ignoreString) {
+		cancelChecker.checkCanceled();
 		DOMNode reg = version;
 		while ((reg = reg.getNextSibling()) != null && !(reg instanceof DOMElement)) {
+			cancelChecker.checkCanceled();
 			if (reg instanceof DOMComment comm) {
 				String data = comm.getData();
 				if (data != null && data.contains(ignoreString)) {
