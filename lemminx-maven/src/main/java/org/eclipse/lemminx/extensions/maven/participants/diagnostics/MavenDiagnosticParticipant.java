@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -48,7 +49,7 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 	@Override
 	public void doDiagnostics(DOMDocument xmlDocument, List<Diagnostic> diagnostics,
-			XMLValidationSettings validationSettings, CancelChecker monitor) {
+			XMLValidationSettings validationSettings, CancelChecker cancelChecker) throws CancellationException {
 		if (!MavenLemminxExtension.match(xmlDocument)) {
 			return;
 		}
@@ -58,43 +59,50 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			problems.stream().map(this::toDiagnostic).forEach(diagnostics::add);
 		}
 		
+		cancelChecker.checkCanceled();
 		DOMElement documentElement = xmlDocument.getDocumentElement();
 		if (documentElement == null) {
 			return;
 		}
-		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions();
+		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions(cancelChecker);
 
 		// Validate project element
+		cancelChecker.checkCanceled();
 		if (PROJECT_ELT.equals(documentElement.getNodeName())) {
-			ProjectValidator projectValidator = new ProjectValidator(plugin);
+			ProjectValidator projectValidator = new ProjectValidator(plugin, cancelChecker);
 			projectValidator.validateProject(new DiagnosticRequest(documentElement, xmlDocument))
 				.ifPresent(diagnosticList ->{
+						cancelChecker.checkCanceled();
 						diagnostics.addAll(diagnosticList.stream()
 							.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
 					});
 		}
 		
+		cancelChecker.checkCanceled();
 		Deque<DOMNode> nodes = new ArrayDeque<>();
 		documentElement.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 		while (!nodes.isEmpty()) {
+			cancelChecker.checkCanceled();
 			DOMNode node = nodes.pop();
 			String nodeName = node.getLocalName(); 
 			if (nodeName != null) {
 				tagDiagnostics.entrySet().stream().filter(entry -> nodeName.equals(entry.getKey()))
 					.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
 					.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
+						cancelChecker.checkCanceled();
 						diagnostics.addAll(diagnosticList.stream()
 								.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
 					});;
 			}
+			cancelChecker.checkCanceled();
 			if (node.hasChildNodes()) {
 				node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 			}
 		}
 	}
 
-	private Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions() {
-		PluginValidator pluginValidator = new PluginValidator(plugin);
+	private Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions(CancelChecker cancelChecker) {
+		PluginValidator pluginValidator = new PluginValidator(plugin, cancelChecker);
 
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginConfiguration = pluginValidator::validateConfiguration;
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginGoal = pluginValidator::validateGoal;
@@ -121,5 +129,4 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			default -> DiagnosticSeverity.Information;
 		};
 	}
-
 }

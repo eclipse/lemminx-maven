@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,6 +42,7 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RemoteRepository.Builder;
+import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
@@ -48,6 +50,7 @@ import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.services.extensions.IPositionRequest;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenPluginUtils {
 
@@ -143,20 +146,23 @@ public class MavenPluginUtils {
 		return builder.build();
 	}
 
-	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node,
-			MavenLemminxExtension lemminxMavenPlugin)
-			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node, MavenLemminxExtension lemminxMavenPlugin)
+			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException,
+				CancellationException {
 		return getContainingPluginDescriptor(node, lemminxMavenPlugin, false);
 	}
 
-	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node,
-			MavenLemminxExtension lemminxMavenPlugin, boolean reThrowPluginDescriptorExceptions)
-			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+	public static PluginDescriptor getContainingPluginDescriptor(DOMNode node, MavenLemminxExtension lemminxMavenPlugin,
+			boolean reThrowPluginDescriptorExceptions) throws PluginResolutionException,
+				PluginDescriptorParsingException, InvalidPluginDescriptorException, CancellationException {
+		CancelChecker cancelChecker = getCancelChecker(node.getOwnerDocument());
+		cancelChecker.checkCanceled();
 		MavenProject project = lemminxMavenPlugin.getProjectCache()
 				.getLastSuccessfulMavenProject(node.getOwnerDocument());
 		if (project == null) {
 			return null;
 		}
+		cancelChecker.checkCanceled();
 		DOMNode pluginNode = DOMUtils.findClosestParentNode(node, PLUGIN_ELT);
 		if (pluginNode == null) {
 			return null;
@@ -171,11 +177,14 @@ public class MavenPluginUtils {
 		if (artifactId.isPresent()) {
 			pluginKey += artifactId.get();
 		}
+		cancelChecker.checkCanceled();
 		Plugin plugin = findPluginInProject(project, pluginKey, artifactId);
 
 		if (plugin == null) {
+			cancelChecker.checkCanceled();
 			DOMNode profileNode = DOMUtils.findClosestParentNode(node, "profile");
 			if (profileNode != null) {
+				cancelChecker.checkCanceled();
 				project = profileNode.getChildren().stream() //
 						.filter(DOMElement.class::isInstance) //
 						.map(DOMElement.class::cast) //
@@ -186,14 +195,16 @@ public class MavenPluginUtils {
 						.filter(Objects::nonNull)
 						.findFirst().orElse(null);
 				if (project != null) {
+					cancelChecker.checkCanceled();
 					plugin = findPluginInProject(project, pluginKey, artifactId);
 				}
 			}
 		}
+
+		cancelChecker.checkCanceled();
 		if (plugin == null) {
 			throw new InvalidPluginDescriptorException("Unable to resolve " + pluginKey, Collections.emptyList());
 		}
-
 		PluginDescriptor pluginDescriptor = null;
 		try {
 			// Fix plugin version in case its value is 'null', to initiate search for an actual version
@@ -212,8 +223,10 @@ public class MavenPluginUtils {
 		} catch (Exception e) {
 			LOGGER.log(Level.SEVERE, "An error occured while getting a plugin descriptor: " + e.getMessage(), e);
 		}
+		
+		cancelChecker.checkCanceled();
 		if (pluginDescriptor == null && "0.0.1-SNAPSHOT".equals(plugin.getVersion())) { // probably missing or not parsed version
-			Optional<DefaultArtifactVersion> version;
+			Optional<DefaultArtifactVersion> version = Optional.empty();
 			final Plugin thePlugin = plugin;
 			try {
 				version = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
@@ -222,16 +235,28 @@ public class MavenPluginUtils {
 					.map(Artifact::getVersion) //
 					.map(DefaultArtifactVersion::new) //
 					.collect(Collectors.maxBy(Comparator.naturalOrder()));
-				if (version.isPresent()) {
-					plugin.setVersion(version.get().toString());
-					pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
-							project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
-							lemminxMavenPlugin.getMavenSession().getRepositorySession());
-				}
 			} catch (IOException e) {
 				LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			}
+			
+			cancelChecker.checkCanceled();
+			if (version.isPresent()) {
+				plugin.setVersion(version.get().toString());
+				try {
+					pluginDescriptor = lemminxMavenPlugin.getMavenPluginManager().getPluginDescriptor(plugin,
+							project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
+							lemminxMavenPlugin.getMavenSession().getRepositorySession());
+				} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException ex) {
+					LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+					if (reThrowPluginDescriptorExceptions) {
+						throw ex; // Needed for plugin validation
+					}
+				} catch (Exception e) {
+					LOGGER.log(Level.SEVERE, "An error occured while getting a plugin descriptor: " + e.getMessage(), e);
+				}
+			}
 		}
+		cancelChecker.checkCanceled();
 		return pluginDescriptor;
 	}
 
@@ -246,5 +271,12 @@ public class MavenPluginUtils {
 			);
 		}
 		return plugin.orElse(null);
+	}
+	
+	private static CancelChecker getCancelChecker(DOMDocument document) {
+		return Optional.ofNullable(document)
+				.filter(Objects::nonNull)
+				.map(DOMDocument::getCancelChecker)
+				.orElse(() -> {});
 	}
 }
