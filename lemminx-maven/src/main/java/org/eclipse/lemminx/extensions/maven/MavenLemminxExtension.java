@@ -112,7 +112,7 @@ import org.eclipse.lsp4j.WorkspaceFolder;
 public class MavenLemminxExtension implements IXMLExtension {
 	
 	// Used for tests
-	public static boolean initializeMavenOnBackground = true;
+	private static boolean unitTestMode = false;
 	
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
@@ -233,7 +233,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 				}
 			});
 		}
-		if (!initializeMavenOnBackground) {
+		if (isUnitTestMode()) {
 			// This code is for tests
 			try {
 				mavenInitializer.get();
@@ -700,5 +700,27 @@ public class MavenLemminxExtension implements IXMLExtension {
 			codeActionParticipants.stream().forEach(registry::unregisterCodeActionParticipant);
 			codeActionParticipants.clear();
 		}
+	}
+	
+	/**
+	 * Returns true if the lemminx maven is run in JUnit test context and false
+	 * otherwise.
+	 * 
+	 * @return true if the lemminx maven is run in JUnit test context and false
+	 *         otherwise
+	 */
+	public static boolean isUnitTestMode() {
+		return MavenLemminxExtension.unitTestMode;
+	}
+
+	/**
+	 * Set true if the lemminx maven is run in JUnit test context and false
+	 * otherwise
+	 * 
+	 * @param unitTestMode true if the lemminx maven is run in JUnit test context
+	 *                     and false otherwise
+	 */
+	public static void setUnitTestMode(boolean unitTestMode) {
+		MavenLemminxExtension.unitTestMode = unitTestMode;
 	}
 }

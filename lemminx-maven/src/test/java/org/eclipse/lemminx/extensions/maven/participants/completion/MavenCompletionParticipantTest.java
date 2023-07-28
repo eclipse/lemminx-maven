@@ -29,7 +29,7 @@ public class MavenCompletionParticipantTest {
 	
 	@BeforeAll
 	public static void setUp() {
-		MavenLemminxExtension.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 	}
 
 	@Test

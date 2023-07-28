@@ -104,6 +104,7 @@ import org.eclipse.lemminx.extensions.maven.DOMConstants;
 import org.eclipse.lemminx.extensions.maven.DependencyScope;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.Phase;
 import org.eclipse.lemminx.extensions.maven.participants.ArtifactWithDescription;
@@ -189,8 +190,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
 				collectPluginConfiguration(request).forEach(response::addCompletionItem);
 			}
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML completion from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML completion from LemMinX
 		}
 	}
 
@@ -488,8 +491,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			if (request.getNode().isText()) {
 				completeProperties(request).forEach(response::addCompletionAttribute);
 			}
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML completion from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML completion from LemMinX
 		}
 	}
 	

@@ -33,6 +33,7 @@ import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -101,8 +102,10 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 					node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 				}
 			}
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML diagnostics from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML diagnostics from LemMinX
 		}
 	}
 
