@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Red Hat Inc. and others.
+ * Copyright (c) 2022, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -30,7 +30,6 @@ import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MavenProjectCache;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
-import org.eclipse.lemminx.services.XMLLanguageService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class ParticipantUtilsTest {
-	private XMLLanguageService languageService;
+	private MavenLanguageService languageService;
 
 	@BeforeEach
 	public void setUp() throws IOException {
@@ -53,8 +52,12 @@ public class ParticipantUtilsTest {
 
 	@Test
 	public void testResolveValueWithProperties() throws IOException, URISyntaxException {
-		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+
+		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
+		languageService.didOpen(document);
+		
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(document);
 		assertNotNull(project);
