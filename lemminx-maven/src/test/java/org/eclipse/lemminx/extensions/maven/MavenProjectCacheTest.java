@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,25 +30,35 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.utils.URIUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenProjectCacheTest {
-
+	private static XMLLanguageService languageService;
+	
+	@BeforeAll
+	public static void setUp() {
+		MavenLemminxExtension.setUnitTestMode(true);
+		languageService = new MavenLanguageService();
+	}
+	
 	@Test
 	public void testSimpleProjectIsParsed() throws Exception {
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+		
 		URI uri = getClass().getResource("/pom-with-properties.xml").toURI();
 		String content = Files.readString(new File(uri).toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		MavenLemminxExtension.setUnitTestMode(true);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -55,12 +66,14 @@ public class MavenProjectCacheTest {
 
 	@Test
 	public void testOnBuildError_ResolveProjectFromDocumentBytes() throws Exception {
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+		
 		URI uri = getClass().getResource("/pom-with-module-error.xml").toURI();
 		File pomFile = new File(uri);
 		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		MavenLemminxExtension.setUnitTestMode(true);
+
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -70,8 +83,9 @@ public class MavenProjectCacheTest {
 	public void testParentChangeReflectedToChild()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		MavenLemminxExtension.setUnitTestMode(true);
+		plugin.start(null,languageService);
 		MavenProjectCache cache = plugin.getProjectCache();
+
 		DOMDocument doc = getDocument("/pom-with-properties-in-parent.xml");
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertTrue(project.getProperties().containsKey("myProperty"), project.getProperties().toString());
@@ -81,10 +95,13 @@ public class MavenProjectCacheTest {
 		try {
 			String content = initialContent.replaceAll("myProperty", "modifiedProperty");
 			Files.writeString(parentPomFile.toPath(), content);
-			doc.getTextDocument().setVersion(2); // Simulate some change
+			doc.getTextDocument().setVersion(doc.getTextDocument().getVersion() + 1); // Simulate some change
 			MavenProject modifiedProject = cache.getLastSuccessfulMavenProject(doc);
 			assertTrue(modifiedProject.getProperties().containsKey("modifiedProperty"),
 					modifiedProject.getProperties().toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail(e);
 		} finally {
 			Files.writeString(parentPomFile.toPath(), initialContent);
 		}
@@ -92,7 +109,6 @@ public class MavenProjectCacheTest {
 
 	@Test
 	public void testAddFolders_didChangeWorkspaceFolders() throws Exception {
-		XMLLanguageService languageService = new MavenLanguageService();
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
 		
@@ -151,9 +167,9 @@ public class MavenProjectCacheTest {
 	public void testNormilizePathsAreUsedInCache()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		MavenLemminxExtension.setUnitTestMode(true);
+		plugin.start(null,languageService);
+
 		MavenProjectCache cache = plugin.getProjectCache();
-		
 		int initialProjectsSize = cache.getProjects().size();
 		
 		// Use URLretative to a child to access a parent pom.xml
@@ -223,10 +239,12 @@ public class MavenProjectCacheTest {
 	}
 	
 	private DOMDocument getDocument(String resource) throws URISyntaxException, IOException {
-		URI uri = getClass().getResource(resource).toURI();
-		File pomFile = new File(uri);
-		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
-		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
-		return doc;
+		String uriString = getClass().getResource(resource).toURI().normalize().toASCIIString();
+//		File pomFile = new File(uri);
+//		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
+//		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
+//		return doc;
+
+		return languageService.getDocumentProvider().getDocument(uriString);
 	}
 }

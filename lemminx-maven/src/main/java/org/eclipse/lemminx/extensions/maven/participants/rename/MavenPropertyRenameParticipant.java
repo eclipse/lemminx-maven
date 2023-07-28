@@ -148,7 +148,7 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 			cancelChecker.checkCanceled();
 			LinkedHashSet<MavenProject> projects = new LinkedHashSet<>();
 			projects.add(thisProject);
-			plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
+			plugin.getCurrentWorkspaceProjects(true).stream().forEach(child -> 
 				projects.addAll(findParentsOfChildProject(thisProject, child)));
 	
 			URI thisProjectUri = ParticipantUtils.normalizedUri(document.getDocumentURI());

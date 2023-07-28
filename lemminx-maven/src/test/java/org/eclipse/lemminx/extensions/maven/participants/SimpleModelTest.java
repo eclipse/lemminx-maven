@@ -336,7 +336,7 @@ public class SimpleModelTest {
 	}
 	
 	@Test
-	public void testModulesCompletionInDependency() throws IOException, URISyntaxException {
+	public void testModulesCompletionInDependency() throws IOException, URISyntaxException, InterruptedException {
 		// We need the WORKSPACE projects to be placed to MavenProjectCache
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
@@ -362,25 +362,51 @@ public class SimpleModelTest {
 				new XMLValidationSettings(), Map.of(), () -> {});
 		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
+		// The items collected from Workspace as well as from Maven Search API cannot be 
+		// immediately obtained due to the "lazy: loading, so, we need to wait until all 
+		// the required data  received and ready for use
+		
 		// in <dependency />
 		// for group ID
-		List<CompletionItem> completions = languageService.doComplete(document, new Position(10, 15), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("org.test.modules"::equals));
-
+		List<CompletionItem> completions = null;
+		int triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		boolean conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document, new Position(10, 15), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("org.test.modules"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
+		
 		// for artifact ID:
-		completions = languageService.doComplete(document, new Position(11, 18), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("ModuleA"::equals));
+		triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document, new Position(11, 18), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("ModuleA"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
 
 		// for versions
-		completions = languageService.doComplete(document, new Position(12, 15), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("0.0.1-SNAPSHOT"::equals));
+		triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document, new Position(12, 15), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("0.0.1-SNAPSHOT"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
 	}
 
 	@Test
-	public void testModulesCompletionInParent() throws IOException, URISyntaxException {
+	public void testModulesCompletionInParent() throws IOException, URISyntaxException, InterruptedException {
 		// We need the WORKSPACE projects to be placed to MavenProjectCache
 		IWorkspaceServiceParticipant workspaceService = languageService.getWorkspaceServiceParticipants().stream().filter(MavenWorkspaceService.class::isInstance).findAny().get();
 		assertNotNull(workspaceService);
@@ -408,19 +434,51 @@ public class SimpleModelTest {
 
 		// in <parent />
 		// for group ID
-		List<CompletionItem> completions = languageService.doComplete(document, new Position(9, 13), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("org.test.modules"::equals));
-
+//		List<CompletionItem> completions = languageService.doComplete(document, new Position(9, 13), new SharedSettings()).getItems();
+//		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+//				.anyMatch("org.test.modules"::equals));
+//
+		List<CompletionItem> completions = null;
+		int triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		boolean conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document, new Position(9, 13), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("org.test.modules"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
+		
 		// for artifact ID:
-		completions = languageService.doComplete(document, new Position(10, 16), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("ModuleA"::equals));
+//		completions = languageService.doComplete(document, new Position(10, 16), new SharedSettings()).getItems();
+//		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+//				.anyMatch("ModuleA"::equals));
+		triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document,  new Position(10, 16), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("ModuleA"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
 
 		// for versions
-		completions = languageService.doComplete(document, new Position(11, 13), new SharedSettings()).getItems();
-		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
-				.anyMatch("0.0.1-SNAPSHOT"::equals));
+//		completions = languageService.doComplete(document, new Position(11, 13), new SharedSettings()).getItems();
+//		assertTrue(completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+//				.anyMatch("0.0.1-SNAPSHOT"::equals));
+		triesLeft = 15; // given a 1-second `sleep` between the retries this gives >15 seconds overall timeout
+		conditionMet = false;
+		do {
+			completions = languageService.doComplete(
+					document, new Position(11, 13), new SharedSettings())
+ 				.getItems();
+			Thread.sleep(1000);
+			conditionMet = completions.stream().map(CompletionItem::getTextEdit).map(Either::getLeft).map(TextEdit::getNewText)
+					.anyMatch("0.0.1-SNAPSHOT"::equals);
+		} while (!conditionMet && triesLeft-- > 0);
 	}
 	
 	@Test

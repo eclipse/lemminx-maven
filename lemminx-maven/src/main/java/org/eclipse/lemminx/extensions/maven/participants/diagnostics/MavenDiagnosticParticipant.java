@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -61,7 +62,16 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 
 		try {
-			LoadedMavenProject loadedMavenProject = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			CompletableFuture<LoadedMavenProject> project = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			if (!project.isDone()) {
+				// The pom.xml takes some times to load it, to avoid blocking the XML syntax validation, XML validation based on XSD
+				// we retrigger the validation when the pom.xml is loaded.
+				project
+					.thenAccept( unused -> plugin.getValidationService().validate(xmlDocument));
+				return;
+			}
+
+			LoadedMavenProject loadedMavenProject = project.getNow(null);
 			Collection<ModelProblem> problems = loadedMavenProject != null ? loadedMavenProject.getProblems() : null;
 			if (problems != null) {
 				problems

@@ -33,10 +33,9 @@ public class LoadedMavenProject {
 	private final Collection<ModelProblem> problems;
 	private final DependencyResolutionResult dependencyResolutionResult;
 
-	public LoadedMavenProject(MavenProject mavenProject, int version, Collection<ModelProblem> problems,
+	public LoadedMavenProject(MavenProject mavenProject, Collection<ModelProblem> problems,
 			DependencyResolutionResult dependencyResolutionResult) {
 		this.mavenProject = mavenProject;
-		this.lastCheckedVersion = version;
 		this.problems = problems;
 		this.dependencyResolutionResult = dependencyResolutionResult;
 	}

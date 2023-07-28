@@ -8,14 +8,14 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
+import java.util.Objects;
 
 import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.utils.FilesUtils;
 
 /**
  * A Maven {@link ModelSource} implementation based on LemMinx
@@ -33,12 +33,17 @@ public class DOMModelSource extends FileModelSource {
 	private final DOMDocument document;
 
 	public DOMModelSource(DOMDocument document) {
-		super(new File(URI.create(document.getDocumentURI()).normalize()));
+		super(FilesUtils.toFile(document.getDocumentURI()));
 		this.document = document;
 	}
 
 	@Override
 	public InputStream getInputStream() throws IOException {
 		return new DOMInputStream(document);
+	}
+	
+	@Override
+	public int hashCode() {
+		return Objects.hash(getFile(), document.getTextDocument().getVersion());
 	}
 }

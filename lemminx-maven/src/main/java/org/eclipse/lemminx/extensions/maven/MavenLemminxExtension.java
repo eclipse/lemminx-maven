@@ -91,6 +91,8 @@ import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
+import org.eclipse.lemminx.services.IXMLDocumentProvider;
+import org.eclipse.lemminx.services.IXMLValidationService;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
@@ -147,6 +149,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	
 	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
 	private CompletableFuture<Void> mavenInitializer;
+	private IXMLDocumentProvider documentProvider;
+	private IXMLValidationService validationService;
 
 	private ProgressSupport progressSupport;
 
@@ -181,6 +185,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		this.currentRegistry = registry;
 		this.resolverExtensionManager = registry.getResolverExtensionManager();
 		this.progressSupport = registry.getProgressSupport();
+		this.documentProvider = registry.getDocumentProvider();
+		this.validationService = registry.getValidationService();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
@@ -228,14 +234,17 @@ public class MavenLemminxExtension implements IXMLExtension {
 		// while Maven component is initializing.
 		if (mavenInitializer == null) {
 			if (isUnitTestMode()) {
+				mavenInitializer = new CompletableFuture<>();
 				doInitialize(() -> {});
-				mavenInitializer = CompletableFuture.completedFuture(null);
+				mavenInitializer.complete(null);
 			} else
 				mavenInitializer = CompletableFutures.computeAsync(cancelChecker -> {
 					doInitialize(cancelChecker);
 					return null;
 				});
 		}
+		// Start Maven Project Cache
+		mavenInitializer.thenAccept(t -> cache.initialized());
 		return mavenInitializer;
 	}
 
@@ -294,7 +303,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-			cache = new MavenProjectCache(mavenSession);
+			cache = new MavenProjectCache(mavenSession, documentProvider);
 
 			// Step5 : create local repository searcher
 			cancelChecker.checkCanceled();
@@ -543,6 +552,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 				|| fileName.endsWith(Maven.POMv4) || fileName.endsWith(".pom"));
 	}
 
+	public IXMLValidationService getValidationService() {
+		return validationService;
+	}
+
 	public MavenProjectCache getProjectCache() {
 		initialize();
 		return this.cache;
@@ -765,12 +778,28 @@ public class MavenLemminxExtension implements IXMLExtension {
 	/**
 	 * Returns the list of Maven Projects currently added to the Workspace
 	 * 
+	 * @param buildIfNecessary A boolean 'true' indicates that all projects are to
+	 *                         be returned, not only the cached ones at the moment,
+	 *                         method should wait for the final build result,
+	 *                         otherwise the only project that are already built and
+	 *                         cached are to be returned, the rest of the projects
+	 *                         are to be built in background
 	 * @return List of Maven Projects
 	 */
-	public List<MavenProject> getCurrentWorkspaceProjects() {
-		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
-			.map(f -> getProjectCache().getLastSuccessfulMavenProject(f))
-			.filter(Objects::nonNull).toList();
+	public List<MavenProject> getCurrentWorkspaceProjects(boolean wait) {
+		if (wait) {
+			return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
+					.map(file -> getProjectCache().getLastSuccessfulMavenProject(file))
+					.filter(Objects::nonNull)
+					.toList();
+		} else {
+			return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
+				.map(file -> getProjectCache().getLoadedMavenProject(toUriASCIIString(file))
+								.getNow(null))
+				.filter(Objects::nonNull)
+				.map(LoadedMavenProject::getMavenProject)
+				.toList();
+		}
 	}
 	
 	/**
@@ -829,5 +858,15 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 */
 	public static void setUnitTestMode(boolean unitTestMode) {
 		MavenLemminxExtension.unitTestMode = unitTestMode;
+	}
+	
+	/**
+	 * Gets a normalized URI ASCII string from the given File
+	 * 
+	 * @param file A File
+	 * @return Normalized URI ASCII string
+	 */
+	public static String toUriASCIIString(File file) {
+		return file.toURI().normalize().toASCIIString();
 	}
 }

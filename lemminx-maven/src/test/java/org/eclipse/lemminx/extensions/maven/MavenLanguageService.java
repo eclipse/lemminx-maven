@@ -8,6 +8,13 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
+import org.eclipse.lemminx.services.IXMLDocumentProvider;
 import org.eclipse.lemminx.services.XMLLanguageService;
 
 /**
@@ -18,8 +25,28 @@ import org.eclipse.lemminx.services.XMLLanguageService;
  */
 public class MavenLanguageService extends XMLLanguageService{
 	
+	private Map<String, DOMDocument> documents = new HashMap<>();
+	
 	public MavenLanguageService() {
 		MavenLemminxExtension.setUnitTestMode(true);
+		setDocumentProvider(new IXMLDocumentProvider() {
+			
+			@Override
+			public DOMDocument getDocument(String uri) {
+				DOMDocument doc = documents.get(uri);
+				if (doc == null) {
+					synchronized (documents) {
+						try {
+							doc =  MavenLemminxTestsUtils.createDOMDocument(URI.create(uri), MavenLanguageService.this);
+							documents.put(uri, doc);
+						} catch (Exception e) {
+							// TODO: handle exception
+						}
+					}
+				}
+				return doc;
+			}
+		});
 	}
 
 }
