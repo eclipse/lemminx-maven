@@ -15,6 +15,7 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 import static org.eclipse.lemminx.extensions.maven.MavenLemminxExtension.key;
 
+import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -388,8 +389,9 @@ public class ExtractPropertyCodeAction implements ICodeActionParticipant {
 			LinkedHashSet<URI> workspaceRoots = plugin.getCurrentWorkspaceFolders();
 			MavenProject parent = child;
 			while ((parent = parent.getParent()) != null) {
-				URI parentUri = ParticipantUtils.normalizedUri(parent.getFile().toURI().toString());
-				if (isInWorkspacet(workspaceRoots, parentUri)) {
+				File file = parent.getFile();
+				if (file != null && isInWorkspacet(workspaceRoots, 
+						ParticipantUtils.normalizedUri(file.toURI().toString()))) {
 					parents.add(parent);
 				}
 			}
