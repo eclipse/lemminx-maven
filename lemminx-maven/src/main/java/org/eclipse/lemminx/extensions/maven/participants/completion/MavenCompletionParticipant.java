@@ -131,12 +131,9 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 public class MavenCompletionParticipant extends CompletionParticipantAdapter {
-
-	public static final String WAITING_LABEL = "⏳  Waiting for Maven Central Response...";
-	
 	private static final Logger LOGGER = Logger.getLogger(MavenCompletionParticipant.class.getName());
-	private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("[-.a-zA-Z0-9]+");
 
+	private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("[-.a-zA-Z0-9]+");
 	private static final String FILE_TYPE = "File";
 	private static final String STRING_TYPE = "File";
 	private static final String DIRECTORY_STRING_LC = "directory";
@@ -183,10 +180,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 
+		cancelChecker.checkCanceled();
 		try {
 			DOMNode tag = request.getNode();
 			if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
-				collectPluginConfiguration(request).forEach(response::addCompletionItem);
+				collectPluginConfiguration(request, cancelChecker).forEach(response::addCompletionItem);
+				cancelChecker.checkCanceled();
 			}
 		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
 			// - Maven is initializing
@@ -196,53 +195,66 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	// TODO: Factor this with MavenHoverParticipant's equivalent method
-	private List<CompletionItem> collectPluginConfiguration(ICompletionRequest request) {
+	private List<CompletionItem> collectPluginConfiguration(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		boolean supportsMarkdown = request.canSupportMarkupKind(MarkupKind.MARKDOWN);
 		try {
-			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
-
+			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin, cancelChecker);
 			if (CONFIGURATION_ELT.equals(request.getParentElement().getLocalName())) {
 				// The configuration element being completed is at the top level
-				return parameters.stream()
+				cancelChecker.checkCanceled();
+				var result = parameters.stream()
 						.map(param -> toTag(param.name,
 								MavenPluginUtils.getMarkupDescription(param, null, supportsMarkdown), request))
 	 					.collect(Collectors.toList());
-	 		}
+				cancelChecker.checkCanceled();
+				return result;
+			}
 	
 			// Nested case: node is a grand child of configuration
 			// Get the node's ancestor which is a child of configuration
+			cancelChecker.checkCanceled();
 			DOMNode parentParameterNode = DOMUtils.findAncestorThatIsAChildOf(request, CONFIGURATION_ELT);
 			if (parentParameterNode != null) {
+				cancelChecker.checkCanceled();
 				List<MojoParameter> parentParameters = parameters.stream()
 						.filter(mojoParameter -> mojoParameter.name.equals(parentParameterNode.getLocalName()))
 						.collect(Collectors.toList());
 				if (!parentParameters.isEmpty()) {
+					cancelChecker.checkCanceled();
 					MojoParameter parentParameter = parentParameters.get(0);
-	
 					if (parentParameter.getNestedParameters().size() == 1) {
 						// The parent parameter must be a collection of a type
 						MojoParameter nestedParameter = parentParameter.getNestedParameters().get(0);
 						Class<?> potentialInlineType = PlexusConfigHelper.getRawType(nestedParameter.getParamType());
 						if (potentialInlineType != null && PlexusConfigHelper.isInline(potentialInlineType)) {
-							return Collections.singletonList(toTag(nestedParameter.name, MavenPluginUtils
+							cancelChecker.checkCanceled();
+							var result = Collections.singletonList(toTag(nestedParameter.name, MavenPluginUtils
 									.getMarkupDescription(nestedParameter, parentParameter, supportsMarkdown), request));
+							cancelChecker.checkCanceled();
+							return result;
 						}
 					}
 	
 					// Get all deeply nested parameters
+					cancelChecker.checkCanceled();
 					List<MojoParameter> nestedParameters = parentParameter.getFlattenedNestedParameters();
 					nestedParameters.add(parentParameter);
-					return nestedParameters.stream()
+					cancelChecker.checkCanceled();
+					var result = nestedParameters.stream()
 							.map(param -> toTag(param.name,
 									MavenPluginUtils.getMarkupDescription(param, parentParameter, supportsMarkdown),
 									request))
 							.collect(Collectors.toList());
+					cancelChecker.checkCanceled();
+					return result;
 				}
 			}
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 
+		cancelChecker.checkCanceled();
 		return Collections.emptyList();
 	}
 
@@ -252,12 +264,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 
+		cancelChecker.checkCanceled();
 		try {
 			if (request.getXMLDocument().getText().length() < 2) {
-				response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
+				response.addCompletionItem(createMinimalPOMCompletionSnippet(request, cancelChecker));
 			}
 			DOMElement parent = request.getParentElement();
 			if (parent == null || parent.getLocalName() == null) {
+				cancelChecker.checkCanceled();
 				return;
 			}
 			DOMElement grandParent = parent.getParentElement();
@@ -276,52 +290,50 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			GAVInsertionStrategy gavInsertionStrategy = computeGAVInsertionStrategy(request);
 			List<ArtifactWithDescription> allArtifactInfos = Collections.synchronizedList(new ArrayList<>());
 			LinkedHashMap<String, CompletionItem> nonArtifactCollector = new LinkedHashMap<>();
+			cancelChecker.checkCanceled();
 			switch (parent.getLocalName()) {
 			case SCOPE_ELT:
 				collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
-						DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
+						DependencyScope::getDescription, request, cancelChecker).forEach(response::addCompletionAttribute);
 				break;
 			case PHASE_ELT:
 				collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
-						phase -> phase.description, request).forEach(response::addCompletionAttribute);
+						phase -> phase.description, request, cancelChecker).forEach(response::addCompletionAttribute);
+				cancelChecker.checkCanceled();
 				break;
 			case GROUP_ID_ELT:
 				if (isParentDeclaration) {
-					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					Optional<MavenProject> filesystem = computeFilesystemParent(request, cancelChecker);
 					if (filesystem.isPresent()) {
 						filesystem.map(MavenProject::getGroupId)
 						.map(g -> toCompletionItem(g.toString(), null, request.getReplaceRange()))
 						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					// TODO if artifactId is set and match existing content, suggest only matching
 					// groupId
 					collectSimpleCompletionItems(
 							isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds()
 									: plugin.getLocalRepositorySearcher().searchGroupIds(),
-							Function.identity(), Function.identity(), request).stream()
+							Function.identity(), Function.identity(), request, cancelChecker).stream()
 								.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 								.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
 					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
 				}
-				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId, cancelChecker);
 	
 				// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
-				nonArtifactCollector.entrySet().stream()
-				.map(entry -> entry.getValue()).forEach(response::addCompletionItem);
+				nonArtifactCollector.entrySet().stream().map(entry -> entry.getValue())
+					.forEach(response::addCompletionItem);
 				nonArtifactCollector.clear();
 				break;
 			case ARTIFACT_ID_ELT:
 				if (isParentDeclaration) {
-					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					Optional<MavenProject> filesystem = computeFilesystemParent(request, cancelChecker);
 					if (filesystem.isPresent()) {
 						filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts()
 							: plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
@@ -330,19 +342,17 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 									.map(ArtifactWithDescription::new).collect(Collectors.toList()));
 					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
 				}
-				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId, cancelChecker);
 				break;
 			case VERSION_ELT:
 				if (isParentDeclaration) {
-					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					Optional<MavenProject> filesystem = computeFilesystemParent(request, cancelChecker);
 					if (filesystem.isPresent()) {
 						filesystem.map(MavenProject::getVersion).map(DefaultArtifactVersion::new)
 						.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
 						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					if (artifactId.isPresent()) {
 						plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
@@ -355,11 +365,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
 					}
 				}
-				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId, cancelChecker);
 	
 				if (nonArtifactCollector.isEmpty()) {
-					response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
+					response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT", cancelChecker));
 				} else {
+					cancelChecker.checkCanceled();
 					// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
 					final AtomicInteger sortIndex = new AtomicInteger(0);
 					nonArtifactCollector.entrySet().stream()
@@ -382,7 +393,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 				break;
 			case MODULE_ELT:
-				collectSubModuleCompletion(request).forEach(response::addCompletionItem);
+				collectSubModuleCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 				break;
 			case TARGET_PATH_ELT:
 			case DIRECTORY_ELT:
@@ -391,25 +402,26 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			case TEST_SOURCE_DIRECTORY_ELT:
 			case OUTPUT_DIRECTORY_ELT:
 			case TEST_OUTPUT_DIRECTORY_ELT:
-				collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+				collectRelativeDirectoryPathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 				break;
 			case FILTER_ELT:
 				if (FILTERS_ELT.equals(grandParent.getLocalName())) {
-					collectRelativeFilterPathCompletion(request).forEach(response::addCompletionItem);
+					collectRelativeFilterPathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 				}
 				break;
 			case EXISTS_ELT:
 			case MISSING_ELT:
 				if (FILE_ELT.equals(grandParent.getLocalName())) {
-					collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+					collectRelativeAnyPathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 				}
 				break;
 			case RELATIVE_PATH_ELT:
-				collectRelativePathCompletion(request).forEach(response::addCompletionItem);
+				collectRelativePathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 				break;
 			case DEPENDENCIES_ELT:
 			case DEPENDENCY_ELT:
 				// TODO completion/resolve to get description for local artifacts
+				cancelChecker.checkCanceled();
 				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
 						.map(ArtifactWithDescription::new).collect(Collectors.toList()));
 				internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, nonArtifactCollector, cancelChecker);
@@ -417,12 +429,13 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			case PLUGINS_ELT:
 			case PLUGIN_ELT:
 				// TODO completion/resolve to get description for local artifacts
+				cancelChecker.checkCanceled();
 				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
 						.map(ArtifactWithDescription::new).collect(Collectors.toList()));
 				internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, nonArtifactCollector, cancelChecker);
 				break;
 			case PARENT_ELT:
-				Optional<MavenProject> filesystem = computeFilesystemParent(request);
+				Optional<MavenProject> filesystem = computeFilesystemParent(request, cancelChecker);
 				if (filesystem.isPresent()) {
 					filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
 				} else {
@@ -431,35 +444,37 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 				break;
 			case GOAL_ELT:
-				collectGoals(request).forEach(response::addCompletionItem);
+				collectGoals(request, cancelChecker).forEach(response::addCompletionItem);
 				break;
 			case PACKAGING_ELT:
-				collectPackaging(request).forEach(response::addCompletionItem);
+				collectPackaging(request, cancelChecker).forEach(response::addCompletionItem);
 				break;
 			default:
-				Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin)
+				Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin, cancelChecker)
 						.stream().filter(p -> p.name.equals(parent.getLocalName()))
 						.filter(p -> (p.type.startsWith(FILE_TYPE)) || 
 								(p.type.startsWith(STRING_TYPE) && p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC)))
 						.collect(Collectors.toSet());
 				if (parameters != null && parameters.size() > 0) {
-					collectMojoParametersDefaultCompletion(request, parameters)
-					.forEach(response::addCompletionItem);
+					collectMojoParametersDefaultCompletion(request, parameters, cancelChecker)
+						.forEach(response::addCompletionItem);
 					if (parameters.stream()
 							.anyMatch(p -> !p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC))) {
 						// Show all files
-						collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+						collectRelativeAnyPathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 					} else {
 						// Show only directories
-						collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+						collectRelativeDirectoryPathCompletion(request, cancelChecker).forEach(response::addCompletionItem);
 					}
 				}
-			}				
+			}
+			
 			if (!allArtifactInfos.isEmpty()) {
 				// As artifact list can be very big (around 4000 artifacts), to keep good performance, we filter it before sending to the LSP client
 				// by checking that artifact id contains one of character of the computed completion prefix.
 				// ex : org| will filter if the artifact contains 'o', 'r', or 'g' 
 				
+				cancelChecker.checkCanceled();
 				// 1. extract the completion prefix.
 				char prefix[] = null;
 				TextDocument textDocument = request.getXMLDocument().getTextDocument();
@@ -471,29 +486,32 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 				final char completionPrefix[] = prefix;
 				
+				cancelChecker.checkCanceled();
 				// 2. loop for each collected artifact by checking that artifact id matches the completion prefix.
 				Comparator<ArtifactWithDescription> artifactInfoComparator = Comparator
 						.comparing(artifact -> new DefaultArtifactVersion(artifact.artifact.getVersion()));
 				final Comparator<ArtifactWithDescription> highestVersionWithDescriptionComparator = artifactInfoComparator
 						.thenComparing(
 								artifactInfo -> artifactInfo.description != null ? artifactInfo.description : "");
+				cancelChecker.checkCanceled();
 				allArtifactInfos.stream()
 						.collect(Collectors.groupingBy(artifact -> artifact.artifact.getGroupId() + ":" + artifact.artifact.getArtifactId()))
 						.values().stream()
 						.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
 						.filter(artifactInfo -> isMatchCompletionPrefix(artifactInfo.artifact.getArtifactId(), completionPrefix))
-						.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, replaceRange, gavInsertionStrategy))
+						.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, replaceRange, gavInsertionStrategy, cancelChecker))
 						.filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
 						.forEach(response::addCompletionItem);
 			}
 			if (request.getNode().isText()) {
-				completeProperties(request).forEach(response::addCompletionAttribute);
+				completeProperties(request, cancelChecker).forEach(response::addCompletionAttribute);
 			}
 		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
 			// - Maven is initializing
 			// - or parse of maven model with DOM document is out of dated
 			// -> catch the error to avoid breaking XML completion from LemMinX
 		}
+		cancelChecker.checkCanceled();
 	}
 	
 	private static boolean isMatchCompletionPrefix(String completionItemText, char[] completionPrefix) {
@@ -508,7 +526,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return false;
 	}
 
-	private CompletionItem toTextCompletionItem(ICompletionRequest request, String text) throws BadLocationException {
+	private CompletionItem toTextCompletionItem(ICompletionRequest request, String text, CancelChecker cancelChecker) throws BadLocationException {
+		cancelChecker.checkCanceled();
 		CompletionItem res = new CompletionItem(text);
 		res.setFilterText(text);
 		TextEdit edit = new TextEdit();
@@ -517,6 +536,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		Position endOffset = request.getXMLDocument().positionAt(request.getOffset());
 		for (int startOffset = Math.max(0, request.getOffset() - text.length()); startOffset <= request
 				.getOffset(); startOffset++) {
+			cancelChecker.checkCanceled();
 			String prefix = request.getXMLDocument().getText().substring(startOffset, request.getOffset());
 			if (text.startsWith(prefix)) {
 				edit.setRange(new Range(request.getXMLDocument().positionAt(startOffset), endOffset));
@@ -524,6 +544,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			}
 		}
 		edit.setRange(new Range(endOffset, endOffset));
+		cancelChecker.checkCanceled();
 		return res;
 	}
 
@@ -543,7 +564,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	}
 
 	@SuppressWarnings("deprecation")
-	private Optional<MavenProject> computeFilesystemParent(ICompletionRequest request) {
+	private Optional<MavenProject> computeFilesystemParent(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		Optional<String> relativePath = null;
 		if (request.getParentElement().getLocalName().equals(PARENT_ELT)) {
 			relativePath = DOMUtils.findChildElementText(request.getNode(), RELATIVE_PATH_ELT);
@@ -551,23 +573,29 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			relativePath = DOMUtils.findChildElementText(request.getParentElement().getParentElement(),
 					RELATIVE_PATH_ELT);
 		}
+		cancelChecker.checkCanceled();
 		if (!relativePath.isPresent()) {
 			relativePath = Optional.of("..");
 		}
 		File referencedTargetPomFile = new File(
 				new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile(),
 				relativePath.orElse(""));
+		cancelChecker.checkCanceled();
 		if (referencedTargetPomFile.isDirectory()) {
 			referencedTargetPomFile = new File(referencedTargetPomFile, Maven.POMv4);
 		}
 		if (referencedTargetPomFile.isFile()) {
-			return plugin.getProjectCache().getSnapshotProject(referencedTargetPomFile);
+			Optional<MavenProject> project = plugin.getProjectCache().getSnapshotProject(referencedTargetPomFile);
+			cancelChecker.checkCanceled();
+			return project;
 		}
+		cancelChecker.checkCanceled();
 		return Optional.empty();
 	}
 
-	private CompletionItem createMinimalPOMCompletionSnippet(ICompletionRequest request)
+	private CompletionItem createMinimalPOMCompletionSnippet(ICompletionRequest request, CancelChecker cancelChecker)
 			throws IOException, BadLocationException {
+		cancelChecker.checkCanceled();
 		CompletionItem item = new CompletionItem("minimal pom content");
 		item.setKind(CompletionItemKind.Snippet);
 		item.setInsertTextFormat(InsertTextFormat.Snippet);
@@ -575,31 +603,41 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		model.setModelVersion("4.0.0");
 		model.setArtifactId(
 				new File(URI.create(request.getXMLDocument().getTextDocument().getUri())).getParentFile().getName());
+		cancelChecker.checkCanceled();
 		MavenXpp3Writer writer = new MavenXpp3Writer();
 		try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
+			cancelChecker.checkCanceled();
 			writer.write(stream, model);
+			cancelChecker.checkCanceled();
 			TextEdit textEdit = new TextEdit(
 					new Range(new Position(0, 0),
 							request.getXMLDocument().positionAt(request.getXMLDocument().getText().length())),
 					new String(stream.toByteArray()));
 			item.setTextEdit(Either.forLeft(textEdit));
 		}
+		cancelChecker.checkCanceled();
 		return item;
 	}
 
-	private Collection<CompletionItem> collectGoals(ICompletionRequest request) {
+	private Collection<CompletionItem> collectGoals(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		PluginDescriptor pluginDescriptor;
 		try {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
-			return collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal,
-					MojoDescriptor::getDescription, request);
+			cancelChecker.checkCanceled();
+			var result = collectSimpleCompletionItems(pluginDescriptor.getMojos(), MojoDescriptor::getGoal,
+					MojoDescriptor::getDescription, request, cancelChecker);
+			cancelChecker.checkCanceled();
+			return result;
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
+		cancelChecker.checkCanceled();
 		return Collections.emptySet();
 	}
 
-	private Collection<CompletionItem> collectPackaging(ICompletionRequest request) {
+	private Collection<CompletionItem> collectPackaging(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		Set<String> packagingTypes = new LinkedHashSet<>();
 		packagingTypes.add(PACKAGING_TYPE_JAR);
 		packagingTypes.add(PACKAGING_TYPE_WAR);
@@ -609,36 +647,43 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		packagingTypes.add(PACKAGING_TYPE_MAVEN_PLUGIN);
 		
 		// dynamically load available packaging types from build plugins
-		updateAvailablePackagingTypes(packagingTypes, request); 
+		updateAvailablePackagingTypes(packagingTypes, request, cancelChecker); 
 
-		return packagingTypes.stream().map(type -> {
-			try {
-				CompletionItem item = toTextCompletionItem(request, type);
-				item.setDocumentation("Packagng Type: " + (type != null ? type : "unknown"));
-				item.setKind(CompletionItemKind.Value);
-				item.setSortText(type != null ? type : "zzz");
-				return item;
-			} catch (BadLocationException e) {
-				LOGGER.log(Level.SEVERE, e.getMessage(), e);
-				return toErrorCompletionItem(e);
-			}
-		}).collect(Collectors.toList());
+		var result = packagingTypes.stream().map(type -> {
+				try {
+					cancelChecker.checkCanceled();
+					CompletionItem item = toTextCompletionItem(request, type, cancelChecker);
+					item.setDocumentation("Packagng Type: " + (type != null ? type : "unknown"));
+					item.setKind(CompletionItemKind.Value);
+					item.setSortText(type != null ? type : "zzz");
+					return item;
+				} catch (BadLocationException e) {
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
+					return toErrorCompletionItem(e);
+				}
+			}).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
-	private void updateAvailablePackagingTypes(Set<String> packagingTypes, ICompletionRequest request) {
+	private void updateAvailablePackagingTypes(Set<String> packagingTypes, ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		MavenProject project = plugin.getProjectCache().getSnapshotProject(request.getXMLDocument(), null, false);
 		if (project == null) {
+			cancelChecker.checkCanceled();
 			return;
 		}
 
 		for (Plugin plugin : project.getBuildPlugins()) {
+			cancelChecker.checkCanceled();
 			if (plugin.isExtensions()) {
 				Artifact artifact = new DefaultArtifact(
 						plugin.getGroupId(), plugin.getArtifactId(),
 						null, plugin.getVersion());
-				addPluginPackagingTypes(packagingTypes, artifact);
+				addPluginPackagingTypes(packagingTypes, artifact, cancelChecker);
 			}
 		}
+		cancelChecker.checkCanceled();
 	}	
 	
 	/**
@@ -652,23 +697,29 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 	 *          is assumed that there is something wrong with the user's project or
 	 *          repository setup which prevents this method from completing.
 	 */
-	private void addPluginPackagingTypes(Set<String> packagingTypes, Artifact artifact) {
+	private void addPluginPackagingTypes(Set<String> packagingTypes, Artifact artifact, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		File artifactPomFile = plugin.getLocalRepositorySearcher().findLocalFile(artifact);
 		if (artifactPomFile == null) {
+			cancelChecker.checkCanceled();
 			return;
 		}
 
+		cancelChecker.checkCanceled();
 		File artifactJarFile = new File(artifactPomFile.getParentFile().getAbsoluteFile(),
 				artifact.getArtifactId() + '-' + artifact.getVersion() + JAR_EXT);
 		try (JarFile jarFile = new JarFile(artifactJarFile.getAbsoluteFile())) {
 			DocumentBuilder db = DocumentBuilderFactory.newDefaultInstance().newDocumentBuilder();
 			JarEntry componentsxml = jarFile.getJarEntry(COMPONENTS_PATH);
+			cancelChecker.checkCanceled();
 			if (componentsxml != null) {
 				Document doc = db.parse(jarFile.getInputStream(componentsxml));
+				cancelChecker.checkCanceled();
 				if (doc.getDocumentElement() != null) {
 					doc.getDocumentElement().normalize();
 					NodeList components = doc.getElementsByTagName(COMPONENTS_COMPONENT_ELT);
 					for (int i = 0; i < components.getLength(); i++) {
+						cancelChecker.checkCanceled();
 						Node component = components.item(i);
 						if (component.getNodeType() == Node.ELEMENT_NODE) {
 							Element element = (Element) component;
@@ -688,10 +739,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		} catch (Exception e) {
 			// Broken XML, file not found, etc. Can't add packaging types.
 		}
+		cancelChecker.checkCanceled();
 	}
 
-	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,Range replaceRange,
-			GAVInsertionStrategy strategy) {
+	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,
+			Range replaceRange, GAVInsertionStrategy strategy, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		boolean hasGroupIdSet = DOMUtils.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent() 
 						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
 		boolean insertArtifactIsEnd = !request.getParentElement().hasEndTag();
@@ -704,10 +757,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			item.setDocumentation(artifactInfo.description);
 		}
 		
+		cancelChecker.checkCanceled();
 		TextEdit textEdit = new TextEdit();
 		item.setTextEdit(Either.forLeft(textEdit));
 		textEdit.setRange(replaceRange);
 		if (strategy == GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING) {
+			cancelChecker.checkCanceled();
 			item.setKind(CompletionItemKind.Value);
 			switch (request.getParentElement().getLocalName()) {
 			case ARTIFACT_ID_ELT:
@@ -720,6 +775,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						+ (insertArtifactIsEnd ? "</artifactId>" : ""));
 				item.setFilterText(artifactInfo.artifact.getArtifactId());
 				List<TextEdit> additionalEdits = new ArrayList<>(2);
+				cancelChecker.checkCanceled();
 				if (insertGroupId) {
 					Position insertionPosition;
 					try {
@@ -737,6 +793,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					}
 				}
+				cancelChecker.checkCanceled();
 				if (insertVersion) {
 					Position insertionPosition;
 					try {
@@ -755,20 +812,25 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					}
 				}
+				cancelChecker.checkCanceled();
 				if (!additionalEdits.isEmpty()) {
 					item.setAdditionalTextEdits(additionalEdits);
 				}
+				cancelChecker.checkCanceled();
 				return item;
 			case GROUP_ID_ELT:
 				item.setLabel(artifactInfo.artifact.getGroupId());
 				textEdit.setNewText(artifactInfo.artifact.getGroupId());
+				cancelChecker.checkCanceled();
 				return item;
 			case VERSION_ELT:
 				item.setLabel(artifactInfo.artifact.getVersion());
 				textEdit.setNewText(artifactInfo.artifact.getVersion());
+				cancelChecker.checkCanceled();
 				return item;
 			}
 		} else {
+			cancelChecker.checkCanceled();
 			item.setLabel(artifactInfo.artifact.getArtifactId() + " - " + artifactInfo.artifact.getGroupId() + ":"
 					+ artifactInfo.artifact.getArtifactId() + ":" + artifactInfo.artifact.getVersion());
 			item.setKind(CompletionItemKind.Struct);
@@ -781,17 +843,20 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						: "";
 				String oneLevelIndent = DOMUtils.getOneLevelIndent(request);
 				String lineDelimiter = request.getLineIndentInfo().getLineDelimiter();
+				cancelChecker.checkCanceled();
 				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy nodeWithChildren) {
 					String elementName = nodeWithChildren.elementName;
 					newText += "<" + elementName + ">" + lineDelimiter + gavElementsIndent + oneLevelIndent; 
 					suffix = lineDelimiter + gavElementsIndent + "</" + elementName + ">";
 					gavElementsIndent += oneLevelIndent;
 				}
+				cancelChecker.checkCanceled();
 				if (insertGroupId) {
 					newText += "<groupId>" + artifactInfo.artifact.getGroupId() + "</groupId>"
 							+ lineDelimiter + gavElementsIndent;
 				}
 				newText += "<artifactId>" + artifactInfo.artifact.getArtifactId() + "</artifactId>";
+				cancelChecker.checkCanceled();
 				if (insertVersion) {
 					newText += lineDelimiter + gavElementsIndent;
 					newText += "<version>" + artifactInfo.artifact.getVersion() + "</version>";
@@ -803,6 +868,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				return null;
 			}
 		}
+		cancelChecker.checkCanceled();
 		return item;
 	}
 
@@ -820,32 +886,36 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return res;
 	}
 
-	private Collection<CompletionItem> completeProperties(ICompletionRequest request) {
+	private Collection<CompletionItem> completeProperties(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
 		if (project == null) {
+			cancelChecker.checkCanceled();
 			return Collections.emptySet();
 		}
 		Map<String, String> allProps = ParticipantUtils.getMavenProjectProperties(project);
-
-		return allProps.entrySet().stream().map(property -> {
-			try {
-				CompletionItem item = toTextCompletionItem(request, "${" + property.getKey() + '}');
-				item.setDocumentation(
-						"Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
-				item.setKind(CompletionItemKind.Property);
-				// '$' sorts before alphabet characters, so we add z to make it appear later in
-				// proposals
-				item.setSortText("z${" + property.getKey() + "}");
-				if (property.getKey().contains("env.")) {
-					// We don't want environment variables at the top of the completion proposals
-					item.setSortText("z${zzz" + property.getKey() + "}");
+		cancelChecker.checkCanceled();
+		var result = allProps.entrySet().stream().map(property -> {
+				try {
+					CompletionItem item = toTextCompletionItem(request, "${" + property.getKey() + '}', cancelChecker);
+					item.setDocumentation(
+							"Default Value: " + (property.getValue() != null ? property.getValue() : "unknown"));
+					item.setKind(CompletionItemKind.Property);
+					// '$' sorts before alphabet characters, so we add z to make it appear later in
+					// proposals
+					item.setSortText("z${" + property.getKey() + "}");
+					if (property.getKey().contains("env.")) {
+						// We don't want environment variables at the top of the completion proposals
+						item.setSortText("z${zzz" + property.getKey() + "}");
+					}
+					return item;
+				} catch (BadLocationException e) {
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
+					return toErrorCompletionItem(e);
 				}
-				return item;
-			} catch (BadLocationException e) {
-				LOGGER.log(Level.SEVERE, e.getMessage(), e);
-				return toErrorCompletionItem(e);
-			}
-		}).collect(Collectors.toList());
+			}).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
 	private CompletionItem toErrorCompletionItem(Throwable e) {
@@ -855,8 +925,10 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return res;
 	}
 
-	private void internalCollectRemoteGAVCompletion(ICompletionRequest request, boolean onlyPlugins,
-			Collection<ArtifactWithDescription> artifactInfosCollector, LinkedHashMap<String, CompletionItem> nonArtifactCollector, CancelChecker cancelChecker) {
+	private void internalCollectRemoteGAVCompletion(ICompletionRequest request, 
+			boolean onlyPlugins, Collection<ArtifactWithDescription> artifactInfosCollector, 
+			LinkedHashMap<String, CompletionItem> nonArtifactCollector, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMElement node = request.getParentElement();
 		Dependency artifactToSearch = MavenParseUtils.parseArtifact(node);
 		if (artifactToSearch == null) {
@@ -866,16 +938,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		int startTagCloseOffset = node.getStartTagCloseOffset() >= 0 ? node.getStartTagCloseOffset() : 0;
 		int endTagOpenOffset = node.getEndTagOpenOffset() >= 0 ? node.getEndTagOpenOffset() : request.getOffset();
 		Range range = XMLPositionUtility.createRange(startTagCloseOffset + 1, endTagOpenOffset, doc);
-		Set<CompletionItem> updateItems = Collections.synchronizedSet(new HashSet<>(1));
-		final CompletionItem updatingItem = new CompletionItem(WAITING_LABEL);
-		updatingItem.setPreselect(false);
-		updatingItem.setInsertText("");
-		updatingItem.setKind(CompletionItemKind.Event);
-		updateItems.add(updatingItem);
 
+		cancelChecker.checkCanceled();
 		plugin.getCentralSearcher().ifPresent(centralSearcher -> {
 			cancelChecker.checkCanceled();
 			try {
+				cancelChecker.checkCanceled();
 				switch (node.getLocalName()) {
 				case GROUP_ID_ELT:
 					// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
@@ -919,7 +987,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					cancelChecker.checkCanceled();
 					return;
 				}
-				updateItems.remove(updatingItem);
 			} catch (OngoingOperationException e) {
 				// The remote searcher cannot return results right now, so
 				// There is nothing to add to the collectors
@@ -928,57 +995,72 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				// item like `Waiting for Maven Central Response...` in the 
 				// result
 			}
-			updateItems.forEach(updateItem -> nonArtifactCollector.put(updateItem.getLabel(), updatingItem));
 		});
 	}
 
 	@SuppressWarnings("deprecation")
-	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request) {
+	private Collection<CompletionItem> collectSubModuleCompletion(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMDocument doc = request.getXMLDocument();
 		File docFolder = new File(URI.create(doc.getTextDocument().getUri())).getParentFile();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
+		cancelChecker.checkCanceled();
 		if (!prefix.isEmpty() && !prefix.endsWith("/")) {
 			files.addAll(Arrays.asList(
 					prefixFile.getParentFile().listFiles((dir, name) -> name.startsWith(prefixFile.getName()))));
 		}
+		cancelChecker.checkCanceled();
 		if (prefixFile.isDirectory()) {
 			files.addAll(Arrays.asList(prefixFile.listFiles(File::isDirectory)));
 		}
+		cancelChecker.checkCanceled();
 		// make folder that have a pom show higher
 		files.sort(Comparator.comparing((File file) -> new File(file, Maven.POMv4).exists()).reversed()
 				.thenComparing(Function.identity()));
+		cancelChecker.checkCanceled();
 		if (prefix.isEmpty()) {
 			files.add(docFolder.getParentFile());
 		}
-		return files.stream().map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		var result = files.stream().map(file -> toFileCompletionItem(file, docFolder, request, cancelChecker)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
-	private Collection<CompletionItem> collectMojoParametersDefaultCompletion(ICompletionRequest request, Set<MojoParameter> parameters) {
+	private Collection<CompletionItem> collectMojoParametersDefaultCompletion(ICompletionRequest request, 
+			Set<MojoParameter> parameters, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		List<String> defaultValues = parameters.stream().filter(p -> (p.getDefaultValue() != null))
 				.map(p -> p.getDefaultValue())
 				.collect(Collectors.toList());
 
+		cancelChecker.checkCanceled();
 		if (!prefix.isEmpty()) {
 			defaultValues = defaultValues.stream().filter(v -> v.startsWith(prefix))
 					.collect(Collectors.toList());
 		}					
-		return	defaultValues.stream()
+		cancelChecker.checkCanceled();
+		var result = defaultValues.stream()
 			 	.sorted(String.CASE_INSENSITIVE_ORDER)
 				.map(defaultValue -> toCompletionItem(defaultValue.toString(), null, request.getReplaceRange()))
 				.collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 	
 	@SuppressWarnings("deprecation")
-	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request) {
+	private Collection<CompletionItem> collectRelativePathCompletion(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
 		File docFolder = docFile.getParentFile();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
+		cancelChecker.checkCanceled();
 		if (prefix.isEmpty()) {
 			Arrays.stream(docFolder.getParentFile().listFiles()).filter(file -> file.getName().contains(PARENT_ELT))
 					.map(file -> new File(file, Maven.POMv4)).filter(File::isFile).forEach(files::add);
@@ -995,11 +1077,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
 			}
 		}
+		cancelChecker.checkCanceled();
 		if (prefixFile.isDirectory()) {
 			files.addAll(Arrays.asList(prefixFile.listFiles()));
 		}
-		return files.stream().filter(file -> file.getName().equals(Maven.POMv4) || file.isDirectory())
+		cancelChecker.checkCanceled();
+		var result = files.stream().filter(file -> file.getName().equals(Maven.POMv4) || file.isDirectory())
 				.filter(file -> !(file.equals(docFolder) || file.equals(docFile))).flatMap(file -> {
+					cancelChecker.checkCanceled();
 					if (docFile.toPath().startsWith(file.toPath()) || file.getName().contains(PARENT_ELT)) {
 						File pomFile = new File(file, Maven.POMv4);
 						if (pomFile.exists()) {
@@ -1020,16 +1105,20 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings
 																														// before...
 						.reversed().thenComparing(Function.identity())// other folders and files
-				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+				).map(file -> toFileCompletionItem(file, docFolder, request, cancelChecker)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
-	private Collection<CompletionItem> collectRelativeAnyPathCompletion(ICompletionRequest request) {
+	private Collection<CompletionItem> collectRelativeAnyPathCompletion(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
 		File docFolder = docFile.getParentFile();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
+		cancelChecker.checkCanceled();
 		if (prefix.isEmpty()) {
 			files.add(docFolder.getParentFile());
 		} else {
@@ -1044,10 +1133,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
 			}
 		}
+		cancelChecker.checkCanceled();
 		if (prefixFile.isDirectory()) {
 			files.addAll(Arrays.asList(prefixFile.listFiles()));
 		}
-		return files.stream().filter(file -> file.isFile() || file.isDirectory())
+		cancelChecker.checkCanceled();
+		var result = files.stream().filter(file -> file.isFile() || file.isDirectory())
 					.sorted(Comparator.comparing(File::isFile) // files before folders
 						.thenComparing(
 								file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath()))
@@ -1059,16 +1150,20 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings
 																														// before...
 						.reversed().thenComparing(Function.identity())// other folders and files
-				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+				).map(file -> toFileCompletionItem(file, docFolder, request, cancelChecker)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 	
-	private Collection<CompletionItem> collectRelativeDirectoryPathCompletion(ICompletionRequest request) {
+	private Collection<CompletionItem> collectRelativeDirectoryPathCompletion(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
 		File docFolder = docFile.getParentFile();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
+		cancelChecker.checkCanceled();
 		if (prefix.isEmpty()) {
 			files.add(docFolder.getParentFile());
 		} else {
@@ -1083,10 +1178,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.listFiles(file -> file.getName().startsWith(thePrefixFile.getName()))));
 			}
 		}
+		cancelChecker.checkCanceled();
 		if (prefixFile.isDirectory()) {
 			files.addAll(Arrays.asList(prefixFile.listFiles()));
 		}
-		return files.stream().filter(file -> file.isDirectory())
+		cancelChecker.checkCanceled();
+		var result = files.stream().filter(file -> file.isDirectory())
 				.filter( file -> !file.equals(docFolder))
 				.sorted(Comparator.comparing(File::isDirectory) // only folders
 						.thenComparing(file -> (file.isDirectory() && file.equals(docFolder.getParentFile())))
@@ -1094,7 +1191,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 																									// "parent" before...
 						.thenComparing(file -> file.getParentFile().getParentFile().equals(docFolder.getParentFile())) // siblings before...
 						.reversed().thenComparing(Function.identity())// other folders and files
-				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+				).map(file -> toFileCompletionItem(file, docFolder, request, cancelChecker)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
 	private List<File> collectRelativePropertiesFiles(File parent) {
@@ -1108,13 +1207,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return result;
 	}
 	
-	private Collection<CompletionItem> collectRelativeFilterPathCompletion(ICompletionRequest request) {
+	private Collection<CompletionItem> collectRelativeFilterPathCompletion(ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMDocument doc = request.getXMLDocument();
 		File docFile = new File(URI.create(doc.getTextDocument().getUri()));
 		File docFolder = docFile.getParentFile();
 		String prefix = request.getNode().getNodeValue() != null ? request.getNode().getNodeValue() : "";
 		File prefixFile = new File(docFolder, prefix);
 		List<File> files = new ArrayList<>();
+		cancelChecker.checkCanceled();
 		if (!prefix.isEmpty()) {
 			try {
 				prefixFile = prefixFile.getCanonicalFile();
@@ -1128,23 +1229,29 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 								&& file.getName().endsWith(".properties")))));
 			}
 		}
+		cancelChecker.checkCanceled();
 		if (prefixFile.isDirectory()) {
 			files.addAll(collectRelativePropertiesFiles(prefixFile));
 		}
-		return files.stream()
+		cancelChecker.checkCanceled();
+		var result = files.stream()
 				.sorted(Comparator.comparing(File::isFile) // pom files before folders
 						.thenComparing(
 								file -> (file.isFile() && docFile.toPath().startsWith(file.getParentFile().toPath())))
 						.reversed().thenComparing(Function.identity())// other folders and files
-				).map(file -> toFileCompletionItem(file, docFolder, request)).collect(Collectors.toList());
+				).map(file -> toFileCompletionItem(file, docFolder, request, cancelChecker)).collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
-	private CompletionItem toFileCompletionItem(File file, File referenceFolder, ICompletionRequest request) {
+	private CompletionItem toFileCompletionItem(File file, File referenceFolder, ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		CompletionItem res = new CompletionItem();
 		Path path = referenceFolder.toPath().relativize(file.toPath());
 		StringBuilder builder = new StringBuilder(path.toString().length());
 		Path current = path;
 		while (current != null) {
+			cancelChecker.checkCanceled();
 			if (!current.equals(path)) {
 				// Only append "/" for parent directories
 				builder.insert(0, '/');
@@ -1153,6 +1260,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			current = current.getParent();
 		}
 
+		cancelChecker.checkCanceled();
 		Range replaceRange = request.getReplaceRange();
 
 		/*
@@ -1176,18 +1284,21 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 
+		cancelChecker.checkCanceled();
 		String pathString = builder.toString();
 		res.setLabel(pathString);
 		res.setFilterText(pathString);
 		res.setKind(file.isDirectory() ? CompletionItemKind.Folder : CompletionItemKind.File);
 		res.setTextEdit(Either.forLeft(new TextEdit(replaceRange, pathString)));
 
+		cancelChecker.checkCanceled();
 		return res;
 	}
 
 	private <T> Collection<CompletionItem> collectSimpleCompletionItems(Collection<T> items,
 			Function<T, String> insertionTextExtractor, Function<T, String> documentationExtractor,
-			ICompletionRequest request) {
+			ICompletionRequest request, CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMElement node = request.getParentElement();
 		DOMDocument doc = request.getXMLDocument();
 		boolean needClosingTag = node.getEndTagOpenOffset() == DOMNode.NULL_VALUE;
@@ -1195,26 +1306,31 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				needClosingTag ? node.getStartTagOpenOffset() + 1 : node.getEndTagOpenOffset(), doc);
 		final Set<String> collectedItemLabels = Collections.synchronizedSet(new HashSet<>());
 
-		return items.stream().map(o -> {
-			String label = insertionTextExtractor.apply(o);
-			CompletionItem item = new CompletionItem();
-			item.setLabel(label);
-			String insertText = label + (needClosingTag ? "</" + node.getTagName() + ">" : "");
-			item.setKind(CompletionItemKind.Property);
-			item.setDocumentation(Either.forLeft(documentationExtractor.apply(o)));
-			item.setFilterText(insertText);
-			item.setTextEdit(Either.forLeft(new TextEdit(range, insertText)));
-			item.setInsertTextFormat(InsertTextFormat.PlainText);
-			return item;
-		})
-		.filter(completionItem -> {
-			if (!collectedItemLabels.contains(completionItem.getLabel())) {
-				collectedItemLabels.add(completionItem.getLabel());
-				return true;
-			}
-			return false;
-		})
-		.collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		var result = items.stream().map(o -> {
+				cancelChecker.checkCanceled();
+				String label = insertionTextExtractor.apply(o);
+				CompletionItem item = new CompletionItem();
+				item.setLabel(label);
+				String insertText = label + (needClosingTag ? "</" + node.getTagName() + ">" : "");
+				item.setKind(CompletionItemKind.Property);
+				item.setDocumentation(Either.forLeft(documentationExtractor.apply(o)));
+				item.setFilterText(insertText);
+				item.setTextEdit(Either.forLeft(new TextEdit(range, insertText)));
+				item.setInsertTextFormat(InsertTextFormat.PlainText);
+				return item;
+			})
+			.filter(completionItem -> {
+				cancelChecker.checkCanceled();
+				if (!collectedItemLabels.contains(completionItem.getLabel())) {
+					collectedItemLabels.add(completionItem.getLabel());
+					return true;
+				}
+				return false;
+			})
+			.collect(Collectors.toList());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
 	/**
@@ -1250,10 +1366,15 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
 	}
 	
-	private void internalCollectWorkspaceArtifacts(ICompletionRequest request, Collection<ArtifactWithDescription> artifactInfosCollector,
-			LinkedHashMap<String, CompletionItem> nonArtifactCollector, Optional<String> groupId, Optional<String> artifactId) {
+	private void internalCollectWorkspaceArtifacts(ICompletionRequest request, 
+			Collection<ArtifactWithDescription> artifactInfosCollector,
+			LinkedHashMap<String, CompletionItem> nonArtifactCollector, 
+			Optional<String> groupId, Optional<String> artifactId, 
+			CancelChecker cancelChecker) {
+		cancelChecker.checkCanceled();
 		DOMElement parent = request.getParentElement();
 		if (parent == null || parent.getLocalName() == null) {
+			cancelChecker.checkCanceled();
 			return;
 		}
 		DOMElement grandParent = parent.getParentElement();
@@ -1261,6 +1382,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				(!PARENT_ELT.equals(grandParent.getLocalName()) &&
 						!DEPENDENCY_ELT.equals(grandParent.getLocalName()) &&
 						!PLUGIN_ELT.equals(grandParent.getLocalName()))) {
+			cancelChecker.checkCanceled();
 			return;
 		}
 		
@@ -1271,28 +1393,30 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		int endTagOpenOffset = parent.getEndTagOpenOffset() >= 0 ? parent.getEndTagOpenOffset() : request.getOffset();
 		Range range = XMLPositionUtility.createRange(startTagCloseOffset + 1, endTagOpenOffset, doc);
 
+		cancelChecker.checkCanceled();
 		switch (parent.getLocalName()) {
 		case ARTIFACT_ID_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(a -> groupIdFilter == null || groupIdFilter.equals(a.getGroupId()))
 				.map(ArtifactWithDescription::new) //
 				.forEach(artifactInfosCollector::add);
 			break;
 		case GROUP_ID_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getGroupId(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		case VERSION_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getVersion(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		}
+		cancelChecker.checkCanceled();
 	}
 
 	private static boolean isInsertTextModeAdjustIndentationSupport(ICompletionRequest request) {

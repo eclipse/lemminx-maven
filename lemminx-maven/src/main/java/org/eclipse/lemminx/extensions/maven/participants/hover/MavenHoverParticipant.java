@@ -487,7 +487,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 		Set<MojoParameter> parameters;
 		cancelChecker.checkCanceled();
 		try {
-			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin);
+			parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin, cancelChecker);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return null;

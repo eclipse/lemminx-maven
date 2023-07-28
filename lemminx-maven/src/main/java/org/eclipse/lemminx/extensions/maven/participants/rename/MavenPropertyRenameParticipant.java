@@ -148,7 +148,7 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 			cancelChecker.checkCanceled();
 			LinkedHashSet<MavenProject> projects = new LinkedHashSet<>();
 			projects.add(thisProject);
-			plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
+			plugin.getCurrentWorkspaceProjects(true).stream().forEach(child -> 
 				projects.addAll(findParentsOfChildProject(thisProject, child)));
 	
 			URI thisProjectUri = ParticipantUtils.normalizedUri(document.getDocumentURI());
@@ -178,7 +178,6 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 			// - Maven is initializing
 			// - or parse of maven model with DOM document is out of dated
 			// -> catch the error to avoid breaking XML rename from LemMinX
-		
 		}
 	}
 

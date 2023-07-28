@@ -53,7 +53,6 @@ public interface MavenLemminxTestsUtils {
 				throw new CancellationException("Call is cancelled on phase " + cancellingPhase);
 			}
 		}
-		
 	}
 
 	// Counts the 'checkCanceled()` calls for an operation 
@@ -68,13 +67,16 @@ public interface MavenLemminxTestsUtils {
 		public int getCounterValue() {
 			return counter;
 		}
-		
 	}
 
 	public static TextDocumentItem createTextDocumentItem(String resourcePath) throws IOException, URISyntaxException {
 		return createTextDocumentItem(resourcePath, null);
 	}
-
+	
+	public static TextDocumentItem createTextDocumentItem(URI uri) throws IOException, URISyntaxException {
+		return createTextDocumentItem(uri, null);
+	}
+	
 	public static DOMDocument createDOMDocument(String resourcePath, Properties replacements, XMLLanguageService languageService) throws IOException, URISyntaxException {
 		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(resourcePath, replacements)), languageService.getResolverExtensionManager());
 	}
@@ -83,8 +85,16 @@ public interface MavenLemminxTestsUtils {
 		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(resourcePath)), languageService.getResolverExtensionManager());
 	}
 
+	public static DOMDocument createDOMDocument(URI uri, XMLLanguageService languageService) throws IOException, URISyntaxException {
+		return org.eclipse.lemminx.dom.DOMParser.getInstance().parse(new TextDocument(createTextDocumentItem(uri)), languageService.getResolverExtensionManager());
+	}
+
 	public static TextDocumentItem createTextDocumentItem(String resourcePath, Properties replacements) throws IOException, URISyntaxException {
 		URI uri = MavenLemminxTestsUtils.class.getResource(resourcePath).toURI();
+		return createTextDocumentItem(uri, replacements);
+	}
+
+	public static TextDocumentItem createTextDocumentItem(URI uri, Properties replacements) throws IOException, URISyntaxException {
 		File file = new File(uri);
 		String contents = Files.readString(file.toPath());
 		if (replacements != null) {

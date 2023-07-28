@@ -109,19 +109,22 @@ public class MavenPluginUtils {
 	}
 
 	public static Set<MojoParameter> collectPluginConfigurationMojoParameters(IPositionRequest request,
-			MavenLemminxExtension plugin)
+			MavenLemminxExtension plugin, CancelChecker cancelChecker)
 			throws PluginResolutionException, PluginDescriptorParsingException, InvalidPluginDescriptorException {
+		cancelChecker.checkCanceled();
 		PluginDescriptor pluginDescriptor = null;
 		try {
 			pluginDescriptor = MavenPluginUtils.getContainingPluginDescriptor(request.getNode(), plugin);
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
+		cancelChecker.checkCanceled();
 		if (pluginDescriptor == null) {
 			return Collections.emptySet();
 		}
 		List<MojoDescriptor> mojosToConsiderList = pluginDescriptor.getMojos();
 		DOMNode executionElementDomNode = DOMUtils.findClosestParentNode(request.getNode(), EXECUTION_ELT);
+		cancelChecker.checkCanceled();
 		if (executionElementDomNode != null) {
 			Set<String> interestingMojos = executionElementDomNode.getChildren().stream()
 					.filter(node -> GOALS_ELT.equals(node.getLocalName())).flatMap(node -> node.getChildren().stream())
@@ -131,14 +134,18 @@ public class MavenPluginUtils {
 					.collect(Collectors.toList());
 		}
 		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(request.getXMLDocument());
+		cancelChecker.checkCanceled();
 		if (project == null) {
 			return Collections.emptySet();
 		}
 		plugin.getMavenSession().setProjects(Collections.singletonList(project));
 		final var finalPluginDescriptor = pluginDescriptor;
-		return mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
+		cancelChecker.checkCanceled();
+		var result = mojosToConsiderList.stream().flatMap(mojo -> PlexusConfigHelper
 				.loadMojoParameters(finalPluginDescriptor, mojo, plugin.getMavenSession(), plugin.getBuildPluginManager())
 				.stream()).collect(Collectors.toSet());
+		cancelChecker.checkCanceled();
+		return result;
 	}
 
 	public static RemoteRepository toRemoteRepo(Repository modelRepo) {

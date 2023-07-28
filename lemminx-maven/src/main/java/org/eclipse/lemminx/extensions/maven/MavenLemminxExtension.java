@@ -34,6 +34,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -91,6 +94,8 @@ import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
+import org.eclipse.lemminx.services.IXMLDocumentProvider;
+import org.eclipse.lemminx.services.IXMLValidationService;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
@@ -119,7 +124,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
-
+	private static final long WAIT_SAFE_TIMEOUT_SECONDS = 10;
+	
 	private XMLExtensionsRegistry currentRegistry;
 	private MavenLemminxWorkspaceReader workspaceReader = new MavenLemminxWorkspaceReader();
 	
@@ -147,6 +153,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	
 	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
 	private CompletableFuture<Void> mavenInitializer;
+	private IXMLDocumentProvider documentProvider;
+	private IXMLValidationService validationService;
 
 	private ProgressSupport progressSupport;
 
@@ -181,6 +189,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		this.currentRegistry = registry;
 		this.resolverExtensionManager = registry.getResolverExtensionManager();
 		this.progressSupport = registry.getProgressSupport();
+		this.documentProvider = registry.getDocumentProvider();
+		this.validationService = registry.getValidationService();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
@@ -228,14 +238,17 @@ public class MavenLemminxExtension implements IXMLExtension {
 		// while Maven component is initializing.
 		if (mavenInitializer == null) {
 			if (isUnitTestMode()) {
+				mavenInitializer = new CompletableFuture<>();
 				doInitialize(() -> {});
-				mavenInitializer = CompletableFuture.completedFuture(null);
+				mavenInitializer.complete(null);
 			} else
 				mavenInitializer = CompletableFutures.computeAsync(cancelChecker -> {
 					doInitialize(cancelChecker);
 					return null;
 				});
 		}
+		// Start Maven Project Cache
+		mavenInitializer.thenAccept(t -> cache.start());
 		return mavenInitializer;
 	}
 
@@ -294,7 +307,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-			cache = new MavenProjectCache(mavenSession);
+			cache = new MavenProjectCache(mavenSession, documentProvider);
 
 			// Step5 : create local repository searcher
 			cancelChecker.checkCanceled();
@@ -473,6 +486,11 @@ public class MavenLemminxExtension implements IXMLExtension {
 		try {
 			realm = classWorld.getRealm(MAVEN_XMLLS_EXTENSION_REALM_ID);
 		} catch (NoSuchRealmException e) {
+			try {
+				classWorld.close();
+			} catch (IOException ex) {
+				LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+			}
 			throw new PlexusContainerException("Could not lookup required class realm", e);
 		}
 		final ContainerConfiguration mavenCoreCC = new DefaultContainerConfiguration() //
@@ -525,8 +543,15 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (mavenInitializer != null) {
 			mavenInitializer.cancel(true);
 		}
+		cache.stop();
 	}
 
+	/**
+	 * Checks if the specified document is to be treated as a Maven Project
+	 * 
+	 * @param document A document to be checked
+	 * @return true If the specified document is to be treated as a Maven Project
+	 */
 	public static boolean match(DOMDocument document) {
 		try {
 			return match(new File(URI.create(document.getDocumentURI())).toPath());
@@ -537,56 +562,122 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
+	/**
+	 * Checks if the specified file is to be treated as a Maven Project
+	 * 
+	 * @param file A file to be checked
+	 * @return true If the specified file is to be treated as a Maven Project
+	 */
 	public static boolean match(Path file) {
 		String fileName = file != null ? file.getFileName().toString() : null;
 		return fileName != null && ((fileName.startsWith("pom") && fileName.endsWith(".xml"))
 				|| fileName.endsWith(Maven.POMv4) || fileName.endsWith(".pom"));
 	}
 
+	/**
+	 * Returns the instance of IXMLValidationService configured on the extension
+	 * 
+	 * @return IXMLValidationService object
+	 */
+	public IXMLValidationService getValidationService() {
+		return validationService;
+	}
+
+	/**
+	 * Returns the cache of collected Maven Projects
+	 * 
+	 * @return Maven Project Cache support
+	 */
 	public MavenProjectCache getProjectCache() {
 		initialize();
 		return this.cache;
 	}
 
+	/** 
+	 * Returns the Maven Session object
+	 * 
+	 * @return Maven Session object
+	 */
 	public MavenSession getMavenSession() {
 		initialize();
 		return this.mavenSession;
 	}
 
+	/**
+	 * Returns the Plexus Container object
+	 * 
+	 * @return Plexus Container object
+	 */
 	public PlexusContainer getPlexusContainer() {
 		initialize();
 		return this.container;
 	}
 
+	/** 
+	 * Returns the Maven Build Plugin Manager object
+	 * 
+	 * @return Maven Build Plugin Manager object
+	 */
 	public BuildPluginManager getBuildPluginManager() {
 		initialize();
 		return buildPluginManager;
 	}
 
+	/**
+	 * Returns the Local Maven Repository Searcher
+	 * 
+	 * @return Local Maven Repository Searcher
+	 */
 	public LocalRepositorySearcher getLocalRepositorySearcher() {
 		initialize();
 		return localRepositorySearcher;
 	}
 
+	/** 
+	 * Returns the Maven Plugin Manager object
+	 * 
+	 * @return Maven Plugin Manager object
+	 */
 	public MavenPluginManager getMavenPluginManager() {
 		initialize();
 		return mavenPluginManager;
 	}
 
+	/**
+	 * Returns the Remote Maven Searcher (uses Maven Search API) instance
+	 * 
+	 * @return Optional RemoteCentralRepositorySearcher object
+	 */
 	public Optional<RemoteCentralRepositorySearcher> getCentralSearcher() {
 		initialize();
 		return Optional.ofNullable(centralSearcher);
 	}
 
+	/**
+	 *  Returns the URI Resolver Extension Manager
+	 *  
+	 * @return URI Resolver Extension Manager object
+	 */
 	public URIResolverExtensionManager getUriResolveExtentionManager() {
 		initialize();
 		return resolverExtensionManager;
 	}
 
+	/**
+	 * Returns set of URI objects representing the folders available in Workspace
+	 * 
+	 * @return A linkedHashSet of Workspace folders URI 
+	 */
 	public LinkedHashSet<URI> getCurrentWorkspaceFolders() {
 		return currentWorkspaceFolders;
 	}
 
+	/**
+	 * A handler to be called on changing the Workspace Folders
+	 * 
+	 * @param added An array of added folders
+ 	 * @param removed An array of removed folders
+	 */
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		CompletableFuture<Void> initializer =  getMavenInitializer();
 		if (initializer.isDone()) {
@@ -596,7 +687,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 	
-	public void internalDidChangeWorkspaceFolders(URI[] added, URI[] removed) {
+	private void internalDidChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		currentWorkspaceFolders.addAll(List.of(added != null? added : new URI[0]));
 		currentWorkspaceFolders.removeAll(List.of(removed != null ? removed : new URI[0]));
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
@@ -765,12 +856,30 @@ public class MavenLemminxExtension implements IXMLExtension {
 	/**
 	 * Returns the list of Maven Projects currently added to the Workspace
 	 * 
+	 * @param wait A boolean 'true' indicates that all projects are to
+	 * 		be returned, not only the cached ones at the moment,
+	 *		method should wait for the final build result,
+	 * 		otherwise the only project that are already built and
+	 * 		cached are to be returned, the rest of the projects
+	 * 		are to be built in background
 	 * @return List of Maven Projects
 	 */
-	public List<MavenProject> getCurrentWorkspaceProjects() {
+	public List<MavenProject> getCurrentWorkspaceProjects(boolean wait) {
 		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
-			.map(f -> getProjectCache().getLastSuccessfulMavenProject(f))
-			.filter(Objects::nonNull).toList();
+					.map(file -> {
+						try {
+							CompletableFuture<LoadedMavenProject> loadedProject = 
+									 getProjectCache().getLoadedMavenProject(toUriASCIIString(file));
+							return wait ? loadedProject.get(WAIT_SAFE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+									: loadedProject.getNow(null);
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							LOGGER.log(Level.SEVERE, e.getMessage(), e);
+							return null;
+						}
+					})
+					.filter(Objects::nonNull)
+					.map(LoadedMavenProject::getMavenProject)
+					.toList();
 	}
 	
 	/**
@@ -829,5 +938,15 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 */
 	public static void setUnitTestMode(boolean unitTestMode) {
 		MavenLemminxExtension.unitTestMode = unitTestMode;
+	}
+	
+	/**
+	 * Gets a normalized URI ASCII string from the given File
+	 * 
+	 * @param file A File
+	 * @return Normalized URI ASCII string
+	 */
+	public static String toUriASCIIString(File file) {
+		return file.toURI().normalize().toASCIIString();
 	}
 }
