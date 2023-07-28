@@ -29,6 +29,7 @@ import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.LineIndentInfo;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -47,7 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenCodeActionPropertyRefactoringTest {
-	private XMLLanguageService xmlLanguageService = new XMLLanguageService();
+	private XMLLanguageService xmlLanguageService = new MavenLanguageService();
 	private SharedSettings sharedSettings = new SharedSettings();
 
 	//

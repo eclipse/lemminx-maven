@@ -8,7 +8,6 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,6 +28,7 @@ import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
 import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.building.DefaultModelProblem;
@@ -49,6 +50,7 @@ import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.utils.DOMModelSource;
 
 public class MavenProjectCache {
 
@@ -58,19 +60,15 @@ public class MavenProjectCache {
 	private final Map<URI, MavenProject> projectCache;
 	private final Map<URI, Collection<ModelProblem>> problemCache;
 
-	private final MavenLemminxExtension lemminxMavenPlugin;
-	private final PlexusContainer plexusContainer;
-	private final MavenExecutionRequest mavenRequest;
+	private final MavenSession mavenSession;
 
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
 	private ProjectBuilder projectBuilder;
 
 	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
 
-	public MavenProjectCache(MavenLemminxExtension lemminxMavenPlugin) {
-		this.lemminxMavenPlugin = lemminxMavenPlugin;
-		this.mavenRequest = lemminxMavenPlugin.getMavenSession().getRequest();
-		this.plexusContainer = lemminxMavenPlugin.getPlexusContainer();
+	public MavenProjectCache(MavenSession mavenSession) {
+		this.mavenSession = mavenSession;
 		this.lastCheckedVersion = new HashMap<>();
 		this.projectCache = new HashMap<>();
 		this.problemCache = new HashMap<>();
@@ -212,7 +210,11 @@ public class MavenProjectCache {
 					}
 				}
 			}
-		} catch (Exception e) {
+		} catch (CancellationException e){
+			// The document which has been used to load Maven project is out of dated
+			throw e;
+		}
+		catch (Exception e) {
 			// Do not add any info, like lastCheckedVersion or problems, to the cache 
 			// In case of project/problems etc. is not available due to an exception happened.
 			// 
@@ -236,12 +238,7 @@ public class MavenProjectCache {
 	private void parseAndCache(DOMDocument document) {
 		URI uri = URI.create(document.getDocumentURI()).normalize();
 		int version = document.getTextDocument().getVersion();
-		FileModelSource source = new FileModelSource(new File(uri)) {
-			@Override
-			public InputStream getInputStream() throws IOException {
-				return new ByteArrayInputStream(document.getText().getBytes());
-			}
-		};
+		DOMModelSource source = new DOMModelSource(document);
 		parseAndCache(uri, version, source);
 	}
 
@@ -257,12 +254,13 @@ public class MavenProjectCache {
 	
 	private ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies) {
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
+		MavenExecutionRequest mavenRequest = mavenSession.getRequest();
 		request.setSystemProperties(mavenRequest.getSystemProperties());
 		request.setLocalRepository(mavenRequest.getLocalRepository());
 		request.setRemoteRepositories(mavenRequest.getRemoteRepositories());
 		request.setPluginArtifactRepositories(mavenRequest.getPluginArtifactRepositories());
 		// TODO more to transfer from mavenRequest to ProjectBuildingRequest?
-		request.setRepositorySession(lemminxMavenPlugin.getMavenSession().getRepositorySession());
+		request.setRepositorySession(mavenSession.getRepositorySession());
 		request.setResolveDependencies(resolveDependencies);
 
 		// See: https://issues.apache.org/jira/browse/MRESOLVER-374
@@ -283,7 +281,7 @@ public class MavenProjectCache {
 	}
 
 	public PlexusContainer getPlexusContainer() {
-		return plexusContainer;
+		return mavenSession.getContainer();
 	}
 
 	public Collection<MavenProject> getProjects() {
@@ -301,12 +299,11 @@ public class MavenProjectCache {
 			request.setActiveProfileIds(List.of(profileId));
 		}
 		try {
-			return projectBuilder.build(new FileModelSource(new File(document.getDocumentURI())) {
-				@Override
-				public InputStream getInputStream() throws IOException {
-					return new ByteArrayInputStream(document.getText().getBytes());
-				}
-			}, request).getProject();
+			DOMModelSource source = new DOMModelSource(document);
+			return projectBuilder.build(source, request).getProject();
+		} catch (CancellationException e) {
+			// The document which has been used to load Maven project is out of dated
+			throw e;
 		} catch (ProjectBuildingException e) {
 			List<ProjectBuildingResult> result = e.getResults();
 			if (result != null && result.size() == 1 && result.get(0).getProject() != null) {

@@ -11,7 +11,6 @@ package org.eclipse.lemminx.extensions.maven.participants.rename;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROPERTIES_ELT;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.eclipse.lemminx.utils.TextEditUtils.creatTextDocumentEdit;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,6 +27,7 @@ import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -47,7 +47,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenPropertyRenameParticipantTest {
-	private XMLLanguageService xmlLanguageService = new XMLLanguageService();
+	private XMLLanguageService xmlLanguageService = new MavenLanguageService();
 
 	@Test
 	public void testRenameMavenProperty() throws Exception {

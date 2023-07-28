@@ -8,9 +8,9 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.hover;
 
-import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.eclipse.lemminx.XMLAssert.assertHover;
 import static org.eclipse.lemminx.XMLAssert.r;
+import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
@@ -37,7 +38,7 @@ public class MavenPropertyHoverTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 	}
 
 	@AfterEach

@@ -14,7 +14,9 @@ import static org.eclipse.lemminx.XMLAssert.testCompletionFor;
 
 import java.util.Arrays;
 
+import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -24,6 +26,11 @@ public class MavenCompletionParticipantTest {
 	// We must use this System.lineSeparator() as line delimiter only for those cases,
 	// where a text editor line doesn't have a line ending separator set
 	private static String LINE_DELIMTER = System.lineSeparator();
+	
+	@BeforeAll
+	public static void setUp() {
+		MavenLemminxExtension.initializeMavenOnBackground = false;
+	}
 
 	@Test
 	public void testOneExistingDependencyDependenciesCompletion() throws Exception {

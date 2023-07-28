@@ -14,6 +14,7 @@ import java.util.Map;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
@@ -26,7 +27,7 @@ public class MatchTest {
 
 	@Test
 	public void testDoesntFailNonHierarchicalURIs() {
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument doc = DOMParser.getInstance().parse("blah", "untitled:Untitled-1",
 				new URIResolverExtensionManager());
 		List<Diagnostic> doDiagnostics = languageService.doDiagnostics(doc, new XMLValidationSettings(), Map.of(), () -> {

@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Position;
@@ -25,7 +26,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginManagementPluginFullyQualified() throws Exception {
 		System.out.println("testPluginManagementFullyQualifiedPlugin()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 //		System.out.println("testPluginManagementFullyQualifiedPlugin(): TEXT: " + document.getText());
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(14, 32), ()->{});
@@ -37,7 +38,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginManagementPluginWithVersionAsProperty() throws Exception {
 		System.out.println("testPluginManagementPluginWithVersionAsProperty()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(19, 32), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginManagementPluginWithVersionAsProperty(): " + uri));
@@ -48,7 +49,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginManagementPluginWithNoGroupId() throws Exception {
 		System.out.println("testPluginManagementPluginWithNoGroupId()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(23, 32), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginManagementPluginWithNoGroupId(): " + uri));
@@ -59,7 +60,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginFullyQualified() throws Exception {
 		System.out.println("testPluginFullyQualified()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(31, 28), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginFullyQualified(): " + uri));
@@ -70,7 +71,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginWithVersionAsProperty() throws Exception {
 		System.out.println("testPluginWithVersionAsProperty()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(36, 28), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginWithVersionAsProperty(): " + uri));
@@ -81,7 +82,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginWithNoGroupId() throws Exception {
 		System.out.println("testPluginWithNoGroupId()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(40, 28), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginWithNoGroupId(): " + uri));
@@ -92,7 +93,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginWithNoVersion() throws Exception {
 		System.out.println("testPluginWithNoVersion()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(45, 28), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginWithNoVersion(): " + uri));
@@ -103,7 +104,7 @@ public class MavenHyperlinkDetectorParticipantTest {
 	@Test
 	public void testPluginWithNoGroupIdNoVersion() throws Exception {
 		System.out.println("testPluginWithNoGroupIdNoVersion()");
-		XMLLanguageService languageService = new XMLLanguageService();
+		XMLLanguageService languageService = new MavenLanguageService();
 		DOMDocument document = createDOMDocument("/pom-remote-test-plugin-hypertlink.xml", languageService);
 		List<? extends LocationLink> definitions = languageService.findDefinition(document, new Position(48, 28), ()->{});
 		definitions.stream().map(LocationLink::getTargetUri).forEach(uri -> System.out.println("testPluginWithNoGroupIdNoVersion(): " + uri));

@@ -18,6 +18,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -31,6 +32,11 @@ public class InitMavenRequestTest {
 	private static final String HOSTNAME_ENV_VARIABLE_NAME = isWindows() ? "COMPUTERNAME" : "HOSTNAME";
 	private static final String MAVEN_PROJECTBASEDIR_ENV_VARIABLE_NAME = "MAVEN_PROJECTBASEDIR";
 	private static final String HOME_ENV_VARIABLE_NAME =  isWindows() ?  "HOMEPATH" : "HOME";
+	
+	@BeforeAll
+	public static void setUp() {
+		MavenLemminxExtension.initializeMavenOnBackground = false;
+	}
 	
 	@Test
 	public void testUserSettingsWithSystemProperty() throws Exception {

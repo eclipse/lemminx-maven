@@ -12,11 +12,9 @@ import static org.eclipse.lemminx.XMLAssert.assertCodeActions;
 import static org.eclipse.lemminx.XMLAssert.ca;
 import static org.eclipse.lemminx.XMLAssert.d;
 import static org.eclipse.lemminx.XMLAssert.teOp;
-
 import static org.eclipse.lemminx.extensions.maven.participants.codeaction.MavenNoGrammarConstraintsCodeAction.XSI_VALUE_PATTERN;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.getDocumentLineSeparator;
-
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -37,6 +35,8 @@ import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.contentmodel.participants.XMLSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationRootSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
+import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -53,13 +53,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.google.gson.Gson;
 
-import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
-
 @ExtendWith(NoMavenCentralExtension.class)
 public class MavenCodeActionParticipantTest {
 	private static final String POM_FILE = "file:///pom.xml";
 	
-	private XMLLanguageService xmlLanguageService = new XMLLanguageService();
+	private XMLLanguageService xmlLanguageService = new MavenLanguageService();
 	private SharedSettings sharedSettings = new SharedSettings();
 
 	// EDITOR_HINT_MISSING_SCHEMA == NoGrammarConstraints
@@ -319,7 +317,7 @@ public class MavenCodeActionParticipantTest {
 		assertNotNull(range, "Range cannot be null");
 
 		if (xmlLanguageService == null) {
-			xmlLanguageService = new XMLLanguageService();
+			xmlLanguageService = new MavenLanguageService();
 		}
 
 		ContentModelSettings cmSettings = new ContentModelSettings();

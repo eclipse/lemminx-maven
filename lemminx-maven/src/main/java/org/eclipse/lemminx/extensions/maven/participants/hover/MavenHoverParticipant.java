@@ -53,6 +53,7 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -90,8 +91,8 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			if (DOMUtils.isADescendantOf(request.getNode(), CONFIGURATION_ELT)) {
 				return collectPluginConfiguration(request, cancelChecker);
 			}
-		} catch (CancellationException e) {
-			LOGGER.log(Level.FINER, e.toString(), e);
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML hover from LemMinX
 		}
 		return null;
 	}
@@ -154,8 +155,8 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
 				default -> null;
 				};
-		} catch (CancellationException e) {
-			LOGGER.log(Level.FINER, e.toString(), e);
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML hover from LemMinX
 		}
 		return null;
 	}
@@ -444,7 +445,7 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			}
 		} catch (CancellationException e) {
 			// Log at FINER level and return null
-			LOGGER.log(Level.FINER, e.toString(), e);
+			throw e;
 		} catch (Exception e1) {
 			LOGGER.log(Level.SEVERE, e1.toString(), e1);
 		}
