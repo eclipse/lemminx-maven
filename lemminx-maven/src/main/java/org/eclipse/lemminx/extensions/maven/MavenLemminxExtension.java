@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -108,7 +110,10 @@ import org.eclipse.lsp4j.WorkspaceFolder;
  *
  */
 public class MavenLemminxExtension implements IXMLExtension {
-
+	
+	// Used for tests
+	public static boolean initializeMavenOnBackground = true;
+	
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
@@ -136,6 +141,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private URIResolverExtensionManager resolverExtensionManager;
 	private List<WorkspaceFolder> initialWorkspaceFolders = List.of();
 	private LinkedHashSet<URI> currentWorkspaceFolders = new LinkedHashSet<>();
+	
+	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
+	private CompletableFuture<Void> mavenInitializer;
 
 	@Override
 	public void doSave(ISaveContext context) {
@@ -189,32 +197,51 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private synchronized void initialize() {
-		if (mavenSession != null) {
-			// already initialized
-			return;
+	private void initialize() throws MavenInitializationException {		
+		if (!getMavenInitializer().isDone() ) {
+			// The Maven initialization is not ready, throws a MavenInitializationException.
+			throw new MavenInitializationException();
 		}
-		try {
-			this.container = newPlexusContainer();
-			mavenRequest = initMavenRequest(container, settings);
-			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
-			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
-			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
-			// TODO: MavenSession is deprecated. Investigate for alternative
-			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-			cache = new MavenProjectCache(this);
-			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			if (!settings.getCentral().isSkip()) {
-				centralSearcher = new RemoteCentralRepositorySearcher();
+	}
+
+	private synchronized CompletableFuture<Void> getMavenInitializer() {
+		// Create thread which loads Maven component (plexus container, maven session, etc) which can take some time.
+		// We do this initialization on background to avoid breaking the XML syntax validation, XML based onXSD, XML completion based on XSD
+		// while Maven component is initializing.
+		if (mavenInitializer == null) {
+			mavenInitializer = CompletableFuture.runAsync(() -> {
+				try {
+					this.container = newPlexusContainer();
+					mavenRequest = initMavenRequest(container, settings);
+					DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
+					RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
+					MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
+					// TODO: MavenSession is deprecated. Investigate for alternative
+					mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
+					cache = new MavenProjectCache(mavenSession);
+					localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
+					if (!settings.getCentral().isSkip()) {
+						centralSearcher = new RemoteCentralRepositorySearcher();
+					}
+					buildPluginManager = null;
+					mavenPluginManager = container.lookup(MavenPluginManager.class);
+					buildPluginManager = container.lookup(BuildPluginManager.class);
+					internalDidChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
+				} catch (Exception e) {
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
+					stop(currentRegistry);
+				}
+			});
+		}
+		if (!initializeMavenOnBackground) {
+			// This code is for tests
+			try {
+				mavenInitializer.get();
+			} catch (InterruptedException | ExecutionException e) {
+				Thread.currentThread().interrupt();
 			}
-			buildPluginManager = null;
-			mavenPluginManager = container.lookup(MavenPluginManager.class);
-			buildPluginManager = container.lookup(BuildPluginManager.class);
-			didChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
-		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			stop(currentRegistry);
 		}
+		return mavenInitializer;
 	}
 
 	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
@@ -388,6 +415,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		this.mavenSession = null;
 		this.currentRegistry = null;
+		if (mavenInitializer != null) {
+			mavenInitializer.cancel(true);
+		}
 	}
 
 	public static boolean match(DOMDocument document) {
@@ -449,9 +479,17 @@ public class MavenLemminxExtension implements IXMLExtension {
 	public LinkedHashSet<URI> getCurrentWorkspaceFolders() {
 		return currentWorkspaceFolders;
 	}
-	
+
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
-		initialize();
+		CompletableFuture<Void> initializer =  getMavenInitializer();
+		if (initializer.isDone()) {
+			internalDidChangeWorkspaceFolders(added, removed);
+		} else {
+			initializer.thenAccept(Void -> internalDidChangeWorkspaceFolders(added, removed));
+		}
+	}
+	
+	public void internalDidChangeWorkspaceFolders(URI[] added, URI[] removed) {
 		currentWorkspaceFolders.addAll(List.of(added != null? added : new URI[0]));
 		currentWorkspaceFolders.removeAll(List.of(removed != null ? removed : new URI[0]));
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();

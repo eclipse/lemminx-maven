@@ -8,11 +8,11 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants.hover;
 
+import static org.eclipse.lemminx.XMLAssert.assertHover;
+import static org.eclipse.lemminx.XMLAssert.r;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.eclipse.lemminx.XMLAssert.assertHover;
-import static org.eclipse.lemminx.XMLAssert.r;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +27,7 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
 import org.eclipse.lemminx.extensions.maven.DOMConstants;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -70,7 +71,7 @@ public class WorkspaceProjectsHoverTest {
 	
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 		
 		localRepoDirectory = System.getProperty("maven.repo.local") != null ?
 				new File(System.getProperty("maven.repo.local")).getAbsoluteFile() :

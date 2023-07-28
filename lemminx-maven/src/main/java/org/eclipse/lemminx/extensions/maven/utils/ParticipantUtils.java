@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CancellationException;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -179,6 +180,8 @@ public class ParticipantUtils {
 			if (result !=null) {
 				return result.getArtifact();
 			}
+		} catch (CancellationException e) {
+			throw e;
 		} catch (ArtifactResolutionException | ComponentLookupException e) {
 			// can happen
 			LOGGER.log(Level.FINEST, e.getMessage(), e);

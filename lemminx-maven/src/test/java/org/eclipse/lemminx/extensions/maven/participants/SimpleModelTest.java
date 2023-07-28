@@ -33,6 +33,7 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
@@ -69,7 +70,7 @@ public class SimpleModelTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 		MavenLemminxTestsUtils.prefetchMavenXSD();
 	}
 

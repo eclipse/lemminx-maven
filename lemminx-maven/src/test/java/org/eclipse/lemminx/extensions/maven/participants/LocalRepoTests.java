@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -35,7 +36,7 @@ public class LocalRepoTests {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 	}
 
 	@AfterEach

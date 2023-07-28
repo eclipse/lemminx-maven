@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.maven.shared.utils.io.FileUtils;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
@@ -51,7 +52,7 @@ public class PluginResolutionTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 		languageService.initializeIfNeeded();
 		File mavenRepo = languageService.getExtensions().stream() //
 				.filter(MavenLemminxExtension.class::isInstance) //

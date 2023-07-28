@@ -29,6 +29,7 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMText;
+import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
@@ -59,111 +60,121 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 	@Override
 	public Either<Range, PrepareRenameResult> prepareRename(IPrepareRenameRequest request,
 			CancelChecker cancelChecker) {
-		DOMDocument document = request.getXMLDocument();
-		DOMNode node = request.getNode();
-		int offset = request.getOffset();
-
-		String propertyName = null;
-		Range propertyRange = null;
-		if (node instanceof DOMText textNode) {
-			Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
-			if (mavenProperty != null) {
-				cancelChecker.checkCanceled();
-				propertyName = mavenProperty.getValue();
-				propertyRange = mavenProperty.getKey();
+		try {
+			DOMDocument document = request.getXMLDocument();
+			DOMNode node = request.getNode();
+			int offset = request.getOffset();
+	
+			String propertyName = null;
+			Range propertyRange = null;
+			if (node instanceof DOMText textNode) {
+				Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
+				if (mavenProperty != null) {
+					cancelChecker.checkCanceled();
+					propertyName = mavenProperty.getValue();
+					propertyRange = mavenProperty.getKey();
+				}
+			} else if (node instanceof DOMElement element) {
+				Range range = getMavenPropertyDefinitionRange(offset, element);
+				if (range != null) {
+					cancelChecker.checkCanceled();
+					propertyName = element.getNodeName();
+					propertyRange =range;
+				}
 			}
-		} else if (node instanceof DOMElement element) {
-			Range range = getMavenPropertyDefinitionRange(offset, element);
-			if (range != null) {
-				cancelChecker.checkCanceled();
-				propertyName = element.getNodeName();
-				propertyRange =range;
+	
+			if (propertyName == null || propertyRange == null) {
+				return null;
 			}
-		}
-
-		if (propertyName == null || propertyRange == null) {
+	
+			// Check Maven property
+			cancelChecker.checkCanceled();
+			MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
+	
+			cancelChecker.checkCanceled();
+			Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(project);
+	
+			cancelChecker.checkCanceled();
+			return properties.get(propertyName) == null ? null : Either.forLeft(propertyRange);
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML prepare rename from LemMinX
 			return null;
 		}
-
-		// Check Maven property
-		cancelChecker.checkCanceled();
-		MavenProject project = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
-
-		cancelChecker.checkCanceled();
-		Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(project);
-
-		cancelChecker.checkCanceled();
-		return properties.get(propertyName) == null ? null : Either.forLeft(propertyRange);
 	}
 
 	@Override
 	public void doRename(IRenameRequest request, IRenameResponse renameResponse, CancelChecker cancelChecker) {
-		DOMDocument document = request.getXMLDocument();
-		DOMNode node = request.getNode();
-		int offset = request.getOffset();
-		String newPropertyName = request.getNewText();
-		
-		String propertyName = null;
-		if (node instanceof DOMText textNode) {
-			Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
-			if (mavenProperty != null) {
-				cancelChecker.checkCanceled();
-				propertyName = mavenProperty.getValue();
-			}
-		} else if (node instanceof DOMElement element) {
-			Range range = getMavenPropertyDefinitionRange(offset, element);
-			if (range != null) {
-				cancelChecker.checkCanceled();
-				propertyName = element.getNodeName();
-			}
-		}
-
-		if (propertyName == null) {
-			return;
-		}
-
-		// Check Maven property
-		cancelChecker.checkCanceled();
-		MavenProject thisProject = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
-		if (thisProject == null) {
-			return;
-		}
-
-		cancelChecker.checkCanceled();
-		Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(thisProject);
-		if (properties.get(propertyName) == null) {
-			return;
-		}
-
-		cancelChecker.checkCanceled();
-		LinkedHashSet<MavenProject> projects = new LinkedHashSet<>();
-		projects.add(thisProject);
-		plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
-			projects.addAll(findParentsOfChildProject(thisProject, child)));
-
-		URI thisProjectUri = ParticipantUtils.normalizedUri(document.getDocumentURI());
-		final String oldPropertyName = propertyName;
-		projects.stream().forEach(project -> {
-			cancelChecker.checkCanceled();
-			URI projectUri = ParticipantUtils.normalizedUri(project.getFile().toURI().toString());
-			DOMDocument projectDocumentt = null;
-			if (projectUri.equals(thisProjectUri)) {
-				projectDocumentt = document;
-			} else {
-				projectDocumentt = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
-					project.getFile().toURI().toString(),
-					request.getNode().getOwnerDocument().getResolverExtensionManager());
-			}
+		try {
+			DOMDocument document = request.getXMLDocument();
+			DOMNode node = request.getNode();
+			int offset = request.getOffset();
+			String newPropertyName = request.getNewText();
 			
+			String propertyName = null;
+			if (node instanceof DOMText textNode) {
+				Map.Entry<Range, String> mavenProperty = getMavenProperty(textNode, offset);
+				if (mavenProperty != null) {
+					cancelChecker.checkCanceled();
+					propertyName = mavenProperty.getValue();
+				}
+			} else if (node instanceof DOMElement element) {
+				Range range = getMavenPropertyDefinitionRange(offset, element);
+				if (range != null) {
+					cancelChecker.checkCanceled();
+					propertyName = element.getNodeName();
+				}
+			}
+	
+			if (propertyName == null) {
+				return;
+			}
+	
+			// Check Maven property
 			cancelChecker.checkCanceled();
-			// Collect Text Edits for the document
-			List<TextEdit> projectTextEdits = new ArrayList<>();
-			collectPropertyElementTextEdits(projectDocumentt, oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
-			collectPropertyUseTextEdits(projectDocumentt.getDocumentElement(), oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
-			VersionedTextDocumentIdentifier projectVersionedTextDocumentIdentifier = new VersionedTextDocumentIdentifier(
-					projectDocumentt.getTextDocument().getUri(), projectDocumentt.getTextDocument().getVersion());
-			renameResponse.addTextDocumentEdit(new TextDocumentEdit(projectVersionedTextDocumentIdentifier, projectTextEdits));
-		});
+			MavenProject thisProject = plugin.getProjectCache().getLastSuccessfulMavenProject(document);
+			if (thisProject == null) {
+				return;
+			}
+	
+			cancelChecker.checkCanceled();
+			Map<String, String> properties = ParticipantUtils.getMavenProjectProperties(thisProject);
+			if (properties.get(propertyName) == null) {
+				return;
+			}
+	
+			cancelChecker.checkCanceled();
+			LinkedHashSet<MavenProject> projects = new LinkedHashSet<>();
+			projects.add(thisProject);
+			plugin.getCurrentWorkspaceProjects().stream().forEach(child -> 
+				projects.addAll(findParentsOfChildProject(thisProject, child)));
+	
+			URI thisProjectUri = ParticipantUtils.normalizedUri(document.getDocumentURI());
+			final String oldPropertyName = propertyName;
+			projects.stream().forEach(project -> {
+				cancelChecker.checkCanceled();
+				URI projectUri = ParticipantUtils.normalizedUri(project.getFile().toURI().toString());
+				DOMDocument projectDocumentt = null;
+				if (projectUri.equals(thisProjectUri)) {
+					projectDocumentt = document;
+				} else {
+					projectDocumentt = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
+						project.getFile().toURI().toString(),
+						request.getNode().getOwnerDocument().getResolverExtensionManager());
+				}
+				
+				cancelChecker.checkCanceled();
+				// Collect Text Edits for the document
+				List<TextEdit> projectTextEdits = new ArrayList<>();
+				collectPropertyElementTextEdits(projectDocumentt, oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
+				collectPropertyUseTextEdits(projectDocumentt.getDocumentElement(), oldPropertyName, newPropertyName, projectTextEdits, cancelChecker);
+				VersionedTextDocumentIdentifier projectVersionedTextDocumentIdentifier = new VersionedTextDocumentIdentifier(
+						projectDocumentt.getTextDocument().getUri(), projectDocumentt.getTextDocument().getVersion());
+				renameResponse.addTextDocumentEdit(new TextDocumentEdit(projectVersionedTextDocumentIdentifier, projectTextEdits));		
+			});
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML rename from LemMinX
+		
+		}
 	}
 
 	/*

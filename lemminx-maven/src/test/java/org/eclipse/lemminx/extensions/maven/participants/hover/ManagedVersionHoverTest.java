@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
@@ -41,7 +42,7 @@ class ManagedVersionHoverTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 	}
 
 	@AfterEach

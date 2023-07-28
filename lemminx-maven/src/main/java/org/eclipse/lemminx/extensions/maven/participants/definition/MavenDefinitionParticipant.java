@@ -31,6 +31,7 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
@@ -176,8 +177,8 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 					return;
 				}
 			}
-		} catch (CancellationException e) {
-			LOGGER.log(Level.FINER, e.toString(), e);
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML definition from LemMinX
 		}
 	}
 	

@@ -8,8 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.utils;
 
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MavenProjectCache;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
@@ -41,7 +42,7 @@ public class ParticipantUtilsTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 	}
 
 	@AfterEach

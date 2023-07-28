@@ -23,6 +23,12 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.MISSING_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.MODULE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.OUTPUT_DIRECTORY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EAR;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EJB;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_JAR;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_MAVEN_PLUGIN;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_POM;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_WAR;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PHASE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
@@ -35,13 +41,6 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.TARGET_PATH_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_OUTPUT_DIRECTORY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.TEST_SOURCE_DIRECTORY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
-
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_JAR;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_WAR;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EJB;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_EAR;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_POM;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PACKAGING_TYPE_MAVEN_PLUGIN;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -102,6 +101,7 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.DOMConstants;
 import org.eclipse.lemminx.extensions.maven.DependencyScope;
+import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.Phase;
@@ -183,9 +183,13 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 
-		DOMNode tag = request.getNode();
-		if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
-			collectPluginConfiguration(request).forEach(response::addCompletionItem);
+		try {
+			DOMNode tag = request.getNode();
+			if (DOMUtils.isADescendantOf(tag, CONFIGURATION_ELT)) {
+				collectPluginConfiguration(request).forEach(response::addCompletionItem);
+			}
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML completion from LemMinX
 		}
 	}
 
@@ -246,224 +250,228 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			return;
 		}
 
-		if (request.getXMLDocument().getText().length() < 2) {
-			response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
-		}
-		DOMElement parent = request.getParentElement();
-		if (parent == null || parent.getLocalName() == null) {
-			return;
-		}
-		DOMElement grandParent = parent.getParentElement();
-		boolean isPlugin = ParticipantUtils.isPlugin(parent);
-		boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
-		Optional<String> groupId = grandParent == null ? Optional.empty()
-				: grandParent.getChildren().stream().filter(DOMNode::isElement)
-						.filter(node -> GROUP_ID_ELT.equals(node.getLocalName()))
-						.flatMap(node -> node.getChildren().stream()).map(DOMNode::getTextContent)
-						.filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).findFirst();
-		Optional<String> artifactId = grandParent == null ? Optional.empty()
-				: grandParent.getChildren().stream().filter(DOMNode::isElement)
-						.filter(node -> ARTIFACT_ID_ELT.equals(node.getLocalName()))
-						.flatMap(node -> node.getChildren().stream()).map(DOMNode::getTextContent)
-						.filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).findFirst();
-		GAVInsertionStrategy gavInsertionStrategy = computeGAVInsertionStrategy(request);
-		List<ArtifactWithDescription> allArtifactInfos = Collections.synchronizedList(new ArrayList<>());
-		LinkedHashMap<String, CompletionItem> nonArtifactCollector = new LinkedHashMap<>();
-		switch (parent.getLocalName()) {
-		case SCOPE_ELT:
-			collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
-					DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
-			break;
-		case PHASE_ELT:
-			collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
-					phase -> phase.description, request).forEach(response::addCompletionAttribute);
-			break;
-		case GROUP_ID_ELT:
-			if (isParentDeclaration) {
-				Optional<MavenProject> filesystem = computeFilesystemParent(request);
-				if (filesystem.isPresent()) {
-					filesystem.map(MavenProject::getGroupId)
-					.map(g -> toCompletionItem(g.toString(), null, request.getReplaceRange()))
-					.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-					.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-				}
-				// TODO localRepo
-				// TODO remoteRepos
-			} else {
-				// TODO if artifactId is set and match existing content, suggest only matching
-				// groupId
-				collectSimpleCompletionItems(
-						isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds()
-								: plugin.getLocalRepositorySearcher().searchGroupIds(),
-						Function.identity(), Function.identity(), request).stream()
-							.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-							.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
+		try {
+			if (request.getXMLDocument().getText().length() < 2) {
+				response.addCompletionItem(createMinimalPOMCompletionSnippet(request));
 			}
-			internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
-
-			// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
-			nonArtifactCollector.entrySet().stream()
-			.map(entry -> entry.getValue()).forEach(response::addCompletionItem);
-			nonArtifactCollector.clear();
-			break;
-		case ARTIFACT_ID_ELT:
-			if (isParentDeclaration) {
+			DOMElement parent = request.getParentElement();
+			if (parent == null || parent.getLocalName() == null) {
+				return;
+			}
+			DOMElement grandParent = parent.getParentElement();
+			boolean isPlugin = ParticipantUtils.isPlugin(parent);
+			boolean isParentDeclaration = ParticipantUtils.isParentDeclaration(parent);
+			Optional<String> groupId = grandParent == null ? Optional.empty()
+					: grandParent.getChildren().stream().filter(DOMNode::isElement)
+							.filter(node -> GROUP_ID_ELT.equals(node.getLocalName()))
+							.flatMap(node -> node.getChildren().stream()).map(DOMNode::getTextContent)
+							.filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).findFirst();
+			Optional<String> artifactId = grandParent == null ? Optional.empty()
+					: grandParent.getChildren().stream().filter(DOMNode::isElement)
+							.filter(node -> ARTIFACT_ID_ELT.equals(node.getLocalName()))
+							.flatMap(node -> node.getChildren().stream()).map(DOMNode::getTextContent)
+							.filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).findFirst();
+			GAVInsertionStrategy gavInsertionStrategy = computeGAVInsertionStrategy(request);
+			List<ArtifactWithDescription> allArtifactInfos = Collections.synchronizedList(new ArrayList<>());
+			LinkedHashMap<String, CompletionItem> nonArtifactCollector = new LinkedHashMap<>();
+			switch (parent.getLocalName()) {
+			case SCOPE_ELT:
+				collectSimpleCompletionItems(Arrays.asList(DependencyScope.values()), DependencyScope::getName,
+						DependencyScope::getDescription, request).forEach(response::addCompletionAttribute);
+				break;
+			case PHASE_ELT:
+				collectSimpleCompletionItems(Arrays.asList(Phase.ALL_STANDARD_PHASES), phase -> phase.id,
+						phase -> phase.description, request).forEach(response::addCompletionAttribute);
+				break;
+			case GROUP_ID_ELT:
+				if (isParentDeclaration) {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(MavenProject::getGroupId)
+						.map(g -> toCompletionItem(g.toString(), null, request.getReplaceRange()))
+						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				} else {
+					// TODO if artifactId is set and match existing content, suggest only matching
+					// groupId
+					collectSimpleCompletionItems(
+							isPlugin ? plugin.getLocalRepositorySearcher().searchPluginGroupIds()
+									: plugin.getLocalRepositorySearcher().searchGroupIds(),
+							Function.identity(), Function.identity(), request).stream()
+								.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+								.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
+				}
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+	
+				// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
+				nonArtifactCollector.entrySet().stream()
+				.map(entry -> entry.getValue()).forEach(response::addCompletionItem);
+				nonArtifactCollector.clear();
+				break;
+			case ARTIFACT_ID_ELT:
+				if (isParentDeclaration) {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				} else {
+					allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts()
+							: plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
+									.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
+									// TODO pass description as documentation
+									.map(ArtifactWithDescription::new).collect(Collectors.toList()));
+					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
+				}
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+				break;
+			case VERSION_ELT:
+				if (isParentDeclaration) {
+					Optional<MavenProject> filesystem = computeFilesystemParent(request);
+					if (filesystem.isPresent()) {
+						filesystem.map(MavenProject::getVersion).map(DefaultArtifactVersion::new)
+						.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
+						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+					}
+					// TODO localRepo
+					// TODO remoteRepos
+				} else {
+					if (artifactId.isPresent()) {
+						plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+								.filter(gav -> gav.getArtifactId().equals(artifactId.get()))
+								.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get())).findAny()
+								.map(Artifact::getVersion).map(DefaultArtifactVersion::new)
+								.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
+								.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+								.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+						internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
+					}
+				}
+				internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
+	
+				if (nonArtifactCollector.isEmpty()) {
+					response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
+				} else {
+					// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
+					final AtomicInteger sortIndex = new AtomicInteger(0);
+					nonArtifactCollector.entrySet().stream()
+						.map(entry -> entry.getValue())
+						.filter(Objects::nonNull)
+						.filter(item -> item.getSortText() != null || item.getLabel() != null)
+						.sorted(new Comparator<CompletionItem>() {
+							// Sort in reverse order to correctly fill 'sortText' 
+							@Override
+							public int compare(CompletionItem o1, CompletionItem o2) {
+								String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
+								String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
+								return new DefaultArtifactVersion(sortText2)
+										.compareTo(new DefaultArtifactVersion(sortText1));
+							}
+						})
+						.peek(item -> item.setSortText(String.format("%06d", (sortIndex.getAndIncrement())) + '.' + item.getLabel()))
+						.forEach(response::addCompletionItem);
+					nonArtifactCollector.clear();
+				}
+				break;
+			case MODULE_ELT:
+				collectSubModuleCompletion(request).forEach(response::addCompletionItem);
+				break;
+			case TARGET_PATH_ELT:
+			case DIRECTORY_ELT:
+			case SOURCE_DIRECTORY_ELT:
+			case SCRIPT_SOURCE_DIRECTORY_ELT:
+			case TEST_SOURCE_DIRECTORY_ELT:
+			case OUTPUT_DIRECTORY_ELT:
+			case TEST_OUTPUT_DIRECTORY_ELT:
+				collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+				break;
+			case FILTER_ELT:
+				if (FILTERS_ELT.equals(grandParent.getLocalName())) {
+					collectRelativeFilterPathCompletion(request).forEach(response::addCompletionItem);
+				}
+				break;
+			case EXISTS_ELT:
+			case MISSING_ELT:
+				if (FILE_ELT.equals(grandParent.getLocalName())) {
+					collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+				}
+				break;
+			case RELATIVE_PATH_ELT:
+				collectRelativePathCompletion(request).forEach(response::addCompletionItem);
+				break;
+			case DEPENDENCIES_ELT:
+			case DEPENDENCY_ELT:
+				// TODO completion/resolve to get description for local artifacts
+				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+						.map(ArtifactWithDescription::new).collect(Collectors.toList()));
+				internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, nonArtifactCollector, cancelChecker);
+				break;
+			case PLUGINS_ELT:
+			case PLUGIN_ELT:
+				// TODO completion/resolve to get description for local artifacts
+				allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
+						.map(ArtifactWithDescription::new).collect(Collectors.toList()));
+				internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, nonArtifactCollector, cancelChecker);
+				break;
+			case PARENT_ELT:
 				Optional<MavenProject> filesystem = computeFilesystemParent(request);
 				if (filesystem.isPresent()) {
 					filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
-				}
-				// TODO localRepo
-				// TODO remoteRepos
-			} else {
-				allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts()
-						: plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
-								.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get()))
-								// TODO pass description as documentation
-								.map(ArtifactWithDescription::new).collect(Collectors.toList()));
-				internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
-			}
-			internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
-			break;
-		case VERSION_ELT:
-			if (isParentDeclaration) {
-				Optional<MavenProject> filesystem = computeFilesystemParent(request);
-				if (filesystem.isPresent()) {
-					filesystem.map(MavenProject::getVersion).map(DefaultArtifactVersion::new)
-					.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
-					.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-					.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-				}
-				// TODO localRepo
-				// TODO remoteRepos
-			} else {
-				if (artifactId.isPresent()) {
-					plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-							.filter(gav -> gav.getArtifactId().equals(artifactId.get()))
-							.filter(gav -> !groupId.isPresent() || gav.getGroupId().equals(groupId.get())).findAny()
-							.map(Artifact::getVersion).map(DefaultArtifactVersion::new)
-							.map(version -> toCompletionItem(version.toString(), null, request.getReplaceRange()))
-							.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-							.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-					internalCollectRemoteGAVCompletion(request, isPlugin, allArtifactInfos, nonArtifactCollector, cancelChecker);
-				}
-			}
-			internalCollectWorkspaceArtifacts(request, allArtifactInfos, nonArtifactCollector, groupId, artifactId);
-
-			if (nonArtifactCollector.isEmpty()) {
-				response.addCompletionItem(toTextCompletionItem(request, "-SNAPSHOT"));
-			} else {
-				// Sort and move nonArtifactCollector items to the response and clear nonArtifactCollector
-				final AtomicInteger sortIndex = new AtomicInteger(0);
-				nonArtifactCollector.entrySet().stream()
-					.map(entry -> entry.getValue())
-					.filter(Objects::nonNull)
-					.filter(item -> item.getSortText() != null || item.getLabel() != null)
-					.sorted(new Comparator<CompletionItem>() {
-						// Sort in reverse order to correctly fill 'sortText' 
-						@Override
-						public int compare(CompletionItem o1, CompletionItem o2) {
-							String sortText1 = o1.getSortText() != null ? o1.getSortText() : o1.getLabel();
-							String sortText2 = o2.getSortText() != null ? o2.getSortText() : o2.getLabel();
-							return new DefaultArtifactVersion(sortText2)
-									.compareTo(new DefaultArtifactVersion(sortText1));
-						}
-					})
-					.peek(item -> item.setSortText(String.format("%06d", (sortIndex.getAndIncrement())) + '.' + item.getLabel()))
-					.forEach(response::addCompletionItem);
-				nonArtifactCollector.clear();
-			}
-			break;
-		case MODULE_ELT:
-			collectSubModuleCompletion(request).forEach(response::addCompletionItem);
-			break;
-		case TARGET_PATH_ELT:
-		case DIRECTORY_ELT:
-		case SOURCE_DIRECTORY_ELT:
-		case SCRIPT_SOURCE_DIRECTORY_ELT:
-		case TEST_SOURCE_DIRECTORY_ELT:
-		case OUTPUT_DIRECTORY_ELT:
-		case TEST_OUTPUT_DIRECTORY_ELT:
-			collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
-			break;
-		case FILTER_ELT:
-			if (FILTERS_ELT.equals(grandParent.getLocalName())) {
-				collectRelativeFilterPathCompletion(request).forEach(response::addCompletionItem);
-			}
-			break;
-		case EXISTS_ELT:
-		case MISSING_ELT:
-			if (FILE_ELT.equals(grandParent.getLocalName())) {
-				collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
-			}
-			break;
-		case RELATIVE_PATH_ELT:
-			collectRelativePathCompletion(request).forEach(response::addCompletionItem);
-			break;
-		case DEPENDENCIES_ELT:
-		case DEPENDENCY_ELT:
-			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-					.map(ArtifactWithDescription::new).collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, false, allArtifactInfos, nonArtifactCollector, cancelChecker);
-			break;
-		case PLUGINS_ELT:
-		case PLUGIN_ELT:
-			// TODO completion/resolve to get description for local artifacts
-			allArtifactInfos.addAll(plugin.getLocalRepositorySearcher().getLocalPluginArtifacts().stream()
-					.map(ArtifactWithDescription::new).collect(Collectors.toList()));
-			internalCollectRemoteGAVCompletion(request, true, allArtifactInfos, nonArtifactCollector, cancelChecker);
-			break;
-		case PARENT_ELT:
-			Optional<MavenProject> filesystem = computeFilesystemParent(request);
-			if (filesystem.isPresent()) {
-				filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
-			} else {
-				// TODO localRepo
-				// TODO remoteRepos
-			}
-			break;
-		case GOAL_ELT:
-			collectGoals(request).forEach(response::addCompletionItem);
-			break;
-		case PACKAGING_ELT:
-			collectPackaging(request).forEach(response::addCompletionItem);
-			break;
-		default:
-			Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin)
-					.stream().filter(p -> p.name.equals(parent.getLocalName()))
-					.filter(p -> (p.type.startsWith(FILE_TYPE)) || 
-							(p.type.startsWith(STRING_TYPE) && p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC)))
-					.collect(Collectors.toSet());
-			if (parameters != null && parameters.size() > 0) {
-				collectMojoParametersDefaultCompletion(request, parameters)
-				.forEach(response::addCompletionItem);
-				if (parameters.stream()
-						.anyMatch(p -> !p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC))) {
-					// Show all files
-					collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
 				} else {
-					// Show only directories
-					collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+					// TODO localRepo
+					// TODO remoteRepos
 				}
-			}
-		}				
-		if (!allArtifactInfos.isEmpty()) {
-			Comparator<ArtifactWithDescription> artifactInfoComparator = Comparator
-					.comparing(artifact -> new DefaultArtifactVersion(artifact.artifact.getVersion()));
-			final Comparator<ArtifactWithDescription> highestVersionWithDescriptionComparator = artifactInfoComparator
-					.thenComparing(
-							artifactInfo -> artifactInfo.description != null ? artifactInfo.description : "");
-			allArtifactInfos.stream()
-					.collect(Collectors.groupingBy(artifact -> artifact.artifact.getGroupId() + ":" + artifact.artifact.getArtifactId()))
-					.values().stream()
-					.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
-					.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
-					.filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
+				break;
+			case GOAL_ELT:
+				collectGoals(request).forEach(response::addCompletionItem);
+				break;
+			case PACKAGING_ELT:
+				collectPackaging(request).forEach(response::addCompletionItem);
+				break;
+			default:
+				Set<MojoParameter> parameters = MavenPluginUtils.collectPluginConfigurationMojoParameters(request, plugin)
+						.stream().filter(p -> p.name.equals(parent.getLocalName()))
+						.filter(p -> (p.type.startsWith(FILE_TYPE)) || 
+								(p.type.startsWith(STRING_TYPE) && p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC)))
+						.collect(Collectors.toSet());
+				if (parameters != null && parameters.size() > 0) {
+					collectMojoParametersDefaultCompletion(request, parameters)
 					.forEach(response::addCompletionItem);
-		}
-		if (request.getNode().isText()) {
-			completeProperties(request).forEach(response::addCompletionAttribute);
+					if (parameters.stream()
+							.anyMatch(p -> !p.name.toLowerCase().endsWith(DIRECTORY_STRING_LC))) {
+						// Show all files
+						collectRelativeAnyPathCompletion(request).forEach(response::addCompletionItem);
+					} else {
+						// Show only directories
+						collectRelativeDirectoryPathCompletion(request).forEach(response::addCompletionItem);
+					}
+				}
+			}				
+			if (!allArtifactInfos.isEmpty()) {
+				Comparator<ArtifactWithDescription> artifactInfoComparator = Comparator
+						.comparing(artifact -> new DefaultArtifactVersion(artifact.artifact.getVersion()));
+				final Comparator<ArtifactWithDescription> highestVersionWithDescriptionComparator = artifactInfoComparator
+						.thenComparing(
+								artifactInfo -> artifactInfo.description != null ? artifactInfo.description : "");
+				allArtifactInfos.stream()
+						.collect(Collectors.groupingBy(artifact -> artifact.artifact.getGroupId() + ":" + artifact.artifact.getArtifactId()))
+						.values().stream()
+						.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
+						.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
+						.filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
+						.forEach(response::addCompletionItem);
+			}
+			if (request.getNode().isText()) {
+				completeProperties(request).forEach(response::addCompletionAttribute);
+			}
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML completion from LemMinX
 		}
 	}
 	

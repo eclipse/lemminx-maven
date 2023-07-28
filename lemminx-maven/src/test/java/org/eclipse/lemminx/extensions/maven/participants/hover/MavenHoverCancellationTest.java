@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.CancelCheckerCallCounter;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.PhaseCancelChecker;
@@ -38,7 +39,7 @@ public class MavenHoverCancellationTest {
 
 	@BeforeEach
 	public void setUp() throws IOException {
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 	}
 
 	@AfterEach

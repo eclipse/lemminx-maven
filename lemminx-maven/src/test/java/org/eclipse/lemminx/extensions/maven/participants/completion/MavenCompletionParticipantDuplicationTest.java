@@ -29,6 +29,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
+
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils;
 import org.eclipse.lemminx.services.XMLLanguageService;
@@ -45,7 +47,7 @@ public class MavenCompletionParticipantDuplicationTest {
 	@BeforeAll
 	public static void setUp() throws IOException, URISyntaxException {
 		RemoteCentralRepositorySearcher.disableCentralSearch = false;
-		languageService = new XMLLanguageService();
+		languageService = new MavenLanguageService();
 
 		// "Build" test project - instead of real build we'll
 		// set up the local repository with a required test artifact

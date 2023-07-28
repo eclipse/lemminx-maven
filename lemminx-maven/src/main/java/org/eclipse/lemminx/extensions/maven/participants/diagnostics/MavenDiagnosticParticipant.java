@@ -31,6 +31,7 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
 import org.eclipse.lsp4j.Diagnostic;
@@ -54,50 +55,54 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 			return;
 		}
 
-		Collection<ModelProblem> problems = plugin.getProjectCache().getProblemsFor(xmlDocument);
-		if (problems != null) {
-			problems.stream().map(this::toDiagnostic).forEach(diagnostics::add);
-		}
-		
-		cancelChecker.checkCanceled();
-		DOMElement documentElement = xmlDocument.getDocumentElement();
-		if (documentElement == null) {
-			return;
-		}
-		Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions(cancelChecker);
-
-		// Validate project element
-		cancelChecker.checkCanceled();
-		if (PROJECT_ELT.equals(documentElement.getNodeName())) {
-			ProjectValidator projectValidator = new ProjectValidator(plugin, cancelChecker);
-			projectValidator.validateProject(new DiagnosticRequest(documentElement, xmlDocument))
-				.ifPresent(diagnosticList ->{
-						cancelChecker.checkCanceled();
-						diagnostics.addAll(diagnosticList.stream()
-							.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
-					});
-		}
-		
-		cancelChecker.checkCanceled();
-		Deque<DOMNode> nodes = new ArrayDeque<>();
-		documentElement.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
-		while (!nodes.isEmpty()) {
+		try {
+			Collection<ModelProblem> problems = plugin.getProjectCache().getProblemsFor(xmlDocument);
+			if (problems != null) {
+				problems.stream().map(this::toDiagnostic).forEach(diagnostics::add);
+			}
+			
 			cancelChecker.checkCanceled();
-			DOMNode node = nodes.pop();
-			String nodeName = node.getLocalName(); 
-			if (nodeName != null) {
-				tagDiagnostics.entrySet().stream().filter(entry -> nodeName.equals(entry.getKey()))
-					.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
-					.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
-						cancelChecker.checkCanceled();
-						diagnostics.addAll(diagnosticList.stream()
+			DOMElement documentElement = xmlDocument.getDocumentElement();
+			if (documentElement == null) {
+				return;
+			}
+			Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions(cancelChecker);
+	
+			// Validate project element
+			cancelChecker.checkCanceled();
+			if (PROJECT_ELT.equals(documentElement.getNodeName())) {
+				ProjectValidator projectValidator = new ProjectValidator(plugin, cancelChecker);
+				projectValidator.validateProject(new DiagnosticRequest(documentElement, xmlDocument))
+					.ifPresent(diagnosticList ->{
+							cancelChecker.checkCanceled();
+							diagnostics.addAll(diagnosticList.stream()
 								.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
-					});;
+						});
 			}
+			
 			cancelChecker.checkCanceled();
-			if (node.hasChildNodes()) {
-				node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
+			Deque<DOMNode> nodes = new ArrayDeque<>();
+			documentElement.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
+			while (!nodes.isEmpty()) {
+				cancelChecker.checkCanceled();
+				DOMNode node = nodes.pop();
+				String nodeName = node.getLocalName(); 
+				if (nodeName != null) {
+					tagDiagnostics.entrySet().stream().filter(entry -> nodeName.equals(entry.getKey()))
+						.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
+						.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
+							cancelChecker.checkCanceled();
+							diagnostics.addAll(diagnosticList.stream()
+									.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
+						});;
+				}
+				cancelChecker.checkCanceled();
+				if (node.hasChildNodes()) {
+					node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
+				}
 			}
+		} catch(MavenInitializationException e) {
+			// Maven is initializing, catch the error to avoid breaking XML diagnostics from LemMinX
 		}
 	}
 
