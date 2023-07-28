@@ -47,7 +47,7 @@ public class MavenProjectCacheTest {
 		String content = Files.readString(new File(uri).toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -60,7 +60,7 @@ public class MavenProjectCacheTest {
 		String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
 		DOMDocument doc = new DOMDocument(new TextDocument(content, uri.toString()), null);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
 		assertNotNull(project);
@@ -70,7 +70,7 @@ public class MavenProjectCacheTest {
 	public void testParentChangeReflectedToChild()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 		MavenProjectCache cache = plugin.getProjectCache();
 		DOMDocument doc = getDocument("/pom-with-properties-in-parent.xml");
 		MavenProject project = cache.getLastSuccessfulMavenProject(doc);
@@ -151,7 +151,7 @@ public class MavenProjectCacheTest {
 	public void testNormilizePathsAreUsedInCache()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException, Exception {
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
-		plugin.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 		MavenProjectCache cache = plugin.getProjectCache();
 		
 		int initialProjectsSize = cache.getProjects().size();

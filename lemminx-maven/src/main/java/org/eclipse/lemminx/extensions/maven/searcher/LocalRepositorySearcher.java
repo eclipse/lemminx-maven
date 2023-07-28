@@ -26,6 +26,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,6 +38,7 @@ import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 
 public class LocalRepositorySearcher {
 
@@ -46,7 +50,7 @@ public class LocalRepositorySearcher {
 		this.localRepository = localRepository;
 	}
 
-	private Map<File, Collection<Artifact>> cache = new HashMap<>();
+	private Map<File, CompletableFuture<Collection<Artifact>>> cache = new HashMap<>();
 	private WatchKey watchKey;
 	private WatchService watchService;
 
@@ -58,35 +62,62 @@ public class LocalRepositorySearcher {
 		return getLocalPluginArtifacts().stream().map(Artifact::getGroupId).distinct().collect(Collectors.toSet());
 	}
 
-	public Collection<Artifact> getLocalPluginArtifacts() throws IOException {
+	public Collection<Artifact> getLocalPluginArtifacts()  {
 		return getLocalArtifactsLastVersion().stream().filter(gav -> gav.getArtifactId().contains("-plugin")).collect(Collectors.toSet());
 	}
 
-	public Collection<Artifact> getLocalArtifactsLastVersion() throws IOException {
-		Collection<Artifact> res = cache.get(localRepository);
-		if (res == null) {
-			res = computeLocalArtifacts();
-			Path localRepoPath = localRepository.toPath();
-			watchService = localRepoPath.getFileSystem().newWatchService();
-			watchKey = localRepoPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
-			new Thread(() -> {
-				WatchKey key;
+	public Collection<Artifact> getLocalArtifactsLastVersion() {
+		CompletableFuture<Collection<Artifact>> loadLocalArtifacts = cache.get(localRepository);
+		if (loadLocalArtifacts == null || loadLocalArtifacts.isCompletedExceptionally()) {
+			// Load local artifacts on background
+			loadLocalArtifacts = CompletableFuture.supplyAsync(() -> {
 				try {
+					return computeLocalArtifacts();
+				} catch (IOException e) {
+					throw new CompletionException(e);
+				}
+			});
+			
+			// Update the cache
+			cache.put(localRepository, loadLocalArtifacts);
+			
+			if (MavenLemminxExtension.isUnitTestMode()) {
+				try {
+					loadLocalArtifacts.get();
+				} catch (InterruptedException | ExecutionException e) {
+					Thread.currentThread().interrupt();
+				}
+			}
+			
+			// Once the local artifacts are loaded, we track the local repository to update the cache.
+			loadLocalArtifacts.thenAcceptAsync(artifacts -> {	
+				try {
+				Path localRepoPath = localRepository.toPath();
+				watchService = localRepoPath.getFileSystem().newWatchService();
+				watchKey = localRepoPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
+				
+				WatchKey key;
+				
 					while ((key = (watchService != null ? watchService.take() : null)) != null) {
 						if (watchKey.equals(key)) {
 							cache.remove(localRepository);
 							key.reset();
 						}
 					}
+				} catch(IOException e) {
+					LOGGER.log(Level.SEVERE, "Local repo thread watcher error", e);
 				} catch (ClosedWatchServiceException e) {
 					LOGGER.log(Level.WARNING, "Local repo thread watcher is closed");
 				} catch (InterruptedException e) {
 					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
 				}
-			}).start();
-			cache.put(localRepository, res);
+			});					
 		}
-		return res;
+		if (loadLocalArtifacts.isDone()) {
+			return loadLocalArtifacts.getNow(Collections.emptyList());
+		}
+		// The local artifacts search is not finished, returns an empty list
+		return Collections.emptyList();
 	}
 
 	public Collection<Artifact> computeLocalArtifacts() throws IOException {

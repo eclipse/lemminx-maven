@@ -15,6 +15,7 @@ import java.io.OutputStream;
 import java.util.concurrent.CancellationException;
 
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 /**
@@ -121,7 +122,9 @@ class DOMInputStream extends ByteArrayInputStream {
 
 	private void checkCanceled() {
 		if (cancelChecker != null) {
-			cancelChecker.checkCanceled();
+			if(cancelChecker.isCanceled()) {
+				throw new MavenModelOutOfDatedException();
+			}
 		}
 	}
 

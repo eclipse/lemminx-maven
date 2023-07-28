@@ -226,18 +226,13 @@ public class MavenPluginUtils {
 		
 		cancelChecker.checkCanceled();
 		if (pluginDescriptor == null && "0.0.1-SNAPSHOT".equals(plugin.getVersion())) { // probably missing or not parsed version
-			Optional<DefaultArtifactVersion> version = Optional.empty();
-			final Plugin thePlugin = plugin;
-			try {
-				version = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
-					.filter(gav -> thePlugin.getArtifactId().equals(gav.getArtifactId()))
-					.filter(gav -> thePlugin.getGroupId().equals(gav.getGroupId()))
-					.map(Artifact::getVersion) //
-					.map(DefaultArtifactVersion::new) //
-					.collect(Collectors.maxBy(Comparator.naturalOrder()));
-			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			}
+			final Plugin thePlugin = plugin;			
+			Optional<DefaultArtifactVersion> version = lemminxMavenPlugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
+				.filter(gav -> thePlugin.getArtifactId().equals(gav.getArtifactId()))
+				.filter(gav -> thePlugin.getGroupId().equals(gav.getGroupId()))
+				.map(Artifact::getVersion) //
+				.map(DefaultArtifactVersion::new) //
+				.collect(Collectors.maxBy(Comparator.naturalOrder()));			
 			
 			cancelChecker.checkCanceled();
 			if (version.isPresent()) {

@@ -55,6 +55,7 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MarkdownUtils;
@@ -91,8 +92,10 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 			if (DOMUtils.isADescendantOf(request.getNode(), CONFIGURATION_ELT)) {
 				return collectPluginConfiguration(request, cancelChecker);
 			}
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML hover from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML hover from LemMinX
 		}
 		return null;
 	}
@@ -155,8 +158,10 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 				// TODO consider incomplete GAV (eg plugins), by querying the "key" against project
 				default -> null;
 				};
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML hover from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML hover from LemMinX
 		}
 		return null;
 	}

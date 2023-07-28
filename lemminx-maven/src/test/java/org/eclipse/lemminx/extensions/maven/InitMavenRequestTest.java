@@ -35,7 +35,7 @@ public class InitMavenRequestTest {
 	
 	@BeforeAll
 	public static void setUp() {
-		MavenLemminxExtension.initializeMavenOnBackground = false;
+		MavenLemminxExtension.setUnitTestMode(true);
 	}
 	
 	@Test

@@ -8,18 +8,15 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
-import org.eclipse.lemminx.services.XMLLanguageService;
+import java.util.concurrent.CancellationException;
 
 /**
- * Extends {@link XMLLanguageService} to do the Maven initialization synchronously.
+ * Exception thrown when Maven model which is parsing is out of dated.
  * 
  * @author Angelo ZERR
  *
  */
-public class MavenLanguageService extends XMLLanguageService{
-	
-	public MavenLanguageService() {
-		MavenLemminxExtension.setUnitTestMode(true);
-	}
+
+public class MavenModelOutOfDatedException extends CancellationException {
 
 }

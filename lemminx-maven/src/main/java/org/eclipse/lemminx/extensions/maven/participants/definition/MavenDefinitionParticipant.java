@@ -33,6 +33,7 @@ import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.extensions.IDefinitionParticipant;
@@ -177,8 +178,10 @@ public class MavenDefinitionParticipant implements IDefinitionParticipant {
 					return;
 				}
 			}
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML definition from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML definition from LemMinX
 		}
 	}
 	

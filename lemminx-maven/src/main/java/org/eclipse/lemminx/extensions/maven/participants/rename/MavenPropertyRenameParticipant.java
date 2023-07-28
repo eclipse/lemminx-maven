@@ -31,6 +31,7 @@ import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.dom.DOMText;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.extensions.rename.IPrepareRenameRequest;
@@ -96,8 +97,10 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 	
 			cancelChecker.checkCanceled();
 			return properties.get(propertyName) == null ? null : Either.forLeft(propertyRange);
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML prepare rename from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML prepare rename from LemMinX
 			return null;
 		}
 	}
@@ -171,8 +174,10 @@ public class MavenPropertyRenameParticipant implements IRenameParticipant {
 						projectDocumentt.getTextDocument().getUri(), projectDocumentt.getTextDocument().getVersion());
 				renameResponse.addTextDocumentEdit(new TextDocumentEdit(projectVersionedTextDocumentIdentifier, projectTextEdits));		
 			});
-		} catch(MavenInitializationException e) {
-			// Maven is initializing, catch the error to avoid breaking XML rename from LemMinX
+		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+			// - Maven is initializing
+			// - or parse of maven model with DOM document is out of dated
+			// -> catch the error to avoid breaking XML rename from LemMinX
 		
 		}
 	}
