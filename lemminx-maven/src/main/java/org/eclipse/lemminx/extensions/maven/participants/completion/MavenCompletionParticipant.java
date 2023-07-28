@@ -96,6 +96,7 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.lemminx.commons.BadLocationException;
+import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
@@ -454,6 +455,22 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				}
 			}				
 			if (!allArtifactInfos.isEmpty()) {
+				// As artifact list can be very big (around 4000 artifacts), to keep good performance, we filter it before sending to the LSP client
+				// by checking that artifact id contains one of character of the computed completion prefix.
+				// ex : org| will filter if the artifact contains 'o', 'r', or 'g' 
+				
+				// 1. extract the completion prefix.
+				char prefix[] = null;
+				TextDocument textDocument = request.getXMLDocument().getTextDocument();
+				final Range replaceRange = textDocument.getWordRangeAt(request.getOffset(), ARTIFACT_ID_PATTERN);
+				if (replaceRange != null) {
+					int start = textDocument.offsetAt(replaceRange.getStart());
+					int end = textDocument.offsetAt(replaceRange.getEnd());
+					prefix = textDocument.getText().substring(start, end).toCharArray();
+				}
+				final char completionPrefix[] = prefix;
+				
+				// 2. loop for each collected artifact by checking that artifact id matches the completion prefix.
 				Comparator<ArtifactWithDescription> artifactInfoComparator = Comparator
 						.comparing(artifact -> new DefaultArtifactVersion(artifact.artifact.getVersion()));
 				final Comparator<ArtifactWithDescription> highestVersionWithDescriptionComparator = artifactInfoComparator
@@ -463,7 +480,8 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.collect(Collectors.groupingBy(artifact -> artifact.artifact.getGroupId() + ":" + artifact.artifact.getArtifactId()))
 						.values().stream()
 						.map(artifacts -> Collections.max(artifacts, highestVersionWithDescriptionComparator))
-						.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, gavInsertionStrategy))
+						.filter(artifactInfo -> isMatchCompletionPrefix(artifactInfo.artifact.getArtifactId(), completionPrefix))
+						.map(artifactInfo -> toGAVCompletionItem(artifactInfo, request, replaceRange, gavInsertionStrategy))
 						.filter(completionItem -> !response.hasAttribute(completionItem.getLabel()))
 						.forEach(response::addCompletionItem);
 			}
@@ -475,6 +493,18 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 	}
 	
+	private static boolean isMatchCompletionPrefix(String completionItemText, char[] completionPrefix) {
+		if (completionPrefix == null || completionPrefix.length == 0) {
+			return true;
+		}
+		for (char c : completionPrefix) {
+			if (completionItemText.indexOf(c) != -1) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private CompletionItem toTextCompletionItem(ICompletionRequest request, String text) throws BadLocationException {
 		CompletionItem res = new CompletionItem(text);
 		res.setFilterText(text);
@@ -657,7 +687,7 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		}
 	}
 
-	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,
+	private CompletionItem toGAVCompletionItem(ArtifactWithDescription artifactInfo, ICompletionRequest request,Range replaceRange,
 			GAVInsertionStrategy strategy) {
 		boolean hasGroupIdSet = DOMUtils.findChildElementText(request.getParentElement().getParentElement(), GROUP_ID_ELT).isPresent() 
 						|| DOMUtils.findChildElementText(request.getParentElement(), GROUP_ID_ELT).isPresent();
@@ -670,15 +700,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		if (artifactInfo.description != null) {
 			item.setDocumentation(artifactInfo.description);
 		}
-		DOMDocument doc = request.getXMLDocument();
-		Range replaceRange = doc.getTextDocument().getWordRangeAt(request.getOffset(), ARTIFACT_ID_PATTERN);
-
+		
 		TextEdit textEdit = new TextEdit();
 		item.setTextEdit(Either.forLeft(textEdit));
 		textEdit.setRange(replaceRange);
 		if (strategy == GAVInsertionStrategy.ELEMENT_VALUE_AND_SIBLING) {
 			item.setKind(CompletionItemKind.Value);
-			textEdit.setRange(replaceRange);
 			switch (request.getParentElement().getLocalName()) {
 			case ARTIFACT_ID_ELT:
 				item.setLabel(artifactInfo.artifact.getArtifactId()
@@ -739,7 +766,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			item.setKind(CompletionItemKind.Struct);
 			item.setFilterText(artifactInfo.artifact.getArtifactId());
 			try {
-				textEdit.setRange(replaceRange);
 				String newText = "";
 				String suffix = "";
 				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
@@ -1245,16 +1271,14 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getGroupId(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-			;
+				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		case VERSION_ELT:
 			plugin.getCurrentWorkspaceProjects().stream() //
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getVersion(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-			;
+				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		}
 	}
