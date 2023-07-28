@@ -325,6 +325,10 @@ public class ParticipantUtils {
 
 		int propertyOffset = tag.getStart();
 		int beforeHover = offset - propertyOffset;
+		if (beforeHover > tagText.length()) {
+			return null;
+		}
+		
 		try {
 			String beforeHoverText = tagText.substring(0, beforeHover);
 			String afterHoverText = tagText.substring(beforeHover);
