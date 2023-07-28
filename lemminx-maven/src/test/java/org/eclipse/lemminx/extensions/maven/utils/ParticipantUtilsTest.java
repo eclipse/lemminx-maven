@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(NoMavenCentralExtension.class)
 public class ParticipantUtilsTest {
-	private XMLLanguageService languageService;
+	private MavenLanguageService languageService;
 
 	@BeforeEach
 	public void setUp() throws IOException {
@@ -53,8 +53,12 @@ public class ParticipantUtilsTest {
 
 	@Test
 	public void testResolveValueWithProperties() throws IOException, URISyntaxException {
-		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
 		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+
+		DOMDocument document = createDOMDocument("/pom-with-properties.xml", languageService);
+		languageService.didOpen(document);
+		
 		MavenProjectCache cache = plugin.getProjectCache();
 		MavenProject project = cache.getLastSuccessfulMavenProject(document);
 		assertNotNull(project);

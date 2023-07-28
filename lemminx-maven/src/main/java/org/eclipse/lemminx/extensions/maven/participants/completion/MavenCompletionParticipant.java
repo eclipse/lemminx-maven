@@ -294,8 +294,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					// TODO if artifactId is set and match existing content, suggest only matching
 					// groupId
@@ -320,8 +318,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					if (filesystem.isPresent()) {
 						filesystem.map(ArtifactWithDescription::new).ifPresent(allArtifactInfos::add);
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					allArtifactInfos.addAll((isPlugin ? plugin.getLocalRepositorySearcher().getLocalPluginArtifacts()
 							: plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion()).stream()
@@ -341,8 +337,6 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 						.ifPresent(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
 					}
-					// TODO localRepo
-					// TODO remoteRepos
 				} else {
 					if (artifactId.isPresent()) {
 						plugin.getLocalRepositorySearcher().getLocalArtifactsLastVersion().stream()
@@ -1273,20 +1267,20 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 
 		switch (parent.getLocalName()) {
 		case ARTIFACT_ID_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(a -> groupIdFilter == null || groupIdFilter.equals(a.getGroupId()))
 				.map(ArtifactWithDescription::new) //
 				.forEach(artifactInfosCollector::add);
 			break;
 		case GROUP_ID_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getGroupId(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
 				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		case VERSION_ELT:
-			plugin.getCurrentWorkspaceProjects().stream() //
+			plugin.getCurrentWorkspaceProjects(false).stream() //
 				.filter(p -> artifactIdFilter == null || artifactIdFilter.equals(p.getArtifactId())) //
 				.map(p -> toCompletionItem(p.getVersion(), null, range)) //
 				.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))

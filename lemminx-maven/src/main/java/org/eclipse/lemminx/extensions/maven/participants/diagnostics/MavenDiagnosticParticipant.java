@@ -20,7 +20,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
@@ -46,6 +50,8 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
+	
+	private static final Logger LOGGER = Logger.getLogger(MavenDiagnosticParticipant.class.getName());
 
 	private final MavenLemminxExtension plugin;
 
@@ -61,7 +67,23 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 
 		try {
-			LoadedMavenProject loadedMavenProject = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			CompletableFuture<LoadedMavenProject> project = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			if (MavenLemminxExtension.isUnitTestMode()) {			
+				try {
+					project.get();
+				} catch (InterruptedException | ExecutionException e) {
+					LOGGER.log(Level.SEVERE, e.getMessage(), e);
+				}
+			}
+			if (!project.isDone()) {
+				// The pom.xml takes some times to load it, to avoid blocking the XML syntax validation, XML validation based on XSD
+				// we retrigger the validation when the pom.xml is loaded.
+				project
+					.thenAccept( unused -> plugin.getValidationService().validate(xmlDocument));
+				return;
+			}
+
+			LoadedMavenProject loadedMavenProject = project.getNow(null);
 			Collection<ModelProblem> problems = loadedMavenProject != null ? loadedMavenProject.getProblems() : null;
 			if (problems != null) {
 				problems
