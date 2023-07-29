@@ -191,6 +191,11 @@ public class LocalRepositorySearcher {
 	}
 
 	public void stop() {
+		// Stop the thread which collects local repository artifacts
+		cache
+			.values()
+			.forEach(f -> f.cancel(true));
+		// Close the watch service which tracks the local repository.
 		if (watchService != null && watchKey != null) {
 			watchKey.cancel();
 			try {
