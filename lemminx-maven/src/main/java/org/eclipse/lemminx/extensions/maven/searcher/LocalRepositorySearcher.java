@@ -13,6 +13,7 @@ import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.isWell
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,14 +22,15 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -38,23 +40,32 @@ import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.lemminx.commons.progress.ProgressMonitor;
+import org.eclipse.lemminx.commons.progress.ProgressSupport;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 
+/**
+ * Search for collecting artifacts from the local repository /.m2
+ *
+ */
 public class LocalRepositorySearcher {
 
 	private static final Logger LOGGER = Logger.getLogger(LocalRepositorySearcher.class.getName());
 
 	private final File localRepository;
 
-	public LocalRepositorySearcher(File localRepository) {
-		this.localRepository = localRepository;
-	}
+	private final ProgressSupport progressSupport;
 
 	private Map<File, CompletableFuture<Collection<Artifact>>> cache = new HashMap<>();
 	private WatchKey watchKey;
 	private WatchService watchService;
+
+	public LocalRepositorySearcher(File localRepository, ProgressSupport progressSupport) {
+		this.localRepository = localRepository;
+		this.progressSupport = progressSupport;
+	}
 
 	public Set<String> searchGroupIds() throws IOException {
 		return getLocalArtifactsLastVersion().stream().map(Artifact::getGroupId).distinct().collect(Collectors.toSet());
@@ -134,8 +145,38 @@ public class LocalRepositorySearcher {
 
 	private Collection<Artifact> computeLocalArtifacts(CancelChecker cancelChecker) throws IOException {
 		final Path repoPath = localRepository.toPath();
+		ProgressMonitor progressMonitor = progressSupport != null ? progressSupport.createProgressMonitor() : null;
+		if (progressMonitor != null) {
+			progressMonitor.begin("Loading local artifacts from '" + repoPath, null, 100, null);
+		}
 		Map<String, Artifact> groupIdArtifactIdToVersion = new HashMap<>();
-		Files.walkFileTree(repoPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
+		try {
+			List<Path> subPaths = getSubDirectories(repoPath);
+			int increment = Math.round(100f / subPaths.size());
+			int i = 0;
+			for (Path path : subPaths) {
+				cancelChecker.checkCanceled();
+				if (progressMonitor != null) {					
+					progressMonitor.report("scanning folder' " + path.getFileName().getName(0) + "' (" + i++ + "/" + subPaths.size() +  ")...", increment++, null);
+				}
+				try {
+					collect(path, repoPath, groupIdArtifactIdToVersion, cancelChecker);
+				}
+				catch(IOException e) {
+					LOGGER.log(Level.SEVERE, "Error while scanning local repo folder " + path, e);
+				}
+			}
+		} finally {
+			if (progressMonitor != null) {
+				progressMonitor.end(null);
+			}
+		}
+		return groupIdArtifactIdToVersion.values();
+	}
+
+	private void collect(final Path currentPath, final Path repoPath, Map<String, Artifact> groupIdArtifactIdToVersion,
+			CancelChecker cancelChecker) throws IOException {
+		Files.walkFileTree(currentPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
 				if (file.getFileName().toString().charAt(0) == '.') {
@@ -174,7 +215,20 @@ public class LocalRepositorySearcher {
 				return FileVisitResult.SKIP_SUBTREE;
 			}
 		});
-		return groupIdArtifactIdToVersion.values();
+	}
+	
+	private static List<Path> getSubDirectories(Path directoryPath) {
+		List<Path> subDirectories = new ArrayList<>();
+		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(directoryPath)) {
+			for (Path entry : directoryStream) {
+				if (Files.isDirectory(entry)) {
+					subDirectories.add(entry);
+				}
+			}
+		} catch (IOException e) {
+			// Do nothing		
+		}
+		return subDirectories;
 	}
 
 	// TODO consider using directly ArtifactRepository for those 2 methods
