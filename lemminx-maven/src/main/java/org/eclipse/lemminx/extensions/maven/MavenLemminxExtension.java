@@ -104,6 +104,8 @@ import org.eclipse.lemminx.settings.InitializationOptionsSettings;
 import org.eclipse.lemminx.uriresolver.URIResolverExtensionManager;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.WorkspaceFolder;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 
 /**
  * Extension for pom.xml.
@@ -204,44 +206,77 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private synchronized CompletableFuture<Void> getMavenInitializer() {
-		// Create thread which loads Maven component (plexus container, maven session, etc) which can take some time.
-		// We do this initialization on background to avoid breaking the XML syntax validation, XML based onXSD, XML completion based on XSD
+	private CompletableFuture<Void> getMavenInitializer() {
+		if (mavenInitializer != null) {
+			return mavenInitializer;
+		}
+		return getOrCreateMavenInitializer();
+	}
+	
+	private synchronized CompletableFuture<Void> getOrCreateMavenInitializer() {
+		if (mavenInitializer != null) {
+			return mavenInitializer;
+		}
+		// Create thread which loads Maven component (plexus container, maven session,
+		// etc) which can take some time.
+		// We do this initialization on background to avoid breaking the XML syntax
+		// validation, XML based onXSD, XML completion based on XSD
 		// while Maven component is initializing.
 		if (mavenInitializer == null) {
-			mavenInitializer = CompletableFuture.runAsync(() -> {
-				try {
-					this.container = newPlexusContainer();
-					mavenRequest = initMavenRequest(container, settings);
-					DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
-					RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
-					MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
-					// TODO: MavenSession is deprecated. Investigate for alternative
-					mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-					cache = new MavenProjectCache(mavenSession);
-					localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-					if (!settings.getCentral().isSkip()) {
-						centralSearcher = new RemoteCentralRepositorySearcher();
-					}
-					buildPluginManager = null;
-					mavenPluginManager = container.lookup(MavenPluginManager.class);
-					buildPluginManager = container.lookup(BuildPluginManager.class);
-					internalDidChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
-				} catch (Exception e) {
-					LOGGER.log(Level.SEVERE, e.getMessage(), e);
-					stop(currentRegistry);
-				}
-			});
-		}
-		if (isUnitTestMode()) {
-			// This code is for tests
-			try {
-				mavenInitializer.get();
-			} catch (InterruptedException | ExecutionException e) {
-				Thread.currentThread().interrupt();
-			}
+			if (isUnitTestMode()) {
+				doInitialize(() -> {});
+				mavenInitializer = CompletableFuture.completedFuture(null);
+			} else
+				mavenInitializer = CompletableFutures.computeAsync(cancelChecker -> {
+					doInitialize(cancelChecker);
+					return null;
+				});
 		}
 		return mavenInitializer;
+	}
+
+	private void doInitialize(CancelChecker cancelChecker) {
+		try {
+			// Step1 : initialize Plexus container
+			cancelChecker.checkCanceled();
+			this.container = newPlexusContainer();
+			
+			// Step2 : initialize Maven request
+			cancelChecker.checkCanceled();
+			mavenRequest = initMavenRequest(container, settings);
+			
+			// Step3 : initialize Repository system session
+			cancelChecker.checkCanceled();
+			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
+			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
+			
+			// Step4 : initialize Maven session
+			cancelChecker.checkCanceled();
+			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
+			// TODO: MavenSession is deprecated. Investigate for alternative
+			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
+			cache = new MavenProjectCache(mavenSession);
+			
+			// Step5 : create local repository searcher
+			cancelChecker.checkCanceled();
+			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
+			
+			if (!settings.getCentral().isSkip()) {
+				// Step6 : create central repository searcher
+				cancelChecker.checkCanceled();
+				centralSearcher = new RemoteCentralRepositorySearcher();
+			}
+			buildPluginManager = null;
+			mavenPluginManager = container.lookup(MavenPluginManager.class);
+			buildPluginManager = container.lookup(BuildPluginManager.class);
+			
+			// Step7 : initializing Workspace readers
+			cancelChecker.checkCanceled();
+			internalDidChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+			stop(currentRegistry);
+		}
 	}
 
 	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
