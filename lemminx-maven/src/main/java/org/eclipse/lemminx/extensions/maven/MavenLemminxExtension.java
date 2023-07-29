@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -74,6 +73,8 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.lemminx.commons.TextDocument;
+import org.eclipse.lemminx.commons.progress.ProgressMonitor;
+import org.eclipse.lemminx.commons.progress.ProgressSupport;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMParser;
 import org.eclipse.lemminx.extensions.maven.participants.codeaction.ExtractPropertyCodeAction;
@@ -147,6 +148,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
 	private CompletableFuture<Void> mavenInitializer;
 
+	private ProgressSupport progressSupport;
+
 	@Override
 	public void doSave(ISaveContext context) {
 		if (context.getType() == SaveContextType.SETTINGS) {
@@ -177,6 +180,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		this.currentRegistry = registry;
 		this.resolverExtensionManager = registry.getResolverExtensionManager();
+		this.progressSupport = registry.getProgressSupport();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
@@ -207,7 +211,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	private CompletableFuture<Void> getMavenInitializer() {
-		if (mavenInitializer != null) {
+		if (mavenInitializer != null && !mavenInitializer.isCompletedExceptionally()) {
 			return mavenInitializer;
 		}
 		return getOrCreateMavenInitializer();
@@ -236,47 +240,115 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	private void doInitialize(CancelChecker cancelChecker) {
+		Exception error = null;
+		ProgressMonitor progressMonitor = progressSupport != null ? progressSupport.createProgressMonitor() : null;
 		try {
+			if (progressMonitor != null) {
+				progressMonitor.begin("Loading Maven components...", "", 100, null);
+			}
+			boolean skipCentralRepository = settings.getCentral().isSkip();
+			int nbSteps = 7 - (skipCentralRepository ? 1 : 0);
+			int currentStep = 1;
+			int percentage = 15;
+
 			// Step1 : initialize Plexus container
 			cancelChecker.checkCanceled();
+			if (progressMonitor != null) {
+				progressMonitor.report("Initializing Plexus container" + getStepMessage(currentStep, nbSteps) + "...",
+						percentage, null);
+			}
 			this.container = newPlexusContainer();
-			
+
 			// Step2 : initialize Maven request
 			cancelChecker.checkCanceled();
+			if (progressMonitor != null) {
+				currentStep++;
+				percentage += 15;
+				progressMonitor.report("Initializing Maven request" + getStepMessage(currentStep, nbSteps) + "...",
+						percentage, null);
+			}
 			mavenRequest = initMavenRequest(container, settings);
-			
+
 			// Step3 : initialize Repository system session
 			cancelChecker.checkCanceled();
-			DefaultRepositorySystemSessionFactory repositorySessionFactory = container.lookup(DefaultRepositorySystemSessionFactory.class);
-			RepositorySystemSession repositorySystemSession = repositorySessionFactory.newRepositorySession(mavenRequest);
-			
+			if (progressMonitor != null) {
+				currentStep++;
+				percentage += 15;
+				progressMonitor.report(
+						"Initializing Repository system session" + getStepMessage(currentStep, nbSteps) + "...",
+						percentage, null);
+			}
+			DefaultRepositorySystemSessionFactory repositorySessionFactory = container
+					.lookup(DefaultRepositorySystemSessionFactory.class);
+			RepositorySystemSession repositorySystemSession = repositorySessionFactory
+					.newRepositorySession(mavenRequest);
+
 			// Step4 : initialize Maven session
 			cancelChecker.checkCanceled();
+			if (progressMonitor != null) {
+				currentStep++;
+				percentage += 15;
+				progressMonitor.report("Initializing Maven session" + getStepMessage(currentStep, nbSteps) + "...",
+						percentage, null);
+			}
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
 			cache = new MavenProjectCache(mavenSession);
-			
+
 			// Step5 : create local repository searcher
 			cancelChecker.checkCanceled();
-			localRepositorySearcher = new LocalRepositorySearcher(mavenSession.getRepositorySession().getLocalRepository().getBasedir());
-			
-			if (!settings.getCentral().isSkip()) {
+			if (progressMonitor != null) {
+				currentStep++;
+				percentage += 15;
+				progressMonitor.report(
+						"Creating local repository searcher" + getStepMessage(currentStep, nbSteps) + "...", percentage,
+						null);
+			}
+			localRepositorySearcher = new LocalRepositorySearcher(
+					mavenSession.getRepositorySession().getLocalRepository().getBasedir(), progressSupport);
+
+			if (!skipCentralRepository) {
 				// Step6 : create central repository searcher
 				cancelChecker.checkCanceled();
+				if (progressMonitor != null) {
+					currentStep++;
+					percentage += 15;
+					progressMonitor.report(
+							"Creating central repository searcher" + getStepMessage(currentStep, nbSteps) + "...",
+							percentage, null);
+				}
 				centralSearcher = new RemoteCentralRepositorySearcher();
 			}
 			buildPluginManager = null;
 			mavenPluginManager = container.lookup(MavenPluginManager.class);
 			buildPluginManager = container.lookup(BuildPluginManager.class);
-			
+
 			// Step7 : initializing Workspace readers
 			cancelChecker.checkCanceled();
-			internalDidChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri).map(URI::create).toArray(URI[]::new), null);
+			if (progressMonitor != null) {
+				currentStep++;
+				percentage += 15;
+				progressMonitor.report("Initializing Workspace readers" + getStepMessage(currentStep, nbSteps) + "...",
+						percentage, null);
+			}
+			internalDidChangeWorkspaceFolders(this.initialWorkspaceFolders.stream().map(WorkspaceFolder::getUri)
+					.map(URI::create).toArray(URI[]::new), null);
 		} catch (Exception e) {
+			error = e;
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			stop(currentRegistry);
+		} finally {
+			if (progressMonitor != null) {
+				String message = error != null ? "Maven initialization terminated with error " + error.getMessage()
+						: "Maven initialization done";
+				progressMonitor.end(message);
+			}
 		}
+	}
+
+	private static String getStepMessage(int currentStep, int nbSteps) {
+		return " (" + currentStep + "/" + nbSteps + ")";
 	}
 
 	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
