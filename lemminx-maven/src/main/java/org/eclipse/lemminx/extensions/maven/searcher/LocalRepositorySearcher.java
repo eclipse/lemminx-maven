@@ -39,6 +39,8 @@ import org.apache.maven.model.Dependency;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 
 public class LocalRepositorySearcher {
 
@@ -69,49 +71,7 @@ public class LocalRepositorySearcher {
 	public Collection<Artifact> getLocalArtifactsLastVersion() {
 		CompletableFuture<Collection<Artifact>> loadLocalArtifacts = cache.get(localRepository);
 		if (loadLocalArtifacts == null || loadLocalArtifacts.isCompletedExceptionally()) {
-			// Load local artifacts on background
-			loadLocalArtifacts = CompletableFuture.supplyAsync(() -> {
-				try {
-					return computeLocalArtifacts();
-				} catch (IOException e) {
-					throw new CompletionException(e);
-				}
-			});
-			
-			// Update the cache
-			cache.put(localRepository, loadLocalArtifacts);
-			
-			if (MavenLemminxExtension.isUnitTestMode()) {
-				try {
-					loadLocalArtifacts.get();
-				} catch (InterruptedException | ExecutionException e) {
-					Thread.currentThread().interrupt();
-				}
-			}
-			
-			// Once the local artifacts are loaded, we track the local repository to update the cache.
-			loadLocalArtifacts.thenAcceptAsync(artifacts -> {	
-				try {
-				Path localRepoPath = localRepository.toPath();
-				watchService = localRepoPath.getFileSystem().newWatchService();
-				watchKey = localRepoPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
-				
-				WatchKey key;
-				
-					while ((key = (watchService != null ? watchService.take() : null)) != null) {
-						if (watchKey.equals(key)) {
-							cache.remove(localRepository);
-							key.reset();
-						}
-					}
-				} catch(IOException e) {
-					LOGGER.log(Level.SEVERE, "Local repo thread watcher error", e);
-				} catch (ClosedWatchServiceException e) {
-					LOGGER.log(Level.WARNING, "Local repo thread watcher is closed");
-				} catch (InterruptedException e) {
-					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
-				}
-			});					
+			loadLocalArtifacts = getOrCreateLocalArtifactsLastVersion();
 		}
 		if (loadLocalArtifacts.isDone()) {
 			return loadLocalArtifacts.getNow(Collections.emptyList());
@@ -120,20 +80,75 @@ public class LocalRepositorySearcher {
 		return Collections.emptyList();
 	}
 
-	public Collection<Artifact> computeLocalArtifacts() throws IOException {
+	private synchronized CompletableFuture<Collection<Artifact>> getOrCreateLocalArtifactsLastVersion() {
+		CompletableFuture<Collection<Artifact>> loadLocalArtifacts = cache.get(localRepository);
+		if (loadLocalArtifacts == null || loadLocalArtifacts.isCompletedExceptionally()) {
+			if (MavenLemminxExtension.isUnitTestMode()) {
+				try {
+					loadLocalArtifacts = CompletableFuture.completedFuture(computeLocalArtifacts(() -> {}));
+				} catch (IOException e) {
+					LOGGER.log(Level.SEVERE, "Local repo loading error", e);
+				}
+			} else {
+				// Load local artifacts on background
+				loadLocalArtifacts = CompletableFutures.computeAsync(cancelChecker -> {
+					try {
+						return computeLocalArtifacts(cancelChecker);
+					} catch (IOException e) {
+						throw new CompletionException(e);
+					}
+				});
+			}
+
+			// Update the cache
+			cache.put(localRepository, loadLocalArtifacts);
+
+			// Once the local artifacts are loaded, we track the local repository to update
+			// the cache.
+			loadLocalArtifacts.thenAcceptAsync(artifacts -> {
+				try {
+					Path localRepoPath = localRepository.toPath();
+					watchService = localRepoPath.getFileSystem().newWatchService();
+					watchKey = localRepoPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
+							StandardWatchEventKinds.ENTRY_DELETE);
+
+					WatchKey key;
+
+					while ((key = (watchService != null ? watchService.take() : null)) != null) {
+						if (watchKey.equals(key)) {
+							cache.remove(localRepository);
+							key.reset();
+						}
+					}
+				} catch (IOException e) {
+					LOGGER.log(Level.SEVERE, "Local repo thread watcher error", e);
+				} catch (ClosedWatchServiceException e) {
+					LOGGER.log(Level.WARNING, "Local repo thread watcher is closed");
+				} catch (InterruptedException e) {
+					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
+				}
+			});
+		}
+		return loadLocalArtifacts;
+	}
+
+	private Collection<Artifact> computeLocalArtifacts(CancelChecker cancelChecker) throws IOException {
 		final Path repoPath = localRepository.toPath();
 		Map<String, Artifact> groupIdArtifactIdToVersion = new HashMap<>();
 		Files.walkFileTree(repoPath, Collections.emptySet(), 10, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes attrs) throws IOException {
 				if (file.getFileName().toString().charAt(0) == '.') {
+					cancelChecker.checkCanceled();
 					return FileVisitResult.SKIP_SUBTREE;
 				}
 				if (!Character.isDigit(file.getFileName().toString().charAt(0))) {
+					cancelChecker.checkCanceled();
 					return FileVisitResult.CONTINUE;
 				}
 				Path artifactFolderPath = repoPath.relativize(file);
 				if (artifactFolderPath.getNameCount() < 3) {
+					cancelChecker.checkCanceled();
 					// eg "maven-dependency-plugin/3.1.2"
 					return FileVisitResult.SKIP_SUBTREE;
 				}
@@ -141,6 +156,7 @@ public class LocalRepositorySearcher {
 				String artifactId = artifactFolderPath.getParent().getFileName().toString();
 				String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
 				if (!new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
+					cancelChecker.checkCanceled();
 					return FileVisitResult.SKIP_SUBTREE;
 				}
 				String groupIdArtifactId = groupId + ':' + artifactId;
@@ -154,6 +170,7 @@ public class LocalRepositorySearcher {
 				if (replace) {
 					groupIdArtifactIdToVersion.put(groupIdArtifactId, new DefaultArtifact(groupId, artifactId, null, version.toString()));
 				}
+				cancelChecker.checkCanceled();
 				return FileVisitResult.SKIP_SUBTREE;
 			}
 		});
