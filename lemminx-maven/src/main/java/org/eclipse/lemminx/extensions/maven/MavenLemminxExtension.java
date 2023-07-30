@@ -120,7 +120,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 
 	private XMLExtensionsRegistry currentRegistry;
-	private MavenLemminxWorkspaceReader workspaceReader = new MavenLemminxWorkspaceReader(this);
+	private MavenLemminxWorkspaceReader workspaceReader = new MavenLemminxWorkspaceReader();
 	
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;

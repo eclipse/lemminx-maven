@@ -36,7 +36,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.RepositoryUtils;
-import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
@@ -195,7 +194,6 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	};
 
 	private final WorkspaceRepository repository;
-	private final MavenLemminxExtension plugin;
 	
 	// Don't add any sorting here, the files are to be processed exactly in the order they added.
 	// Any sorting is to be done before adding to this set
@@ -208,8 +206,7 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 
 	private Map<Artifact, File> workspaceArtifacts = new ConcurrentHashMap<>();
 	
-	public MavenLemminxWorkspaceReader(MavenLemminxExtension plugin) {
-		this.plugin = plugin;
+	public MavenLemminxWorkspaceReader() {
 		repository = new WorkspaceRepository("workspace");
 		skipFlushBeforeResult.set(false);
 	}
@@ -220,33 +217,34 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	}
 
 	@Override
-	public File findArtifact(Artifact artifact) {
-		String projectKey = ArtifactUtils.key(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+	public File findArtifact(Artifact artifact) {		
 		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
-			LOGGER.finest("Waiting for " + projectKey + " to be avilable; processing workspace in the meantime...");
-			while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(projectKey).isEmpty()) {
+			String artifactId = ArtifactIdUtils.toId(artifact);
+			LOGGER.finest("Waiting for " + artifactId + " to be avilable; processing workspace in the meantime...");
+			while (!toProcess.isEmpty() && getCurrentWorkspaceArtifact(artifact).isEmpty()) {
 				try {
 					Thread.sleep(POLLING_INTERVAL);
 				} catch (InterruptedException e) {
 					LOGGER.severe(e.getMessage());
 				}
 			}
-			LOGGER.finest("Done waiting from " + projectKey + ". Either found, or all workspace processed.");
+			LOGGER.finest("Done waiting from " + artifactId + ". Either found, or all workspace processed.");
 		}
-		return getCurrentWorkspaceArtifact(projectKey).orElse(null);
+		return getCurrentWorkspaceArtifact(artifact).orElse(null);
 	}
 
-	private Optional<File> getCurrentWorkspaceArtifact(String projectKey) {
+	private Optional<File> getCurrentWorkspaceArtifact(Artifact artifact) {
 		return workspaceArtifacts.entrySet().stream() //
-			.filter(entry -> ArtifactUtils.key(entry.getKey().getGroupId(), entry.getKey().getArtifactId(), entry.getKey().getVersion()).equals(projectKey))
+			.filter(entry -> equalsId(artifact, entry.getKey()))
 			.map(Entry::getValue)
 			.findAny();
 	}
- 
+
 	@Override
 	public List<String> findVersions(Artifact artifact) {
 		if (skipFlushBeforeResult.get() != Boolean.TRUE) {
-			LOGGER.finest("Lookup available versions for " + artifact + "; processing workspace in the meantime...");
+			String artifactId = ArtifactIdUtils.toId(artifact);
+			LOGGER.finest("Lookup available versions for " + artifactId + "; processing workspace in the meantime...");
 			while (!toProcess.isEmpty()) {
 				try {
 					Thread.sleep(POLLING_INTERVAL);
@@ -256,16 +254,14 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 			}
 			LOGGER.finest("Workspace processing complete");
 		}
-		String key = ArtifactUtils.versionlessKey(artifact.getGroupId(), artifact.getArtifactId());
 		SortedSet<String> res = new TreeSet<>(Comparator.reverseOrder());
 		workspaceArtifacts.entrySet().stream() //
-				.filter(entry -> Objects.equals(key, ArtifactUtils.versionlessKey(entry.getKey().getGroupId(), entry.getKey().getArtifactId())))
+				.filter(entry -> equalsVersionlessId(artifact, entry.getKey()))
 				.map(Entry::getKey)
 				.map(Artifact::getVersion)
 				.forEach(res::add);
 		return new ArrayList<>(res);
 	}
-	
 	private File find(MavenProject project, Artifact artifact) {
 		if ("pom".equals(artifact.getExtension())) {
 			return project.getFile();
@@ -330,5 +326,35 @@ public class MavenLemminxWorkspaceReader implements WorkspaceReader {
 	List<File> getCurrentWorkspaceArtifactFiles() {
 		return workspaceArtifacts.values().stream()
 				.filter(Objects::nonNull).toList();
+	}
+
+	private static boolean equalsId(Artifact artifact1, Artifact artifact2) {
+		if (artifact1 == null || artifact2 == null) {
+			return false;
+		}
+		if (!Objects.equals(artifact1.getArtifactId(), artifact2.getArtifactId())) {
+			return false;
+		}
+		if (!Objects.equals(artifact1.getGroupId(), artifact2.getGroupId())) {
+			return false;
+		}
+
+		if (!Objects.equals(artifact1.getVersion(), artifact2.getVersion())) {
+			return false;
+		}
+		return true;
+	}
+
+	private static boolean equalsVersionlessId(Artifact artifact1, Artifact artifact2) {
+		if (artifact1 == null || artifact2 == null) {
+			return false;
+		}
+		if (!Objects.equals(artifact1.getArtifactId(), artifact2.getArtifactId())) {
+			return false;
+		}
+		if (!Objects.equals(artifact1.getGroupId(), artifact2.getGroupId())) {
+			return false;
+		}
+		return true;
 	}
 }
