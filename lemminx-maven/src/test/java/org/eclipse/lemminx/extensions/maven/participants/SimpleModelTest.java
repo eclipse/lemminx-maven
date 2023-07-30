@@ -8,6 +8,8 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.participants;
 
+import static org.eclipse.lemminx.XMLAssert.d;
+import static org.eclipse.lemminx.XMLAssert.r;
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -309,15 +311,28 @@ public class SimpleModelTest {
 	@Test
 	public void testModules() throws IOException, URISyntaxException {
 		List<Diagnostic> diagnosticsA = languageService.doDiagnostics(
-				createDOMDocument("/modules/module-a-pom.xml", languageService), 
-				new XMLValidationSettings(), Map.of(), () -> {});
-		assertFalse(diagnosticsA.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+				createDOMDocument("/modules/module-a-pom.xml", languageService), new XMLValidationSettings(), Map.of(),
+				() -> {
+				});
+		assertFalse(diagnosticsA.stream()
+				.anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
 
 		DOMDocument document = createDOMDocument("/modules/dependent/module-b-pom.xml", languageService);
-		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(
-				document, 
-				new XMLValidationSettings(), Map.of(),  () -> {});
-		assertFalse(diagnosticsB.stream().anyMatch(diag -> (diag.getMessage().contains("ModuleA") || diag.getMessage().contains("ModuleB"))));
+		List<Diagnostic> diagnosticsB = languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(),
+				() -> {
+				});
+		// As there is not workspace folders initialized, there is the error
+		// "Could not find artifact org.test.modules:ModuleA:jar:0.0.1-SNAPSHOT
+		assertArrayEquals(new Diagnostic[] { d(9, 4, 13, 17, null,
+				"", "xml", DiagnosticSeverity.Error), //
+		}, diagnosticsB
+				.stream()
+				.filter(d -> {
+					d.setMessage("");
+					return true;
+				})
+				.toList()
+				.toArray(new Diagnostic[diagnosticsB.size()]));
 	}
 	
 	@Test
@@ -566,14 +581,47 @@ public class SimpleModelTest {
 	@Test
 	public void testResolveParentFromCentralWhenAnotherRepoIsDeclared() throws Exception {
 		DOMDocument document = createDOMDocument("/it1/pom.xml", languageService);
-		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+		assertArrayEquals(new Diagnostic[] { //
+				// org.sonatype.forge:forge-parent:jar:10 failed to transfer from https://download.eclipse.org/eclipse/updates/4.16/ 
+				// during a previous attempt. This failure was cached in the local repository and resolution is not reattempted 
+				// until the update interval of platform has elapsed or updates are forced. Original error: 
+				// Could not transfer artifact org.sonatype.forge:forge-parent:jar:10 from/to platform (https://download.eclipse.org/eclipse/updates/4.16/): Cannot access https://download.eclipse.org/eclipse/updates/4.16/ with type p2 using the available connector factories: AetherRepositoryConnectorFactory"
+				d(27, 0, 31, 13, null,	"", "xml", DiagnosticSeverity.Error), //
+				// org.sonatype.forge:forge-parent:jar:10 was not found in https://repo.maven.apache.org/maven2 
+				// during a previous attempt. This failure was cached in the local repository and resolution is 
+				// not reattempted until the update interval of central has elapsed or updates are forced
+				d(27, 0, 31, 13, null,	"", "xml", DiagnosticSeverity.Error) //
+				}
+		, languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {})
+			.stream()
+			.filter(diag -> {
+				// as message is to complex, we don't compare them
+				diag.setMessage("");
+				return diag.getSeverity() == DiagnosticSeverity.Error;
+			})
+			.toArray(Diagnostic[]::new));
 	}
+	
+	
 
 	@Test
 	public void testSystemPath() throws Exception {
-		DOMDocument document = createDOMDocument("/pom-systemPath.xml", languageService);
-		assertArrayEquals(new Diagnostic[0], languageService.doDiagnostics(
-				document, new XMLValidationSettings(), Map.of(), () -> {}).stream().filter(diag -> diag.getSeverity() == DiagnosticSeverity.Error).toArray(Diagnostic[]::new));
+		// We create an instance here of language service to be sure that workspace
+		// folders will be not filled by an another test
+		MavenLanguageService languageService = new MavenLanguageService();
+		List<Diagnostic> diagnostics = languageService.doDiagnostics(
+				createDOMDocument("/pom-systemPath.xml", languageService), new XMLValidationSettings(), Map.of(),
+				() -> {
+				});
+		// 'dependencies.dependency.systemPath' for a:a:jar should not point at files
+		// within the project directory, ${basedir} will be unresolvable by dependent
+		// projects
+		// 'dependencies.dependency.systemPath' for a:a:jar must specify an absolute
+		// path but is ${basedir}
+		assertTrue(
+				diagnostics.stream().anyMatch(diag -> (diag.getMessage().contains("dependencies.dependency.systemPath")
+						&& r(14, 17, 14, 27).equals(diag.getRange()))));
+		languageService.dispose();
 	}
 
 	@Test

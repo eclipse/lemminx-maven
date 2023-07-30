@@ -41,6 +41,7 @@ import org.apache.maven.model.io.ModelParseException;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.project.DefaultProjectBuilder;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.DependencyResolutionResult;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
@@ -55,11 +56,7 @@ import org.eclipse.lemminx.extensions.maven.utils.DOMModelSource;
 public class MavenProjectCache {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenProjectCache.class.getName());
-
-	private final Map<URI, Integer> lastCheckedVersion;
-	private final Map<URI, MavenProject> projectCache;
-	private final Map<URI, Collection<ModelProblem>> problemCache;
-
+	private final Map<URI, LoadedMavenProject> projectCache;
 	private final MavenSession mavenSession;
 
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
@@ -69,15 +66,13 @@ public class MavenProjectCache {
 
 	public MavenProjectCache(MavenSession mavenSession) {
 		this.mavenSession = mavenSession;
-		this.lastCheckedVersion = new HashMap<>();
 		this.projectCache = new HashMap<>();
-		this.problemCache = new HashMap<>();
 		initializeMavenBuildState();
 	}
 
 	/**
-	 * Returns the last successfully parsed and cached Maven Project for the 
-	 * given document
+	 * Returns the last successfully parsed and cached Maven Project for the given
+	 * document
 	 * 
 	 * @param document A given Document
 	 * @return the last MavenDocument that could be build for the more recent
@@ -87,12 +82,13 @@ public class MavenProjectCache {
 	 */
 	public MavenProject getLastSuccessfulMavenProject(DOMDocument document) {
 		check(document);
-		return projectCache.get(URI.create(document.getTextDocument().getUri()).normalize());
+		LoadedMavenProject project = getLoadedMavenProject(document.getTextDocument().getUri());
+		return project != null ? project.getMavenProject() : null;
 	}
 
 	/**
-	 * Returns the last successfully parsed and cached Maven Project for the 
-	 * given POM file
+	 * Returns the last successfully parsed and cached Maven Project for the given
+	 * POM file
 	 * 
 	 * @param pomFile A given POM File
 	 * @return the last MavenDocument that could be build for the more recent
@@ -102,7 +98,8 @@ public class MavenProjectCache {
 	 */
 	public MavenProject getLastSuccessfulMavenProject(File pomFile) {
 		check(pomFile);
-		return projectCache.get(pomFile.toURI().normalize());
+		LoadedMavenProject project = getLoadedMavenProject(pomFile.toURI());
+		return project != null ? project.getMavenProject() : null;
 	}
 
 	/**
@@ -111,27 +108,30 @@ public class MavenProjectCache {
 	 * @return the problems for the latest version of the document (either in cache,
 	 *         or the one passed in arguments)
 	 */
-	public Collection<ModelProblem> getProblemsFor(DOMDocument document) {
+	public LoadedMavenProject getLoadedMavenProject(DOMDocument document) {
 		check(document);
-		return problemCache.get(URI.create(document.getTextDocument().getUri()).normalize());
+		return getLoadedMavenProject(document.getTextDocument().getUri());
 	}
 
 	private void check(DOMDocument document) {
-		Integer last = lastCheckedVersion.get(URI.create(document.getTextDocument().getUri()).normalize());
+		LoadedMavenProject project = getLoadedMavenProject(document.getTextDocument().getUri());
+		Integer last = project != null ? project.getLastCheckedVersion() : null;
 		if (last == null || last.intValue() < document.getTextDocument().getVersion()) {
 			parseAndCache(document);
 		}
 	}
 
 	private void check(File pomFile) {
-		Integer last = lastCheckedVersion.get(pomFile.toURI().normalize());
+		LoadedMavenProject project = getLoadedMavenProject(pomFile.toURI());
+		Integer last = project != null ? project.getLastCheckedVersion() : null;
 		if (last == null || last.intValue() < 0) {
 			parseAndCache(pomFile);
 		}
 	}
 
 	public Optional<MavenProject> getSnapshotProject(File file) {
-		MavenProject lastKnownVersionMavenProject = projectCache.get(file.toURI().normalize());
+		LoadedMavenProject loadedProject = getLoadedMavenProject(file.toURI());
+		MavenProject lastKnownVersionMavenProject = loadedProject != null ? loadedProject.getMavenProject() : null;
 		if (lastKnownVersionMavenProject != null) {
 			return Optional.of(lastKnownVersionMavenProject);
 		}
@@ -146,7 +146,8 @@ public class MavenProjectCache {
 			}
 		} catch (Exception e) {
 			// Some other kinds of exceptions may be thrown, for instance,
-			// an IllegalStateException in case of fail to acquire write lock for an artifact
+			// an IllegalStateException in case of fail to acquire write lock for an
+			// artifact
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
 
@@ -155,14 +156,16 @@ public class MavenProjectCache {
 
 	private void parseAndCache(URI uri, int version, FileModelSource source) {
 		Collection<ModelProblem> problems = new ArrayList<>();
+		DependencyResolutionResult dependencyResolutionResult = null;
 		uri = uri.normalize();
 		final File file = new File(uri);
-		MavenProject project = null; 
+		MavenProject project = null;
 		try {
 			ProjectBuildingResult buildResult = projectBuilder.build(source, newProjectBuildingRequest());
 			project = buildResult.getProject();
 			problems.addAll(buildResult.getProblems());
-			
+			dependencyResolutionResult = buildResult.getDependencyResolutionResult();
+
 			if (project != null) {
 				// setFile should ideally be invoked during project build, but related methods
 				// to pass modelSource and pomFile are private
@@ -171,11 +174,11 @@ public class MavenProjectCache {
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
 				if (e.getCause() instanceof ModelBuildingException modelBuildingException) {
-					// Try to manually build a minimal project from the document to collect lower-level
+					// Try to manually build a minimal project from the document to collect
+					// lower-level
 					// errors and to have something usable in cache for most basic operations
 					modelBuildingException.getProblems().stream()
-						.filter(p -> !(p.getException() instanceof ModelParseException))
-						.forEach(problems::add);
+							.filter(p -> !(p.getException() instanceof ModelParseException)).forEach(problems::add);
 					try (InputStream documentStream = source.getInputStream()) {
 						Model model = mavenReader.read(documentStream);
 						project = new MavenProject(model);
@@ -192,7 +195,8 @@ public class MavenProjectCache {
 						project.setFile(file);
 						project.setBuild(new Build());
 					} catch (XmlPullParserException parserException) {
-						// XML document is invalid fo parsing (eg user is typing), it's a valid state that shouldn't log
+						// XML document is invalid fo parsing (eg user is typing), it's a valid state
+						// that shouldn't log
 						// exceptions
 					} catch (IOException ex) {
 						LOGGER.log(Level.SEVERE, e.getMessage(), e);
@@ -210,29 +214,29 @@ public class MavenProjectCache {
 					}
 				}
 			}
-		} catch (CancellationException e){
+		} catch (CancellationException e) {
 			// The document which has been used to load Maven project is out of dated
 			throw e;
-		}
-		catch (Exception e) {
-			// Do not add any info, like lastCheckedVersion or problems, to the cache 
-			// In case of project/problems etc. is not available due to an exception happened.
-			// 
+		} catch (Exception e) {
+			// Do not add any info, like lastCheckedVersion or problems, to the cache
+			// In case of project/problems etc. is not available due to an exception
+			// happened.
+			//
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 			return; // Nothing to be cached
 		}
-		
-		cacheProject(project, file, uri, version, problems);
+
+		cacheProject(project, file, uri, version, problems, dependencyResolutionResult);
 	}
 
-	private void cacheProject(final MavenProject project, File file, URI uri, 
-			int version, Collection<ModelProblem> problems) {
+	private void cacheProject(final MavenProject project, File file, URI uri, int version,
+			Collection<ModelProblem> problems, DependencyResolutionResult dependencyResolutionResult) {
+		LoadedMavenProject loadedProject = new LoadedMavenProject(project, version, problems,
+				dependencyResolutionResult);
 		if (project != null) {
-			projectCache.put(uri, project);
 			projectParsedListeners.forEach(listener -> listener.accept(project));
 		}
-		lastCheckedVersion.put(uri, version);
-		problemCache.put(uri, problems);
+		projectCache.put(uri, loadedProject);
 	}
 
 	private void parseAndCache(DOMDocument document) {
@@ -251,7 +255,7 @@ public class MavenProjectCache {
 	private ProjectBuildingRequest newProjectBuildingRequest() {
 		return newProjectBuildingRequest(true);
 	}
-	
+
 	private ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies) {
 		ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
 		MavenExecutionRequest mavenRequest = mavenSession.getRequest();
@@ -274,7 +278,8 @@ public class MavenProjectCache {
 		}
 		try {
 			projectBuilder = getPlexusContainer().lookup(ProjectBuilder.class);
-			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY, Boolean.toString(true));
+			System.setProperty(DefaultProjectBuilder.DISABLE_GLOBAL_MODEL_CACHE_SYSTEM_PROPERTY,
+					Boolean.toString(true));
 		} catch (ComponentLookupException e) {
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
 		}
@@ -285,13 +290,13 @@ public class MavenProjectCache {
 	}
 
 	public Collection<MavenProject> getProjects() {
-		return projectCache.values();
+		return projectCache.values().stream().map(LoadedMavenProject::getMavenProject).toList();
 	}
 
 	public MavenProject getSnapshotProject(DOMDocument document, String profileId) {
 		return getSnapshotProject(document, profileId, true);
 	}
-	
+
 	public MavenProject getSnapshotProject(DOMDocument document, String profileId, boolean resolveDependencies) {
 		// it would be nice to directly rebuild from Model instead of reparsing text
 		ProjectBuildingRequest request = newProjectBuildingRequest(resolveDependencies);
@@ -311,5 +316,13 @@ public class MavenProjectCache {
 			}
 		}
 		return null;
+	}
+
+	private LoadedMavenProject getLoadedMavenProject(String uri) {
+		return getLoadedMavenProject(URI.create(uri));
+	}
+
+	private LoadedMavenProject getLoadedMavenProject(URI uri) {
+		return projectCache.get(uri.normalize());
 	}
 }
