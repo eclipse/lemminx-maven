@@ -37,7 +37,7 @@ public class DiagnosticRequest implements IPositionRequest {
 	}
 
 	public Diagnostic createDiagnostic(String errorMessage, DiagnosticSeverity severity) {
-		return new Diagnostic(this.getRange(), errorMessage, severity, this.getXMLDocument().getDocumentURI(), "XML");
+		return new Diagnostic(this.getRange(), errorMessage, severity, "xml", null);
 	}
 
 	private Range getRange() {

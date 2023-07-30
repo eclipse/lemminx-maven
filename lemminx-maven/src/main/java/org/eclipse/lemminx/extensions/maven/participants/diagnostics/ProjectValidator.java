@@ -11,15 +11,15 @@ package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ARTIFACT_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.BUILD_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.CLASSIFIER_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCIES_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.DEPENDENCY_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PARENT_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGINS_ELT;
-import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROFILE_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROFILES_ELT;
+import static org.eclipse.lemminx.extensions.maven.DOMConstants.PROFILE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.TYPE_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.VERSION_ELT;
 
@@ -28,9 +28,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
-import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 
@@ -41,21 +41,23 @@ import org.apache.maven.model.InputLocationTracker;
 import org.apache.maven.model.InputSource;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.PluginManagement;
+import org.apache.maven.project.DependencyResolutionResult;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.dom.DOMComment;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
+import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class ProjectValidator {
-	private static final Logger LOGGER = Logger.getLogger(ProjectValidator.class.getName());
 
 	public static final String ATTR_MANAGED_VERSION_LOCATION = "managedVersionLocation"; //$NON-NLS-1$
 	public static final String ATTR_MANAGED_VERSION_LINE = "managedVersionLine"; //$NON-NLS-1$
@@ -67,11 +69,14 @@ public class ProjectValidator {
 	 */
 	public static String MARKER_IGNORE_MANAGED = "$NO-MVN-MAN-VER$";//$NON-NLS-1$
 
-	private MavenLemminxExtension plugin;
-	private CancelChecker cancelChecker;
+	private final MavenLemminxExtension plugin;
+	private final DependencyResolutionResult dependencyResolutionResult;
+	
+	private final CancelChecker cancelChecker;
 
-	public ProjectValidator(MavenLemminxExtension plugin, @Nonnull CancelChecker cancelChecker) {
+	public ProjectValidator(MavenLemminxExtension plugin, DependencyResolutionResult dependencyResolutionResult, @Nonnull CancelChecker cancelChecker) {
 		this.plugin = plugin;
+		this.dependencyResolutionResult = dependencyResolutionResult;
 		this.cancelChecker = cancelChecker;
 	}
 
@@ -164,12 +169,15 @@ public class ProjectValidator {
 			return Optional.empty();
 		}
 
+		List<Diagnostic> diagnostics = new ArrayList<>();
 		cancelChecker.checkCanceled();
 		List<DOMElement> candidates = new ArrayList<>();
 		Optional<DOMElement> dependencies = DOMUtils.findChildElement(node, DEPENDENCIES_ELT);
 		dependencies.ifPresent(dependenciesElement -> {
 			cancelChecker.checkCanceled();
-			DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT).stream()
+			DOMUtils.findChildElements(dependenciesElement, DEPENDENCY_ELT)
+					.stream()
+					.filter(dependency -> validateDependency(dependency, diagnosticRequest, diagnostics))
 					.filter(dependency -> DOMUtils.findChildElement(dependency, VERSION_ELT).isPresent())
 					.forEach(candidates::add);
 		});
@@ -229,7 +237,6 @@ public class ProjectValidator {
 
 		// now we have all the candidates, match them against the effective managed set
 		cancelChecker.checkCanceled();
-		List<Diagnostic> diagnostics = new ArrayList<>();
 		candidates.stream().forEach(dep -> {
 			cancelChecker.checkCanceled();
 			Optional<DOMElement> version = DOMUtils.findChildElement(dep, VERSION_ELT);
@@ -272,6 +279,31 @@ public class ProjectValidator {
 		});
 
 		return Optional.of(diagnostics);
+	}
+
+	private boolean validateDependency(DOMElement dependencyNode, DiagnosticRequest diagnosticRequest,
+			List<Diagnostic> diagnostics) {
+		if (dependencyResolutionResult != null && dependencyResolutionResult.getUnresolvedDependencies() != null
+				&& !dependencyResolutionResult.getUnresolvedDependencies().isEmpty()) {
+			Dependency dependency = MavenParseUtils.parseArtifact(dependencyNode);
+			for (org.eclipse.aether.graph.Dependency unresolved : dependencyResolutionResult
+					.getUnresolvedDependencies()) {
+				if (Objects.equals(dependency.getGroupId(), unresolved.getArtifact().getGroupId())
+						&& Objects.equals(dependency.getArtifactId(), unresolved.getArtifact().getArtifactId())
+						&& ((dependency.getVersion() != null && dependency.getVersion().startsWith("${"))
+								|| Objects.equals(dependency.getVersion(), unresolved.getArtifact().getVersion()))) {
+					List<Exception> errors = dependencyResolutionResult.getResolutionErrors(unresolved);
+					for (Exception error : errors) {
+						Diagnostic diagnostic = diagnosticRequest.createDiagnostic(error.getMessage(),
+								DiagnosticSeverity.Error);
+						Range range = XMLPositionUtility.createRange(dependencyNode);
+						diagnostic.setRange(range);
+						diagnostics.add(diagnostic);
+					}
+				}
+			}
+		}
+		return true;
 	}
 
 	/**

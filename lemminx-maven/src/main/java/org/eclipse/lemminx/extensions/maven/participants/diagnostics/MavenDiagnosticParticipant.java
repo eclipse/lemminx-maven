@@ -27,14 +27,18 @@ import javax.annotation.Nonnull;
 
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.ModelProblem.Severity;
+import org.apache.maven.project.DependencyResolutionResult;
+import org.eclipse.lemminx.commons.BadLocationException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.LoadedMavenProject;
 import org.eclipse.lemminx.extensions.maven.MavenInitializationException;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.services.extensions.diagnostics.IDiagnosticsParticipant;
+import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
@@ -57,45 +61,57 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 
 		try {
-			Collection<ModelProblem> problems = plugin.getProjectCache().getProblemsFor(xmlDocument);
+			LoadedMavenProject loadedMavenProject = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			Collection<ModelProblem> problems = loadedMavenProject != null ? loadedMavenProject.getProblems() : null;
 			if (problems != null) {
-				problems.stream().map(this::toDiagnostic).forEach(diagnostics::add);
+				problems
+					.stream()
+					.map(problem -> toDiagnostic(problem, xmlDocument))
+					.forEach(diagnostics::add);
 			}
-			
+			DependencyResolutionResult dependencyResolutionResult = loadedMavenProject != null
+					? loadedMavenProject.getDependencyResolutionResult()
+					: null;
+
 			cancelChecker.checkCanceled();
 			DOMElement documentElement = xmlDocument.getDocumentElement();
 			if (documentElement == null) {
 				return;
 			}
-			Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions(cancelChecker);
-	
+			Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> tagDiagnostics = configureDiagnosticFunctions(
+					cancelChecker);
+
 			// Validate project element
 			cancelChecker.checkCanceled();
 			if (PROJECT_ELT.equals(documentElement.getNodeName())) {
-				ProjectValidator projectValidator = new ProjectValidator(plugin, cancelChecker);
+				ProjectValidator projectValidator = new ProjectValidator(plugin, dependencyResolutionResult,
+						cancelChecker);
 				projectValidator.validateProject(new DiagnosticRequest(documentElement, xmlDocument))
-					.ifPresent(diagnosticList ->{
+						.ifPresent(diagnosticList -> {
 							cancelChecker.checkCanceled();
-							diagnostics.addAll(diagnosticList.stream()
-								.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
+							diagnostics.addAll(
+									diagnosticList.stream().filter(diagnostic -> !diagnostics.contains(diagnostic))
+											.collect(Collectors.toList()));
 						});
 			}
-			
+
 			cancelChecker.checkCanceled();
 			Deque<DOMNode> nodes = new ArrayDeque<>();
 			documentElement.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 			while (!nodes.isEmpty()) {
 				cancelChecker.checkCanceled();
 				DOMNode node = nodes.pop();
-				String nodeName = node.getLocalName(); 
+				String nodeName = node.getLocalName();
 				if (nodeName != null) {
 					tagDiagnostics.entrySet().stream().filter(entry -> nodeName.equals(entry.getKey()))
-						.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
-						.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
-							cancelChecker.checkCanceled();
-							diagnostics.addAll(diagnosticList.stream()
-									.filter(diagnostic -> !diagnostics.contains(diagnostic)).collect(Collectors.toList()));
-						});;
+							.map(entry -> entry.getValue().apply(new DiagnosticRequest(node, xmlDocument)))
+							.filter(Optional::isPresent).map(dl -> dl.get()).forEach(diagnosticList -> {
+								cancelChecker.checkCanceled();
+								diagnostics.addAll(
+										diagnosticList.stream().filter(diagnostic -> !diagnostics.contains(diagnostic))
+												.collect(Collectors.toList()));
+							});
+					;
 				}
 				cancelChecker.checkCanceled();
 				if (node.hasChildNodes()) {
@@ -109,7 +125,8 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		}
 	}
 
-	private Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions(CancelChecker cancelChecker) {
+	private Map<String, Function<DiagnosticRequest, Optional<List<Diagnostic>>>> configureDiagnosticFunctions(
+			CancelChecker cancelChecker) {
 		PluginValidator pluginValidator = new PluginValidator(plugin, cancelChecker);
 
 		Function<DiagnosticRequest, Optional<List<Diagnostic>>> validatePluginConfiguration = pluginValidator::validateConfiguration;
@@ -121,20 +138,39 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 		return tagDiagnostics;
 	}
 
-	private Diagnostic toDiagnostic(@Nonnull ModelProblem problem) {
+	private Diagnostic toDiagnostic(@Nonnull ModelProblem problem, @Nonnull DOMDocument xmlDocument) {
 		Diagnostic diagnostic = new Diagnostic();
 		diagnostic.setMessage(problem.getMessage());
 		diagnostic.setSeverity(toDiagnosticSeverity(problem.getSeverity()));
-		diagnostic.setRange(new Range(new Position(problem.getLineNumber() - 1, problem.getColumnNumber() - 1),
-				new Position(problem.getLineNumber() - 1, problem.getColumnNumber())));
+		Range range = null;
+
+		// The Maven problem returns only line / column position.
+		// We try to get the DOM text node at this offset to improve the error range.
+		Position start = new Position(problem.getLineNumber() - 1, problem.getColumnNumber() - 1);
+		try {
+			int offset = xmlDocument.offsetAt(start) + 1;
+			DOMNode node = xmlDocument.findNodeAt(offset);
+			if (node != null && node.isText()) {
+				// The maven problem position higlight a text node use this range
+				range = XMLPositionUtility.createRange(node);
+			}
+		} catch (BadLocationException e) {
+			//	Do nothing
+		}
+
+		if (range == null) {
+			Position end = new Position(problem.getLineNumber() - 1, problem.getColumnNumber());
+			range = new Range(start, end);
+		}
+		diagnostic.setRange(range);
 		return diagnostic;
 	}
 
 	private DiagnosticSeverity toDiagnosticSeverity(Severity severity) {
 		return switch (severity) {
-			case ERROR, FATAL -> DiagnosticSeverity.Error;
-			case WARNING -> DiagnosticSeverity.Warning;
-			default -> DiagnosticSeverity.Information;
+		case ERROR, FATAL -> DiagnosticSeverity.Error;
+		case WARNING -> DiagnosticSeverity.Warning;
+		default -> DiagnosticSeverity.Information;
 		};
 	}
 }

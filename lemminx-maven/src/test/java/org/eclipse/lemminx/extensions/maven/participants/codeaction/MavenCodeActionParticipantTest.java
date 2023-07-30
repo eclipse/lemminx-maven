@@ -246,7 +246,7 @@ public class MavenCodeActionParticipantTest {
 
 		List<Diagnostic> actual = xmlLanguageService.doDiagnostics(xmlDocument, settings.getValidation(),
 				Collections.emptyMap(), () -> {
-				}).stream().filter(a -> a.getCode()!= null & a.getCode().getLeft().equals(expectedDiagnostic.getCode().getLeft()))
+				}).stream().filter(a -> a.getCode()!= null && a.getCode().getLeft() != null && a.getCode().getLeft().equals(expectedDiagnostic.getCode().getLeft()))
 				.collect(Collectors.toList());
 //		if (expected == null) {
 //			assertTrue(actual.isEmpty());
