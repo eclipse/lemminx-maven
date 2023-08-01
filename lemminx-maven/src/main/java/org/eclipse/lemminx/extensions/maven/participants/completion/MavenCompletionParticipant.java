@@ -117,6 +117,7 @@ import org.eclipse.lemminx.utils.XMLPositionUtility;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.InsertTextFormat;
+import org.eclipse.lsp4j.InsertTextMode;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
@@ -724,9 +725,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					try {
 						insertionPosition = request.getXMLDocument()
 								.positionAt(request.getParentElement().getParentElement().getStartTagCloseOffset() + 1);
+						String indent = !isInsertTextModeAdjustIndentationSupport(request)
+								? request.getLineIndentInfo().getWhitespacesIndent()
+								: "";
 						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition),
 								request.getLineIndentInfo().getLineDelimiter()
-										+ request.getLineIndentInfo().getWhitespacesIndent() + "<groupId>"
+										+ indent + "<groupId>"
 										+ artifactInfo.artifact.getGroupId() + "</groupId>"));
 					} catch (BadLocationException e) {
 						// TODO Auto-generated catch block
@@ -738,10 +742,12 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 					try {
 						insertionPosition = insertArtifactIsEnd ? replaceRange.getEnd() :
 								request.getXMLDocument().positionAt(request.getParentElement().getEndTagCloseOffset() + 1);
-						
+						String indent = !isInsertTextModeAdjustIndentationSupport(request)
+								? request.getLineIndentInfo().getWhitespacesIndent()
+								: "";
 						additionalEdits.add(new TextEdit(new Range(insertionPosition, insertionPosition),
 								request.getLineIndentInfo().getLineDelimiter()
-										+ request.getLineIndentInfo().getWhitespacesIndent() + "<version>"
+										+ indent + "<version>"
 										+ artifactInfo.artifact.getVersion()
 										+ "</version>"));
 					} catch (BadLocationException e) {
@@ -770,7 +776,9 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 			try {
 				String newText = "";
 				String suffix = "";
-				String gavElementsIndent = request.getLineIndentInfo().getWhitespacesIndent();
+				String gavElementsIndent = !isInsertTextModeAdjustIndentationSupport(request)
+						? request.getLineIndentInfo().getWhitespacesIndent()
+						: "";
 				String oneLevelIndent = DOMUtils.getOneLevelIndent(request);
 				String lineDelimiter = request.getLineIndentInfo().getLineDelimiter();
 				if (strategy instanceof GAVInsertionStrategy.NodeWithChildrenInsertionStrategy nodeWithChildren) {
@@ -1285,5 +1293,13 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 				.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));			
 			break;
 		}
+	}
+
+	private static boolean isInsertTextModeAdjustIndentationSupport(ICompletionRequest request) {
+		return request.getSharedSettings() != null
+				&& request.getSharedSettings().getCompletionSettings() != null
+				&& request.getSharedSettings().getCompletionSettings().getCompletionCapabilities() != null
+				&& InsertTextMode.AdjustIndentation.equals(request.getSharedSettings().getCompletionSettings()
+						.getCompletionCapabilities().getInsertTextMode());
 	}
 }
