@@ -16,6 +16,10 @@ import java.util.Arrays;
 
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
+import org.eclipse.lemminx.services.XMLLanguageService;
+import org.eclipse.lemminx.settings.SharedSettings;
+import org.eclipse.lsp4j.CompletionCapabilities;
+import org.eclipse.lsp4j.InsertTextMode;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +69,46 @@ public class MavenCompletionParticipantTest {
 							      <artifactId>maven-core</artifactId>
 							      <version>3.0</version>
 							    </dependency>"""),
+				"maven-core"));
+	}
+
+	@Test
+	public void testOneExistingDependencyDependenciesCompletionAdjustIndentation() throws Exception {
+		SharedSettings settings = new SharedSettings();
+		CompletionCapabilities completionCapabilities = new CompletionCapabilities();
+		settings.getCompletionSettings().setCapabilities(completionCapabilities);
+		settings.getCompletionSettings().getCompletionCapabilities().setInsertTextMode(InsertTextMode.AdjustIndentation);
+		String pom = //
+				"""
+			<?xml version="1.0" encoding="UTF-8"?>
+			<project
+			  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			                      https://maven.apache.org/xsd/maven-4.0.0.xsd"
+			  xmlns="http://maven.apache.org/POM/4.0.0"
+			  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			  <modelVersion>4.0.0</modelVersion>
+			  <artifactId>just-a-pom</artifactId>
+			  <groupId>com.datho7561</groupId>
+			  <version>0.1.0</version>
+			  <dependencies>
+			    <dependency>
+			      <groupId>com.fasterxml.jackson.core</groupId>
+			      <artifactId>jackson-core</artifactId>
+			      <version>2.11.3</version>
+			    </dependency>
+			    maven-core|
+			  </dependencies>
+			</project>
+			""";
+		testCompletionFor(new XMLLanguageService(), pom, null, null, "file:///pom.xml", null, settings, //
+				c("maven-core - org.apache.maven:maven-core:3.0", //
+				te(16, 4, 16, 14, //
+						"""
+							<dependency>
+							  <groupId>org.apache.maven</groupId>
+							  <artifactId>maven-core</artifactId>
+							  <version>3.0</version>
+							</dependency>"""),
 				"maven-core"));
 	}
 
