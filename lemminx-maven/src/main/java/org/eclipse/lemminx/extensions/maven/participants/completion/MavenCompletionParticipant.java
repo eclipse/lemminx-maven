@@ -60,11 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -108,6 +104,7 @@ import org.eclipse.lemminx.extensions.maven.MavenModelOutOfDatedException;
 import org.eclipse.lemminx.extensions.maven.MojoParameter;
 import org.eclipse.lemminx.extensions.maven.Phase;
 import org.eclipse.lemminx.extensions.maven.participants.ArtifactWithDescription;
+import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher.OngoingOperationException;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenPluginUtils;
@@ -869,59 +866,61 @@ public class MavenCompletionParticipant extends CompletionParticipantAdapter {
 		updateItems.add(updatingItem);
 
 		plugin.getCentralSearcher().ifPresent(centralSearcher -> {
+			cancelChecker.checkCanceled();
 			try {
-				CompletableFuture.runAsync(() -> {
-						cancelChecker.checkCanceled();
-						switch (node.getLocalName()) {
-						case GROUP_ID_ELT:
-							// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
-							// parameter
-							(onlyPlugins ?
-									centralSearcher.getPluginGroupIds(artifactToSearch) :
-									centralSearcher.getGroupIds(artifactToSearch))
-								.stream() //
-								.map(groupId -> toCompletionItem(groupId, null, range)) //
-								.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-								.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-							cancelChecker.checkCanceled();
-							return;
-						case ARTIFACT_ID_ELT:
-							(onlyPlugins ?
-									centralSearcher.getPluginArtifacts(artifactToSearch) :
-									centralSearcher.getArtifacts(artifactToSearch))
-								.stream() //
-								.map(ArtifactWithDescription::new) //
-								.forEach(artifactInfosCollector::add);
-							cancelChecker.checkCanceled();
-							return;
-						case VERSION_ELT:
-							(onlyPlugins ?
-									centralSearcher.getPluginArtifactVersions(artifactToSearch) :
-									centralSearcher.getArtifactVersions(artifactToSearch))
-								.stream() //
-								.map(version -> toCompletionItem(version.toString(), null, range)) //
-								.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
-								.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
-							cancelChecker.checkCanceled();
-							return;
-						case DEPENDENCIES_ELT:
-						case DEPENDENCY_ELT:
-							centralSearcher.getArtifacts(artifactToSearch).stream().map(ArtifactWithDescription::new).forEach(artifactInfosCollector::add);
-							cancelChecker.checkCanceled();
-							return;
-						case PLUGINS_ELT:
-						case PLUGIN_ELT:
-							centralSearcher.getPluginArtifacts(artifactToSearch).stream().map(ArtifactWithDescription::new).forEach(artifactInfosCollector::add);
-							cancelChecker.checkCanceled();
-							return;
-						}
-					}).whenComplete((ok, error) -> updateItems.remove(updatingItem)).get(2, TimeUnit.SECONDS);
-			} catch (InterruptedException | ExecutionException exception) {
-				LOGGER.log(Level.SEVERE, exception.getCause() != null ? exception.getCause().toString() : exception.getMessage(), exception);
-			} catch (TimeoutException e) {
-				// nothing to log, some work still pending
-				updateItems.forEach(updateItem -> nonArtifactCollector.put(updateItem.getLabel(), updatingItem));
+				switch (node.getLocalName()) {
+				case GROUP_ID_ELT:
+					// TODO: just pass only plugins boolean, and make getGroupId's accept a boolean
+					// parameter
+					(onlyPlugins ?
+							centralSearcher.getPluginGroupIds(artifactToSearch) :
+							centralSearcher.getGroupIds(artifactToSearch))
+						.stream() //
+						.map(groupId -> toCompletionItem(groupId, null, range)) //
+						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+						.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+					cancelChecker.checkCanceled();
+					return;
+				case ARTIFACT_ID_ELT:
+					(onlyPlugins ?
+							centralSearcher.getPluginArtifacts(artifactToSearch) :
+							centralSearcher.getArtifacts(artifactToSearch))
+						.stream() //
+						.map(ArtifactWithDescription::new) //
+						.forEach(artifactInfosCollector::add);
+					cancelChecker.checkCanceled();
+					return;
+				case VERSION_ELT:
+					(onlyPlugins ?
+							centralSearcher.getPluginArtifactVersions(artifactToSearch) :
+							centralSearcher.getArtifactVersions(artifactToSearch))
+						.stream() //
+						.map(version -> toCompletionItem(version.toString(), null, range)) //
+						.filter(completionItem -> !nonArtifactCollector.containsKey(completionItem.getLabel()))
+						.forEach(completionItem -> nonArtifactCollector.put(completionItem.getLabel(), completionItem));
+					cancelChecker.checkCanceled();
+					return;
+				case DEPENDENCIES_ELT:
+				case DEPENDENCY_ELT:
+					centralSearcher.getArtifacts(artifactToSearch).stream().map(ArtifactWithDescription::new).forEach(artifactInfosCollector::add);
+					cancelChecker.checkCanceled();
+					return;
+				case PLUGINS_ELT:
+				case PLUGIN_ELT:
+					centralSearcher.getPluginArtifacts(artifactToSearch).stream().map(ArtifactWithDescription::new).forEach(artifactInfosCollector::add);
+					cancelChecker.checkCanceled();
+					return;
+				}
+				updateItems.remove(updatingItem);
+			} catch (OngoingOperationException e) {
+				// The remote searcher cannot return results right now, so
+				// There is nothing to add to the collectors
+				// Just ignore, next time hopefully the required data 
+				// will be received and cached, leaving a content assist
+				// item like `Waiting for Maven Central Response...` in the 
+				// result
 			}
+			updateItems.forEach(updateItem -> nonArtifactCollector.put(updateItem.getLabel(), updatingItem));
 		});
 	}
 
