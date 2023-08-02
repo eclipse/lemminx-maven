@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -90,6 +89,8 @@ import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
+import org.eclipse.lemminx.services.IXMLDocumentProvider;
+import org.eclipse.lemminx.services.IXMLValidationService;
 import org.eclipse.lemminx.services.extensions.IXMLExtension;
 import org.eclipse.lemminx.services.extensions.XMLExtensionsRegistry;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;
@@ -146,6 +147,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 	
 	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
 	private CompletableFuture<Void> mavenInitializer;
+	
+	private IXMLDocumentProvider documentProvider;
+	
+	private IXMLValidationService validationService;
 
 	@Override
 	public void doSave(ISaveContext context) {
@@ -177,6 +182,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		this.currentRegistry = registry;
 		this.resolverExtensionManager = registry.getResolverExtensionManager();
+		this.documentProvider = registry.getDocumentProvider();
+		this.validationService = registry.getValidationService();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
 			// or that will trigger loading of plexus, Maven and so on even for non pom files
@@ -255,7 +262,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-			cache = new MavenProjectCache(mavenSession);
+			cache = new MavenProjectCache(mavenSession, documentProvider);
 			
 			// Step5 : create local repository searcher
 			cancelChecker.checkCanceled();
@@ -471,6 +478,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 				|| fileName.endsWith(Maven.POMv4) || fileName.endsWith(".pom"));
 	}
 
+	public IXMLValidationService getValidationService() {
+		return validationService;
+	}
+	
 	public MavenProjectCache getProjectCache() {
 		initialize();
 		return this.cache;

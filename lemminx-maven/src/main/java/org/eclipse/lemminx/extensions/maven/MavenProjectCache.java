@@ -11,7 +11,6 @@ package org.eclipse.lemminx.extensions.maven;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -19,7 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -52,21 +52,22 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.maven.utils.DOMModelSource;
+import org.eclipse.lemminx.services.IXMLDocumentProvider;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 public class MavenProjectCache {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenProjectCache.class.getName());
-	private final Map<URI, LoadedMavenProject> projectCache;
+	private final Map<String, LoadedMavenProjectProvider> projectCache;
 	private final MavenSession mavenSession;
-
+	private final IXMLDocumentProvider documentProvider;
 	MavenXpp3Reader mavenReader = new MavenXpp3Reader();
 	private ProjectBuilder projectBuilder;
 
-	private final List<Consumer<MavenProject>> projectParsedListeners = new ArrayList<>();
-
-	public MavenProjectCache(MavenSession mavenSession) {
+	public MavenProjectCache(MavenSession mavenSession, IXMLDocumentProvider documentProvider) {
 		this.mavenSession = mavenSession;
 		this.projectCache = new HashMap<>();
+		this.documentProvider = documentProvider;
 		initializeMavenBuildState();
 	}
 
@@ -81,9 +82,14 @@ public class MavenProjectCache {
 	 *         <code>null</code>.
 	 */
 	public MavenProject getLastSuccessfulMavenProject(DOMDocument document) {
-		check(document);
-		LoadedMavenProject project = getLoadedMavenProject(document.getTextDocument().getUri());
-		return project != null ? project.getMavenProject() : null;
+		CompletableFuture<LoadedMavenProject> project = getLoadedMavenProject(document.getTextDocument().getUri());
+		try {
+			return project != null ? project.get().getMavenProject() : null;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+		}
+		return null;
 	}
 
 	/**
@@ -97,9 +103,14 @@ public class MavenProjectCache {
 	 *         <code>null</code>.
 	 */
 	public MavenProject getLastSuccessfulMavenProject(File pomFile) {
-		check(pomFile);
-		LoadedMavenProject project = getLoadedMavenProject(pomFile.toURI());
-		return project != null ? project.getMavenProject() : null;
+		CompletableFuture<LoadedMavenProject> project = getLoadedMavenProject(pomFile.toURI().toASCIIString());
+		try {
+			return project != null ? project.get().getMavenProject() : null;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+		}
+		return null;
 	}
 
 	/**
@@ -108,60 +119,23 @@ public class MavenProjectCache {
 	 * @return the problems for the latest version of the document (either in cache,
 	 *         or the one passed in arguments)
 	 */
-	public LoadedMavenProject getLoadedMavenProject(DOMDocument document) {
-		check(document);
-		return getLoadedMavenProject(document.getTextDocument().getUri());
-	}
-
-	private void check(DOMDocument document) {
-		LoadedMavenProject project = getLoadedMavenProject(document.getTextDocument().getUri());
-		Integer last = project != null ? project.getLastCheckedVersion() : null;
-		if (last == null || last.intValue() < document.getTextDocument().getVersion()) {
-			parseAndCache(document);
-		}
-	}
-
-	private void check(File pomFile) {
-		LoadedMavenProject project = getLoadedMavenProject(pomFile.toURI());
-		Integer last = project != null ? project.getLastCheckedVersion() : null;
-		if (last == null || last.intValue() < 0) {
-			parseAndCache(pomFile);
-		}
+	public CompletableFuture<LoadedMavenProject> getLoadedMavenProject(DOMDocument document) {
+		String uri = document.getTextDocument().getUri();
+		return getLoadedMavenProject(uri);
 	}
 
 	public Optional<MavenProject> getSnapshotProject(File file) {
-		LoadedMavenProject loadedProject = getLoadedMavenProject(file.toURI());
-		MavenProject lastKnownVersionMavenProject = loadedProject != null ? loadedProject.getMavenProject() : null;
-		if (lastKnownVersionMavenProject != null) {
-			return Optional.of(lastKnownVersionMavenProject);
-		}
-		try {
-			MavenProject project = projectBuilder.build(file, newProjectBuildingRequest()).getProject();
-			return Optional.of(project);
-		} catch (ProjectBuildingException e) {
-			List<ProjectBuildingResult> result = e.getResults();
-			if (result != null && result.size() == 1 && result.get(0).getProject() != null) {
-				MavenProject project = result.get(0).getProject();
-				return Optional.of(project);
-			}
-		} catch (Exception e) {
-			// Some other kinds of exceptions may be thrown, for instance,
-			// an IllegalStateException in case of fail to acquire write lock for an
-			// artifact
-			LOGGER.log(Level.SEVERE, e.getMessage(), e);
-		}
-
-		return Optional.empty();
+		return Optional.of(getLastSuccessfulMavenProject(file));
 	}
-
-	private void parseAndCache(URI uri, int version, FileModelSource source) {
+	
+	public LoadedMavenProject build(FileModelSource source, CancelChecker cancelChecker) {
 		Collection<ModelProblem> problems = new ArrayList<>();
 		DependencyResolutionResult dependencyResolutionResult = null;
-		uri = uri.normalize();
-		final File file = new File(uri);
 		MavenProject project = null;
-		try {
+		File file = source.getFile();
+		try {			
 			ProjectBuildingResult buildResult = projectBuilder.build(source, newProjectBuildingRequest());
+			cancelChecker.checkCanceled();
 			project = buildResult.getProject();
 			problems.addAll(buildResult.getProblems());
 			dependencyResolutionResult = buildResult.getDependencyResolutionResult();
@@ -169,7 +143,7 @@ public class MavenProjectCache {
 			if (project != null) {
 				// setFile should ideally be invoked during project build, but related methods
 				// to pass modelSource and pomFile are private
-				project.setFile(new File(uri));
+				project.setFile(file);
 			}
 		} catch (ProjectBuildingException e) {
 			if (e.getResults() == null) {
@@ -181,6 +155,7 @@ public class MavenProjectCache {
 							.filter(p -> !(p.getException() instanceof ModelParseException)).forEach(problems::add);
 					try (InputStream documentStream = source.getInputStream()) {
 						Model model = mavenReader.read(documentStream);
+						cancelChecker.checkCanceled();
 						project = new MavenProject(model);
 						project.setRemoteArtifactRepositories(model.getRepositories().stream()
 								.map(repo -> new MavenArtifactRepository(repo.getId(), repo.getUrl(),
@@ -210,7 +185,7 @@ public class MavenProjectCache {
 				if (e.getResults().size() == 1) {
 					project = e.getResults().get(0).getProject();
 					if (project != null) {
-						project.setFile(new File(uri));
+						project.setFile(file);
 					}
 				}
 			}
@@ -223,33 +198,9 @@ public class MavenProjectCache {
 			// happened.
 			//
 			LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			return; // Nothing to be cached
+			return null; // Nothing to be cached
 		}
-
-		cacheProject(project, file, uri, version, problems, dependencyResolutionResult);
-	}
-
-	private void cacheProject(final MavenProject project, File file, URI uri, int version,
-			Collection<ModelProblem> problems, DependencyResolutionResult dependencyResolutionResult) {
-		LoadedMavenProject loadedProject = new LoadedMavenProject(project, version, problems,
-				dependencyResolutionResult);
-		if (project != null) {
-			projectParsedListeners.forEach(listener -> listener.accept(project));
-		}
-		projectCache.put(uri, loadedProject);
-	}
-
-	private void parseAndCache(DOMDocument document) {
-		URI uri = URI.create(document.getDocumentURI()).normalize();
-		int version = document.getTextDocument().getVersion();
-		DOMModelSource source = new DOMModelSource(document);
-		parseAndCache(uri, version, source);
-	}
-
-	private void parseAndCache(File pomFile) {
-		URI uri = pomFile.toURI().normalize();
-		FileModelSource source = new FileModelSource(pomFile);
-		parseAndCache(uri, 0, source);
+		return new LoadedMavenProject(project, problems, dependencyResolutionResult);
 	}
 
 	private ProjectBuildingRequest newProjectBuildingRequest() {
@@ -290,7 +241,7 @@ public class MavenProjectCache {
 	}
 
 	public Collection<MavenProject> getProjects() {
-		return projectCache.values().stream().map(LoadedMavenProject::getMavenProject).toList();
+		return null; //projectCache.values().stream().map(LoadedMavenProject::getMavenProject).toList();
 	}
 
 	public MavenProject getSnapshotProject(DOMDocument document, String profileId) {
@@ -318,11 +269,17 @@ public class MavenProjectCache {
 		return null;
 	}
 
-	private LoadedMavenProject getLoadedMavenProject(String uri) {
-		return getLoadedMavenProject(URI.create(uri));
-	}
-
-	private LoadedMavenProject getLoadedMavenProject(URI uri) {
-		return projectCache.get(uri.normalize());
+	private CompletableFuture<LoadedMavenProject> getLoadedMavenProject(String uri) {
+		LoadedMavenProjectProvider provider = projectCache.get(uri);
+		if (provider == null) {
+			synchronized (projectCache) {
+				provider = projectCache.get(uri);
+				if (provider == null) {
+					provider = new LoadedMavenProjectProvider(uri, documentProvider, this);
+					projectCache.put(uri, provider);
+				}
+			}
+		}
+		return provider.getLoadedMavenProject();
 	}
 }

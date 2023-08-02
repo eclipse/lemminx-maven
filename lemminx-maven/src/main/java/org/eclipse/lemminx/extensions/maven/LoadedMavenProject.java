@@ -29,14 +29,12 @@ import org.eclipse.lemminx.dom.DOMDocument;
 public class LoadedMavenProject {
 
 	private final MavenProject mavenProject;
-	private int lastCheckedVersion;
 	private final Collection<ModelProblem> problems;
 	private final DependencyResolutionResult dependencyResolutionResult;
 
-	public LoadedMavenProject(MavenProject mavenProject, int version, Collection<ModelProblem> problems,
+	public LoadedMavenProject(MavenProject mavenProject, Collection<ModelProblem> problems,
 			DependencyResolutionResult dependencyResolutionResult) {
 		this.mavenProject = mavenProject;
-		this.lastCheckedVersion = version;
 		this.problems = problems;
 		this.dependencyResolutionResult = dependencyResolutionResult;
 	}
@@ -72,16 +70,4 @@ public class LoadedMavenProject {
 		return dependencyResolutionResult;
 	}
 
-	/**
-	 * Returns the last checked version of the document of the pom.xml.
-	 * <p>
-	 * 0 means that the loaded maven project has been loaded by a pom.xml file (it
-	 * is not editing).
-	 * </p>
-	 * 
-	 * @return the last checked version of the document of the pom.xml.
-	 */
-	public int getLastCheckedVersion() {
-		return lastCheckedVersion;
-	}
 }
