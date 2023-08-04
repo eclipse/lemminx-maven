@@ -49,4 +49,12 @@ public class MavenLanguageService extends XMLLanguageService{
 		});
 	}
 
+	public void didOpen(DOMDocument document) {
+		// We need to store the dom document instance that test created because
+		// the dpcument content can changes in the test and when getDocument(String uri)
+		// will be called it need to use this instance otherwise it will get the 
+		// instance loaded from the file which have not changed
+		documents.put(document.getDocumentURI(), document);
+	}
+
 }

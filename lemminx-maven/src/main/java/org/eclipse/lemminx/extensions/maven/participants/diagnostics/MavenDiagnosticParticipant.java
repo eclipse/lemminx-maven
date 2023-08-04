@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -63,6 +64,17 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 
 		try {
 			CompletableFuture<LoadedMavenProject> project = plugin.getProjectCache().getLoadedMavenProject(xmlDocument);
+			if (MavenLemminxExtension.isUnitTestMode()) {			
+				try {
+					project.get();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (ExecutionException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 			if (!project.isDone()) {
 				// The pom.xml takes some times to load it, to avoid blocking the XML syntax validation, XML validation based on XSD
 				// we retrigger the validation when the pom.xml is loaded.

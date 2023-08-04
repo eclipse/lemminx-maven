@@ -137,7 +137,12 @@ public class SimpleModelTest {
 	@Test
 	public void testMissingArtifactIdError()
 			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		MavenLanguageService languageService = new MavenLanguageService();
+		
 		DOMDocument document = createDOMDocument("/pom-without-artifactId.xml", languageService);
+		
+		
+		languageService.didOpen(document);
 		assertTrue(languageService.doDiagnostics(document, new XMLValidationSettings(), Map.of(), () -> {}).stream().map(Diagnostic::getMessage)
 				.anyMatch(message -> message.contains("artifactId")));
 		// simulate an edit
