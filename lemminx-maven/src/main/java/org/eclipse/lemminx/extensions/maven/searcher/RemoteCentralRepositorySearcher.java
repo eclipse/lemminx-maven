@@ -416,19 +416,20 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	private JsonObject getResponseBody(Request request, Dependency artifactToSearch) throws Exception {
-		Response response = client.newCall(request).execute();
-		if (response.isSuccessful()) {
-			JsonObject bodyObject = JsonParser.parseReader(response.body().charStream()).getAsJsonObject();
-			if (bodyObject.has(RESPONSE)) {
-				JsonObject responseObject = bodyObject.get(RESPONSE).getAsJsonObject();
-				if (responseObject.has(NUM_FOUND) && responseObject.has(DOCS)) {
-					return responseObject;
+		try (Response response = client.newCall(request).execute()) {
+			if (response.isSuccessful()) {
+				JsonObject bodyObject = JsonParser.parseReader(response.body().charStream()).getAsJsonObject();
+				if (bodyObject.has(RESPONSE)) {
+					JsonObject responseObject = bodyObject.get(RESPONSE).getAsJsonObject();
+					if (responseObject.has(NUM_FOUND) && responseObject.has(DOCS)) {
+						return responseObject;
+					}
 				}
+			} else {
+				LOGGER.log(Level.SEVERE, "Maven Central Repo search failed for " + String.join(":",
+						artifactToSearch.getGroupId(), artifactToSearch.getArtifactId(), artifactToSearch.getVersion()),
+						response.message());
 			}
-		} else {
-			LOGGER.log(Level.SEVERE, "Maven Central Repo search failed for " + String.join(":",
-					artifactToSearch.getGroupId(), artifactToSearch.getArtifactId(), artifactToSearch.getVersion()),
-					response.message());
 		}
 		return null;
 	}
