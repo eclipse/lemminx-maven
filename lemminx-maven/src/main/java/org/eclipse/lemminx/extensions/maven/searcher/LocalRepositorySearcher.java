@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -116,6 +117,7 @@ public class LocalRepositorySearcher {
 
 			// Once the local artifacts are loaded, we track the local repository to update
 			// the cache.
+			final CompletableFuture<Collection<Artifact>> future = loadLocalArtifacts;
 			loadLocalArtifacts.thenAcceptAsync(artifacts -> {
 				try {
 					Path localRepoPath = localRepository.toPath();
@@ -126,8 +128,24 @@ public class LocalRepositorySearcher {
 					WatchKey key;
 
 					while ((key = (watchService != null ? watchService.take() : null)) != null) {
-						if (watchKey.equals(key)) {
-							cache.remove(localRepository);
+						if (watchKey.equals(key)) {							
+							for (WatchEvent<?> event : key.pollEvents()) {
+								Path file = event.context() instanceof Path ? (Path) event.context() : null;
+								if (file != null) {
+									DefaultArtifact artifact = createArtifact(file, localRepoPath, null);
+									if (artifact != null) {																	
+								        if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+								        	future.thenAccept(list -> {
+								        		list.add(artifact);
+								        	});
+								        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+								        	future.thenAccept(list -> {
+								        		list.remove(artifact);
+								        	});
+								        }
+									}
+								}
+						    }
 							key.reset();
 						}
 					}
@@ -187,30 +205,11 @@ public class LocalRepositorySearcher {
 					cancelChecker.checkCanceled();
 					return FileVisitResult.CONTINUE;
 				}
-				Path artifactFolderPath = repoPath.relativize(file);
-				if (artifactFolderPath.getNameCount() < 3) {
-					cancelChecker.checkCanceled();
-					// eg "maven-dependency-plugin/3.1.2"
-					return FileVisitResult.SKIP_SUBTREE;
-				}
-				ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
-				String artifactId = artifactFolderPath.getParent().getFileName().toString();
-				String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
-				if (!new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
-					cancelChecker.checkCanceled();
-					return FileVisitResult.SKIP_SUBTREE;
-				}
-				String groupIdArtifactId = groupId + ':' + artifactId;
-				Artifact existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
-				boolean replace = existingGav == null;
-				if (existingGav != null) {
-					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
-					replace |= existingVersion.compareTo(version) < 0;
-					replace |= (existingVersion.toString().endsWith("-SNAPSHOT") && !version.toString().endsWith("-SNAPSHOT"));
-				}
-				if (replace) {
-					groupIdArtifactIdToVersion.put(groupIdArtifactId, new DefaultArtifact(groupId, artifactId, null, version.toString()));
-				}
+				DefaultArtifact artifact = createArtifact(file, repoPath, groupIdArtifactIdToVersion);
+				if (artifact != null) {
+					String groupIdArtifactId = artifact.getGroupId() + ':' + artifact.getArtifactId();
+					groupIdArtifactIdToVersion.put(groupIdArtifactId, artifact);
+				}				
 				cancelChecker.checkCanceled();
 				return FileVisitResult.SKIP_SUBTREE;
 			}
@@ -249,7 +248,7 @@ public class LocalRepositorySearcher {
 		cache
 			.values()
 			.forEach(f -> f.cancel(true));
-		// Close the watch service which tracks the local repository.
+		// Close the watch service which tracks the l)ocal repository.
 		if (watchService != null && watchKey != null) {
 			watchKey.cancel();
 			try {
@@ -260,6 +259,34 @@ public class LocalRepositorySearcher {
 			watchKey = null;
 			watchService = null;
 		}
+	}
+
+	private DefaultArtifact createArtifact(Path file, final Path repoPath, Map<String, Artifact> groupIdArtifactIdToVersion) {
+		Path artifactFolderPath = repoPath.relativize(file);
+		if (artifactFolderPath.getNameCount() < 3) {
+			// eg "maven-dependency-plugin/3.1.2"
+			return null;
+		} else {
+			ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
+			String artifactId = artifactFolderPath.getParent().getFileName().toString();
+			String groupId = artifactFolderPath.getParent().getParent().toString()
+					.replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
+			if (new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
+				String groupIdArtifactId = groupId + ':' + artifactId;
+				Artifact existingGav = groupIdArtifactIdToVersion != null ? groupIdArtifactIdToVersion.get(groupIdArtifactId) : null;
+				boolean replace = existingGav == null;
+				if (existingGav != null) {
+					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
+					replace |= existingVersion.compareTo(version) < 0;
+					replace |= (existingVersion.toString().endsWith("-SNAPSHOT")
+							&& !version.toString().endsWith("-SNAPSHOT"));
+				}
+				if (replace) {
+					return new DefaultArtifact(groupId, artifactId, null, version.toString());
+				}
+			}
+		}
+		return null;
 	}
 
 }
