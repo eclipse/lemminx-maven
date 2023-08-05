@@ -533,6 +533,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 			localRepositorySearcher.stop();
 			localRepositorySearcher = null;
 		}
+		if (centralSearcher != null) {
+			centralSearcher.stop();
+			centralSearcher = null;
+		}
 		cache = null;
 		if (container != null) {
 			container.dispose();
