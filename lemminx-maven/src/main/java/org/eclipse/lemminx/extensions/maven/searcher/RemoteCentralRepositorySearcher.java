@@ -17,6 +17,8 @@ import static org.eclipse.lemminx.extensions.maven.searcher.JsonRemoteCentralRep
 import static org.eclipse.lemminx.extensions.maven.searcher.JsonRemoteCentralRepositoryConstants.VERSION;
 import static org.eclipse.lemminx.utils.ExceptionUtils.getRootCause;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.MessageFormat;
@@ -39,18 +41,22 @@ import java.util.logging.Logger;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
+import org.eclipse.aether.ConfigurationProperties;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
+import org.eclipse.lemminx.utils.platform.Platform;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import io.takari.aether.client.AetherClientAuthentication;
+import io.takari.aether.client.AetherClientConfig;
+import io.takari.aether.client.AetherClientProxy;
+import io.takari.aether.client.Response;
+import io.takari.aether.okhttp.OkHttpAetherClient;
 
 public class RemoteCentralRepositorySearcher {
 	private static final Logger LOGGER = Logger.getLogger(RemoteCentralRepositorySearcher.class.getName());
@@ -67,12 +73,9 @@ public class RemoteCentralRepositorySearcher {
 	public static boolean disableCentralSearch = Boolean.parseBoolean(
 			System.getProperty(RemoteCentralRepositorySearcher.class.getName() + ".disableCentralSearch"));
 
-	private static int cacheExpirationTimeoutMinutes = Integer.parseInt(System
-			.getProperty(RemoteCentralRepositorySearcher.class.getName() + ".cacheExpirationTimeoutMinutes", "-1"), 10);
-
 	private final static long DEFAULT_CACHE_EXPIRATION_TIMEOUT = 30L;
 
-	private final OkHttpClient client;
+	private final OkHttpAetherClient client;
 
 	private final ExecutorService executorService;
 
@@ -101,13 +104,13 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	private static class RequestKey {
-		Request request;
+		String url;
 		RequestKind kind;
 		Dependency artifact;
 		String packaging;
 
-		public RequestKey(Request request, RequestKind kind, Dependency artifact, String packaging) {
-			this.request = request;
+		public RequestKey(String url, RequestKind kind, Dependency artifact, String packaging) {
+			this.url = url;
 			this.kind = kind;
 			this.artifact = artifact;
 			this.packaging = packaging;
@@ -126,9 +129,8 @@ public class RemoteCentralRepositorySearcher {
 
 		@Override
 		public int hashCode() {
-			String requestString = request.toString();
 			String artifactString = artifact.toString();
-			return Objects.hash(requestString, kind, packaging, artifactString);
+			return Objects.hash(url, kind, packaging, artifactString);
 		}
 	}
 
@@ -227,7 +229,7 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	public RemoteCentralRepositorySearcher() {
-		this.client = new OkHttpClient();
+		this.client = newHttpClient();
 		this.executorService = Executors.newFixedThreadPool(3);
 		this.cache = CacheBuilder.newBuilder() //
 				.expireAfterWrite(DEFAULT_CACHE_EXPIRATION_TIMEOUT, TimeUnit.MINUTES)//
@@ -236,6 +238,51 @@ public class RemoteCentralRepositorySearcher {
 		this.groupIdsCache = new CacheManager<RemoteCentralRepositorySearcher.RequestKey, Collection<String>>(cache);
 		this.artifactVersionsCache = new CacheManager<RemoteCentralRepositorySearcher.RequestKey, Collection<ArtifactVersion>>(
 				cache);
+	}
+
+	private OkHttpAetherClient newHttpClient() {
+		AetherClientConfig config = new AetherClientConfig();
+		config.setConnectionTimeout(ConfigurationProperties.DEFAULT_CONNECT_TIMEOUT);
+		config.setRequestTimeout(ConfigurationProperties.DEFAULT_REQUEST_TIMEOUT);
+		// config.setSslSocketFactory(SSLContext.getDefault().getSocketFactory());
+
+		// Authentification
+		AetherClientAuthentication authentication = null;
+		final String username = System.getProperty("http.proxyUser");
+		final String password = System.getProperty("http.proxyPassword");
+		if (username != null && password != null) {
+			authentication = new AetherClientAuthentication(username, password);
+		}
+
+		// Proxy
+		String proxyHost = System.getProperty("http.proxyHost");
+		Integer proxyPort = null;
+		if (proxyHost != null) {
+			proxyPort = Integer.getInteger(System.getProperty("http.proxyPort"));
+		} else {
+			proxyHost = System.getProperty("https.proxyHost");
+			if (proxyHost != null) {
+				proxyPort = Integer.getInteger(System.getProperty("https.proxyPort"));
+			}
+		}
+		if (proxyHost != null && proxyPort != null) {
+			AetherClientProxy clientProxy = new AetherClientProxy();
+			clientProxy.setHost(proxyHost);
+			clientProxy.setPort(proxyPort);
+			clientProxy.setAuthentication(authentication);
+			config.setProxy(clientProxy);
+		}
+
+		if (config.getProxy() == null) {
+			config.setAuthentication(authentication);
+		}
+		
+		// ex: LemMinX/0.27.1-SNAPSHOT (Windows 11 10.0)
+		String userAgent = "LemMinX/" + Platform.getVersion().getVersionNumber() + " (" + Platform.getOS().getName()
+				+ " " + Platform.getOS().getVersion() + ")";
+		config.setUserAgent(userAgent);
+		config.setHeaders(Collections.emptyMap());
+		return new OkHttpAetherClient(config);
 	}
 
 	public Collection<Artifact> getArtifacts(Dependency artifactToSearch) throws OngoingOperationException {
@@ -271,13 +318,13 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	private Collection<Artifact> internalGetArtifacts(Dependency artifactToSearch, String packaging) {
-		Request request = createArtifactIdsRequesty(artifactToSearch, packaging);
+		String url = createArtifactIdsRequesty(artifactToSearch, packaging);
 		Collection<Artifact> result = artifactsCache.getAssync(
-				new RequestKey(request, RequestKind.KIND_GET_ARTIFACTS, artifactToSearch, packaging),
+				new RequestKey(url, RequestKind.KIND_GET_ARTIFACTS, artifactToSearch, packaging),
 				new Callable<Collection<Artifact>>() {
 					@Override
 					public Collection<Artifact> call() throws Exception {
-						JsonObject responseBody = getResponseBody(request, artifactToSearch);
+						JsonObject responseBody = getResponseBody(url, artifactToSearch);
 						if (responseBody == null || responseBody.get(NUM_FOUND).getAsInt() <= 0) {
 							return Collections.emptyList();
 						}
@@ -298,13 +345,13 @@ public class RemoteCentralRepositorySearcher {
 			return Collections.emptySet();
 		}
 
-		Request request = createArtifactVersionsRequest(artifactToSearch, packaging);
+		String url = createArtifactVersionsRequest(artifactToSearch, packaging);
 		Collection<ArtifactVersion> result = artifactVersionsCache.getAssync(
-				new RequestKey(request, RequestKind.KIND_GET_ARTIFACT_VERSIONS, artifactToSearch, packaging),
+				new RequestKey(url, RequestKind.KIND_GET_ARTIFACT_VERSIONS, artifactToSearch, packaging),
 				new Callable<Collection<ArtifactVersion>>() {
 					@Override
 					public Collection<ArtifactVersion> call() throws Exception {
-						JsonObject responseBody = getResponseBody(request, artifactToSearch);
+						JsonObject responseBody = getResponseBody(url, artifactToSearch);
 						if (responseBody == null || responseBody.get(NUM_FOUND).getAsInt() <= 0) {
 							return Collections.emptySet();
 						}
@@ -326,13 +373,13 @@ public class RemoteCentralRepositorySearcher {
 			return Collections.emptySet();
 		}
 
-		Request request = createGroupIdsRequest(artifactToSearch, packaging);
+		String url = createGroupIdsRequest(artifactToSearch, packaging);
 		Collection<String> result = groupIdsCache.getAssync(
-				new RequestKey(request, RequestKind.KIND_GET_GROUP_IDS, artifactToSearch, packaging),
+				new RequestKey(url, RequestKind.KIND_GET_GROUP_IDS, artifactToSearch, packaging),
 				new Callable<Collection<String>>() {
 					@Override
 					public Collection<String> call() throws Exception {
-						JsonObject responseBody = getResponseBody(request, artifactToSearch);
+						JsonObject responseBody = getResponseBody(url, artifactToSearch);
 						if (responseBody == null || responseBody.get(NUM_FOUND).getAsInt() <= 0) {
 							return Collections.emptySet();
 						}
@@ -348,7 +395,7 @@ public class RemoteCentralRepositorySearcher {
 		return result != null ? result : Collections.emptySet();
 	}
 
-	private static Request createGroupIdsRequest(Dependency artifactToSearch, String packaging) {
+	private static String createGroupIdsRequest(Dependency artifactToSearch, String packaging) {
 		StringBuilder query = new StringBuilder();
 		query.append("p:").append(packaging).append(" AND ").append("g:");
 		if (!isEmpty(artifactToSearch.getGroupId())) {
@@ -366,10 +413,10 @@ public class RemoteCentralRepositorySearcher {
 					ex.getMessage());
 			return null;
 		}
-		return new Request.Builder().url(url.toString()).build();
+		return url.toString();
 	}
 
-	private static Request createArtifactIdsRequesty(Dependency artifactToSearch, String packaging) {
+	private static String createArtifactIdsRequesty(Dependency artifactToSearch, String packaging) {
 		StringBuilder query = new StringBuilder();
 		query.append("p:").append(packaging);
 
@@ -390,10 +437,10 @@ public class RemoteCentralRepositorySearcher {
 					ex.getMessage());
 			return null;
 		}
-		return new Request.Builder().url(url.toString()).build();
+		return url.toString();
 	}
 
-	private static Request createArtifactVersionsRequest(Dependency artifactToSearch, String packaging) {
+	private static String createArtifactVersionsRequest(Dependency artifactToSearch, String packaging) {
 		StringBuilder query = new StringBuilder();
 		query.append("p:").append(packaging).append(" AND ").append("g:").append(artifactToSearch.getGroupId())
 				.append(" AND ").append("a:").append(artifactToSearch.getArtifactId());
@@ -412,25 +459,44 @@ public class RemoteCentralRepositorySearcher {
 					ex.getMessage());
 			return null;
 		}
-		return new Request.Builder().url(url.toString()).build();
+		return url.toString();
 	}
 
-	private JsonObject getResponseBody(Request request, Dependency artifactToSearch) throws Exception {
-		Response response = client.newCall(request).execute();
-		if (response.isSuccessful()) {
-			JsonObject bodyObject = JsonParser.parseReader(response.body().charStream()).getAsJsonObject();
-			if (bodyObject.has(RESPONSE)) {
-				JsonObject responseObject = bodyObject.get(RESPONSE).getAsJsonObject();
-				if (responseObject.has(NUM_FOUND) && responseObject.has(DOCS)) {
-					return responseObject;
+	private JsonObject getResponseBody(String url, Dependency artifactToSearch) throws Exception {
+		// Response is closable
+		try (Response response = client.get(url)) {
+			if (isSuccessful(response)) {
+				JsonObject bodyObject = JsonParser.parseReader(new InputStreamReader(response.getInputStream()))
+						.getAsJsonObject();
+				if (bodyObject.has(RESPONSE)) {
+					JsonObject responseObject = bodyObject.get(RESPONSE).getAsJsonObject();
+					if (responseObject.has(NUM_FOUND) && responseObject.has(DOCS)) {
+						return responseObject;
+					}
 				}
+			} else {
+				LOGGER.log(Level.SEVERE,
+						"Maven Central Repo search failed for " + String.join(":", artifactToSearch.getGroupId(),
+								artifactToSearch.getArtifactId(), artifactToSearch.getVersion()),
+						response.getStatusMessage());
 			}
-		} else {
-			LOGGER.log(Level.SEVERE, "Maven Central Repo search failed for " + String.join(":",
-					artifactToSearch.getGroupId(), artifactToSearch.getArtifactId(), artifactToSearch.getVersion()),
-					response.message());
 		}
 		return null;
+	}
+
+	/**
+	 * Returns true if the code is in [200..300), which means the request was
+	 * successfully received, understood, and accepted.
+	 * 
+	 * @throws IOException
+	 */
+	private static boolean isSuccessful(Response response) {
+		try {
+			int code = response.getStatusCode();
+			return code >= 200 && code < 300;
+		} catch (IOException e) {
+			return false;
+		}
 	}
 
 	private static final Artifact toArtifactInfo(JsonObject object) {
@@ -446,6 +512,7 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	public void stop() {
+		client.close();
 		executorService.shutdown();
 	}
 }
