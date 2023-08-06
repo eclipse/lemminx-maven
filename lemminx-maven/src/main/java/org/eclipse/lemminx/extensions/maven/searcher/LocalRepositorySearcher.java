@@ -12,15 +12,11 @@ import static org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils.isWell
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,6 +39,7 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.lemminx.commons.progress.ProgressMonitor;
 import org.eclipse.lemminx.commons.progress.ProgressSupport;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.searcher.watcher.LocalRepositoryFilesWatcher;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 
@@ -59,8 +56,8 @@ public class LocalRepositorySearcher {
 	private final ProgressSupport progressSupport;
 
 	private Map<File, CompletableFuture<Collection<Artifact>>> cache = new HashMap<>();
-	private WatchKey watchKey;
-	private WatchService watchService;
+
+	private LocalRepositoryFilesWatcher localRepoWatcher;
 
 	public LocalRepositorySearcher(File localRepository, ProgressSupport progressSupport) {
 		this.localRepository = localRepository;
@@ -75,8 +72,9 @@ public class LocalRepositorySearcher {
 		return getLocalPluginArtifacts().stream().map(Artifact::getGroupId).distinct().collect(Collectors.toSet());
 	}
 
-	public Collection<Artifact> getLocalPluginArtifacts()  {
-		return getLocalArtifactsLastVersion().stream().filter(gav -> gav.getArtifactId().contains("-plugin")).collect(Collectors.toSet());
+	public Collection<Artifact> getLocalPluginArtifacts() {
+		return getLocalArtifactsLastVersion().stream().filter(gav -> gav.getArtifactId().contains("-plugin"))
+				.collect(Collectors.toSet());
 	}
 
 	public Collection<Artifact> getLocalArtifactsLastVersion() {
@@ -96,7 +94,8 @@ public class LocalRepositorySearcher {
 		if (loadLocalArtifacts == null || loadLocalArtifacts.isCompletedExceptionally()) {
 			if (MavenLemminxExtension.isUnitTestMode()) {
 				try {
-					loadLocalArtifacts = CompletableFuture.completedFuture(computeLocalArtifacts(() -> {}));
+					loadLocalArtifacts = CompletableFuture.completedFuture(computeLocalArtifacts(() -> {
+					}));
 				} catch (IOException e) {
 					LOGGER.log(Level.SEVERE, "Local repo loading error", e);
 				}
@@ -116,27 +115,12 @@ public class LocalRepositorySearcher {
 
 			// Once the local artifacts are loaded, we track the local repository to update
 			// the cache.
-			loadLocalArtifacts.thenAcceptAsync(artifacts -> {
+			loadLocalArtifacts.thenAccept(artifacts -> {
 				try {
 					Path localRepoPath = localRepository.toPath();
-					watchService = localRepoPath.getFileSystem().newWatchService();
-					watchKey = localRepoPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
-							StandardWatchEventKinds.ENTRY_DELETE);
-
-					WatchKey key;
-
-					while ((key = (watchService != null ? watchService.take() : null)) != null) {
-						if (watchKey.equals(key)) {
-							cache.remove(localRepository);
-							key.reset();
-						}
-					}
+					localRepoWatcher = new LocalRepositoryFilesWatcher(localRepoPath, artifacts);
 				} catch (IOException e) {
-					LOGGER.log(Level.SEVERE, "Local repo thread watcher error", e);
-				} catch (ClosedWatchServiceException e) {
-					LOGGER.log(Level.WARNING, "Local repo thread watcher is closed");
-				} catch (InterruptedException e) {
-					LOGGER.log(Level.SEVERE, "Local repo thread watcher interrupted", e);
+					LOGGER.log(Level.SEVERE, "Cannot create local repo thread watcher error", e);
 				}
 			});
 		}
@@ -156,13 +140,13 @@ public class LocalRepositorySearcher {
 			int i = 0;
 			for (Path path : subPaths) {
 				cancelChecker.checkCanceled();
-				if (progressMonitor != null) {					
-					progressMonitor.report("scanning folder' " + path.getFileName().getName(0) + "' (" + i++ + "/" + subPaths.size() +  ")...", increment++, null);
+				if (progressMonitor != null) {
+					progressMonitor.report("scanning folder' " + path.getFileName().getName(0) + "' (" + i++ + "/"
+							+ subPaths.size() + ")...", increment++, null);
 				}
 				try {
 					collect(path, repoPath, groupIdArtifactIdToVersion, cancelChecker);
-				}
-				catch(IOException e) {
+				} catch (IOException e) {
 					LOGGER.log(Level.SEVERE, "Error while scanning local repo folder " + path, e);
 				}
 			}
@@ -171,7 +155,21 @@ public class LocalRepositorySearcher {
 				progressMonitor.end(null);
 			}
 		}
-		return groupIdArtifactIdToVersion.values();
+		return new ArrayList<>(groupIdArtifactIdToVersion.values());
+	}
+
+	private static List<Path> getSubDirectories(Path directoryPath) {
+		List<Path> subDirectories = new ArrayList<>();
+		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(directoryPath)) {
+			for (Path entry : directoryStream) {
+				if (Files.isDirectory(entry)) {
+					subDirectories.add(entry);
+				}
+			}
+		} catch (IOException e) {
+			// Do nothing
+		}
+		return subDirectories;
 	}
 
 	private void collect(final Path currentPath, final Path repoPath, Map<String, Artifact> groupIdArtifactIdToVersion,
@@ -187,48 +185,52 @@ public class LocalRepositorySearcher {
 					cancelChecker.checkCanceled();
 					return FileVisitResult.CONTINUE;
 				}
-				Path artifactFolderPath = repoPath.relativize(file);
-				if (artifactFolderPath.getNameCount() < 3) {
-					cancelChecker.checkCanceled();
-					// eg "maven-dependency-plugin/3.1.2"
-					return FileVisitResult.SKIP_SUBTREE;
-				}
-				ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
-				String artifactId = artifactFolderPath.getParent().getFileName().toString();
-				String groupId = artifactFolderPath.getParent().getParent().toString().replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
-				if (!new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
-					cancelChecker.checkCanceled();
-					return FileVisitResult.SKIP_SUBTREE;
-				}
-				String groupIdArtifactId = groupId + ':' + artifactId;
-				Artifact existingGav = groupIdArtifactIdToVersion.get(groupIdArtifactId);
-				boolean replace = existingGav == null;
-				if (existingGav != null) {
-					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
-					replace |= existingVersion.compareTo(version) < 0;
-					replace |= (existingVersion.toString().endsWith("-SNAPSHOT") && !version.toString().endsWith("-SNAPSHOT"));
-				}
-				if (replace) {
-					groupIdArtifactIdToVersion.put(groupIdArtifactId, new DefaultArtifact(groupId, artifactId, null, version.toString()));
+				DefaultArtifact artifact = createArtifact(file, repoPath, groupIdArtifactIdToVersion);
+				if (artifact != null) {
+					String groupIdArtifactId = artifact.getGroupId() + ':' + artifact.getArtifactId();
+					groupIdArtifactIdToVersion.put(groupIdArtifactId, artifact);
 				}
 				cancelChecker.checkCanceled();
 				return FileVisitResult.SKIP_SUBTREE;
 			}
 		});
 	}
-	
-	private static List<Path> getSubDirectories(Path directoryPath) {
-		List<Path> subDirectories = new ArrayList<>();
-		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(directoryPath)) {
-			for (Path entry : directoryStream) {
-				if (Files.isDirectory(entry)) {
-					subDirectories.add(entry);
+
+	public static DefaultArtifact createArtifact(Path file, final Path repoPath,
+			Map<String, Artifact> groupIdArtifactIdToVersion) {
+		return createArtifact(file, repoPath, groupIdArtifactIdToVersion, true);
+	}
+
+	public static DefaultArtifact createArtifact(Path file, final Path repoPath,
+			Map<String, Artifact> groupIdArtifactIdToVersion, boolean checkExistingPomFile) {
+		Path artifactFolderPath = repoPath.relativize(file);
+		if (artifactFolderPath.getNameCount() < 3) {
+			// eg "maven-dependency-plugin/3.1.2"
+			return null;
+		} else {
+			ArtifactVersion version = new DefaultArtifactVersion(artifactFolderPath.getFileName().toString());
+			String artifactId = artifactFolderPath.getParent().getFileName().toString();
+			String groupId = artifactFolderPath.getParent().getParent().toString()
+					.replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
+			if (!checkExistingPomFile
+					|| new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
+				String groupIdArtifactId = groupId + ':' + artifactId;
+				Artifact existingGav = groupIdArtifactIdToVersion != null
+						? groupIdArtifactIdToVersion.get(groupIdArtifactId)
+						: null;
+				boolean replace = existingGav == null;
+				if (existingGav != null) {
+					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
+					replace |= existingVersion.compareTo(version) < 0;
+					replace |= (existingVersion.toString().endsWith("-SNAPSHOT")
+							&& !version.toString().endsWith("-SNAPSHOT"));
+				}
+				if (replace) {
+					return new DefaultArtifact(groupId, artifactId, null, version.toString());
 				}
 			}
-		} catch (IOException e) {
-			// Do nothing		
 		}
-		return subDirectories;
+		return null;
 	}
 
 	// TODO consider using directly ArtifactRepository for those 2 methods
@@ -239,26 +241,21 @@ public class LocalRepositorySearcher {
 						+ File.separatorChar + dependency.getArtifactId() + '-' + dependency.getVersion() + ".pom")
 				: null;
 	}
-	
+
 	public File findLocalFile(Artifact gav) {
-		return new File(localRepository, gav.getGroupId().replace('.', File.separatorChar) + File.separatorChar + gav.getArtifactId() + File.separatorChar + gav.getVersion() + File.separatorChar + gav.getArtifactId() + '-' + gav.getVersion() + ".pom");
+		return new File(localRepository,
+				gav.getGroupId().replace('.', File.separatorChar) + File.separatorChar + gav.getArtifactId()
+						+ File.separatorChar + gav.getVersion() + File.separatorChar + gav.getArtifactId() + '-'
+						+ gav.getVersion() + ".pom");
 	}
 
 	public void stop() {
 		// Stop the thread which collects local repository artifacts
-		cache
-			.values()
-			.forEach(f -> f.cancel(true));
+		cache.values().forEach(f -> f.cancel(true));
 		// Close the watch service which tracks the local repository.
-		if (watchService != null && watchKey != null) {
-			watchKey.cancel();
-			try {
-				watchService.close();
-			} catch (IOException e) {
-				LOGGER.log(Level.SEVERE, e.getMessage(), e);
-			}
-			watchKey = null;
-			watchService = null;
+		if (localRepoWatcher != null) {
+			localRepoWatcher.stop();
+			localRepoWatcher = null;
 		}
 	}
 
