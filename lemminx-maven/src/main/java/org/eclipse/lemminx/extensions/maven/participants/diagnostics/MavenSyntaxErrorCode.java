@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven;
+package org.eclipse.lemminx.extensions.maven.participants.diagnostics;
 
 import java.util.HashMap;
 import java.util.Map;

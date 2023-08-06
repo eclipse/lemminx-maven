@@ -90,8 +90,12 @@ import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinit
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.rename.MavenPropertyRenameParticipant;
+import org.eclipse.lemminx.extensions.maven.project.LoadedMavenProject;
+import org.eclipse.lemminx.extensions.maven.project.MavenProjectCache;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySearcher;
+import org.eclipse.lemminx.extensions.maven.settings.XMLMavenGeneralSettings;
+import org.eclipse.lemminx.extensions.maven.settings.XMLMavenSettings;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.services.IXMLDocumentProvider;

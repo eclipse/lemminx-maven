@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven;
+package org.eclipse.lemminx.extensions.maven.project;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -14,9 +14,8 @@ import java.util.logging.Logger;
 
 import org.apache.maven.model.building.FileModelSource;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.project.MavenProjectCache.ProjectBuildManager;
 import org.eclipse.lemminx.extensions.maven.utils.DOMModelSource;
-import org.eclipse.lemminx.extensions.maven.MavenProjectCache.ProjectBuildManager;
-
 import org.eclipse.lemminx.services.IXMLDocumentProvider;
 import org.eclipse.lemminx.utils.FilesUtils;
 

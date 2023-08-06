@@ -9,7 +9,7 @@
  * Contributors:
  * Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven;
+package org.eclipse.lemminx.extensions.maven.settings;
 
 import org.eclipse.lemminx.settings.XMLGeneralClientSettings;
 import org.eclipse.lemminx.utils.JSONUtility;

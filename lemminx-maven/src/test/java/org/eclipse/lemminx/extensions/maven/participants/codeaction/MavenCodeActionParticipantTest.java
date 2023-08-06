@@ -36,8 +36,8 @@ import org.eclipse.lemminx.extensions.contentmodel.participants.XMLSyntaxErrorCo
 import org.eclipse.lemminx.extensions.contentmodel.settings.ContentModelSettings;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationRootSettings;
 import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
-import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
+import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lemminx.utils.StringUtils;

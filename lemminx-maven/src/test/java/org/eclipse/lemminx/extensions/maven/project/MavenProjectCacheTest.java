@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven;
+package org.eclipse.lemminx.extensions.maven.project;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +29,10 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.extensions.contentmodel.settings.XMLValidationSettings;
+import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
+import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
+import org.eclipse.lemminx.extensions.maven.MavenWorkspaceService;
+import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
 import org.eclipse.lemminx.services.extensions.IWorkspaceServiceParticipant;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;

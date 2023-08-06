@@ -48,7 +48,6 @@ import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
 import org.eclipse.lemminx.dom.DOMNode;
 import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
-import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.utils.XMLPositionUtility;
