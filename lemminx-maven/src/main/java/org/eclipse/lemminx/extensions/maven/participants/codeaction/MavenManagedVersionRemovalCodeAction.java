@@ -24,7 +24,7 @@ import org.eclipse.lemminx.commons.CodeActionFactory;
 import org.eclipse.lemminx.commons.TextDocument;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMNode;
-import org.eclipse.lemminx.extensions.maven.MavenSyntaxErrorCode;
+import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenSyntaxErrorCode;
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.ProjectValidator;
 import org.eclipse.lemminx.extensions.maven.utils.ParticipantUtils;
 import org.eclipse.lemminx.services.extensions.codeaction.ICodeActionParticipant;

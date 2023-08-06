@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.lemminx.extensions.maven;
+package org.eclipse.lemminx.extensions.maven.project;
 
 import static org.eclipse.lemminx.extensions.maven.utils.URIUtils.toURIKey;
 import static org.eclipse.lemminx.extensions.maven.utils.URIUtils.toURIString;
