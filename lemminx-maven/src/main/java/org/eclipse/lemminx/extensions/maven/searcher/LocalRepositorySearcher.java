@@ -65,6 +65,8 @@ public class LocalRepositorySearcher {
 	public LocalRepositorySearcher(File localRepository, ProgressSupport progressSupport) {
 		this.localRepository = localRepository;
 		this.progressSupport = progressSupport;
+		// Force the load of the local artifacts done in background
+		getLocalArtifactsLastVersion();
 	}
 
 	public Set<String> searchGroupIds() throws IOException {
