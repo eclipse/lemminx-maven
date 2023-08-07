@@ -27,12 +27,14 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -97,6 +99,7 @@ import org.eclipse.lemminx.extensions.maven.searcher.RemoteCentralRepositorySear
 import org.eclipse.lemminx.extensions.maven.settings.XMLMavenGeneralSettings;
 import org.eclipse.lemminx.extensions.maven.settings.XMLMavenSettings;
 import org.eclipse.lemminx.extensions.maven.utils.DOMUtils;
+import org.eclipse.lemminx.extensions.maven.utils.LocalRepositoryUtils;
 import org.eclipse.lemminx.extensions.maven.utils.MavenParseUtils;
 import org.eclipse.lemminx.services.IXMLDocumentProvider;
 import org.eclipse.lemminx.services.IXMLValidationService;
@@ -122,17 +125,17 @@ import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
  *
  */
 public class MavenLemminxExtension implements IXMLExtension {
-	
+
 	// Used for tests
 	private static boolean unitTestMode = false;
-	
+
 	private static final Logger LOGGER = Logger.getLogger(MavenLemminxExtension.class.getName());
 	private static final String MAVEN_XMLLS_EXTENSION_REALM_ID = MavenLemminxExtension.class.getName();
 	private static final long WAIT_SAFE_TIMEOUT_SECONDS = 10;
-	
+
 	private XMLExtensionsRegistry currentRegistry;
 	private MavenLemminxWorkspaceReader workspaceReader = new MavenLemminxWorkspaceReader();
-	
+
 	private ICompletionParticipant completionParticipant;
 	private IDiagnosticsParticipant diagnosticParticipant;
 	private IHoverParticipant hoverParticipant;
@@ -154,8 +157,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private URIResolverExtensionManager resolverExtensionManager;
 	private List<WorkspaceFolder> initialWorkspaceFolders = List.of();
 	private LinkedHashSet<URI> currentWorkspaceFolders = new LinkedHashSet<>();
-	
-	// Thread which loads Maven component (plexus container, maven session, etc) which can take some time.
+
+	// Thread which loads Maven component (plexus container, maven session, etc)
+	// which can take some time.
 	private CompletableFuture<Void> mavenInitializer;
 	private IXMLDocumentProvider documentProvider;
 	private IXMLValidationService validationService;
@@ -165,8 +169,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 	@Override
 	public void doSave(ISaveContext context) {
 		if (context.getType() == SaveContextType.SETTINGS) {
-			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes null on stop
-			XMLMavenGeneralSettings generalXMLSettings = XMLMavenGeneralSettings.getGeneralXMLSettings(context.getSettings());
+			final XMLExtensionsRegistry registry = this.currentRegistry; // keep ref as this.currentRegistry becomes
+																			// null on stop
+			XMLMavenGeneralSettings generalXMLSettings = XMLMavenGeneralSettings
+					.getGeneralXMLSettings(context.getSettings());
 			if (generalXMLSettings == null) {
 				return;
 			}
@@ -197,7 +203,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		this.validationService = registry.getValidationService();
 		try {
 			// Do not invoke getters the MavenLemminxExtension in participant constructors,
-			// or that will trigger loading of plexus, Maven and so on even for non pom files
+			// or that will trigger loading of plexus, Maven and so on even for non pom
+			// files
 			// Initialization will happen when calling getters.
 			workspaceServiceParticipant = new MavenWorkspaceService(this);
 			registry.registerWorkspaceServiceParticipant(workspaceServiceParticipant);
@@ -217,8 +224,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 	}
 
-	private void initialize() throws MavenInitializationException {		
-		if (!getMavenInitializer().isDone() ) {
+	private void initialize() throws MavenInitializationException {
+		if (!getMavenInitializer().isDone()) {
 			// The Maven initialization is not ready, throws a MavenInitializationException.
 			throw new MavenInitializationException();
 		}
@@ -230,7 +237,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		}
 		return getOrCreateMavenInitializer();
 	}
-	
+
 	private synchronized CompletableFuture<Void> getOrCreateMavenInitializer() {
 		if (mavenInitializer != null) {
 			return mavenInitializer;
@@ -243,7 +250,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (mavenInitializer == null) {
 			if (isUnitTestMode()) {
 				mavenInitializer = new CompletableFuture<>();
-				doInitialize(() -> {});
+				doInitialize(() -> {
+				});
 				mavenInitializer.complete(null);
 			} else
 				mavenInitializer = CompletableFutures.computeAsync(cancelChecker -> {
@@ -284,8 +292,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 				progressMonitor.report("Initializing Maven request" + getStepMessage(currentStep, nbSteps) + "...",
 						percentage, null);
 			}
+			// Get the real local repository of the user
+			// Initialize maven request
 			mavenRequest = initMavenRequest(container, settings);
-
+			List<File> localRepositoryDir = LocalRepositoryUtils.getLocalRepositoryPaths(mavenRequest);
 			// Step3 : initialize Repository system session
 			cancelChecker.checkCanceled();
 			if (progressMonitor != null) {
@@ -295,6 +305,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 						"Initializing Repository system session" + getStepMessage(currentStep, nbSteps) + "...",
 						percentage, null);
 			}
+
 			DefaultRepositorySystemSessionFactory repositorySessionFactory = container
 					.lookup(DefaultRepositorySystemSessionFactory.class);
 			RepositorySystemSession repositorySystemSession = repositorySessionFactory
@@ -322,8 +333,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 						"Creating local repository searcher" + getStepMessage(currentStep, nbSteps) + "...", percentage,
 						null);
 			}
-			localRepositorySearcher = new LocalRepositorySearcher(
-					mavenSession.getRepositorySession().getLocalRepository().getBasedir(), progressSupport);
+			Set<File> dirs = new HashSet(localRepositoryDir);
+			dirs.add(mavenRequest.getLocalRepositoryPath());
+			localRepositorySearcher = new LocalRepositorySearcher(dirs, progressSupport);
 
 			if (!skipCentralRepository) {
 				// Step6 : create central repository searcher
@@ -368,7 +380,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return " (" + currentStep + "/" + nbSteps + ")";
 	}
 
-	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options) throws Exception {
+	private MavenExecutionRequest initMavenRequest(PlexusContainer container, XMLMavenSettings options)
+			throws Exception {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		Properties systemProperties = getSystemProperties();
 		mavenRequest.setSystemProperties(systemProperties);
@@ -378,45 +391,33 @@ public class MavenLemminxExtension implements IXMLExtension {
 			final File localSettingsFile = getFileFromOptions(options.getUserSettings(),
 					SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
 
-			Settings settngs = buildSettings(container,
-		    		globalSettingsFile.canRead() ? globalSettingsFile : null,
-		    		localSettingsFile.canRead() ? localSettingsFile : null,
-		    		systemProperties);
-			
-		    if (settngs != null) {
+			Settings settings = buildSettings(container, globalSettingsFile.canRead() ? globalSettingsFile : null,
+					localSettingsFile.canRead() ? localSettingsFile : null, systemProperties);
+
+			if (settings != null) {
 				if (globalSettingsFile.canRead()) {
 					mavenRequest.setGlobalSettingsFile(globalSettingsFile);
 				}
 				if (localSettingsFile.canRead()) {
 					mavenRequest.setUserSettingsFile(localSettingsFile);
 				}
-				MavenExecutionRequestPopulator requestPopulator = container.lookup(MavenExecutionRequestPopulator.class);
-				requestPopulator.populateFromSettings(mavenRequest, settngs);
-		    }
-		}
-		
-		String localRepoProperty = System.getProperty("maven.repo.local");
-		if (localRepoProperty != null) {
-			mavenRequest.setLocalRepositoryPath(new File(localRepoProperty));
-		}
-		String localRepoOption = options.getRepo().getLocal();
-		if (localRepoOption != null && !localRepoOption.trim().isEmpty()) {
-			File candidate = new File(localRepoOption);
-			if (candidate.isFile() && candidate.canRead()) {
-				mavenRequest.setLocalRepositoryPath(candidate);
+				MavenExecutionRequestPopulator requestPopulator = container
+						.lookup(MavenExecutionRequestPopulator.class);
+				requestPopulator.populateFromSettings(mavenRequest, settings);
 			}
 		}
 
-		if (mavenRequest.getLocalRepositoryPath() == null) {
-			mavenRequest.setLocalRepositoryPath(RepositorySystem.defaultUserLocalRepository);
-		}
+		LocalRepositoryUtils.updateLocalRepositoryPath(mavenRequest, options);
 
 		RepositorySystem repositorySystem = container.lookup(RepositorySystem.class);
 		ArtifactRepository localRepo = repositorySystem.createLocalRepository(mavenRequest.getLocalRepositoryPath());
 		mavenRequest.setLocalRepository(localRepo);
-		List<ArtifactRepository> defaultRemoteRepositories = Collections.singletonList(repositorySystem.createDefaultRemoteRepository());
-		mavenRequest.setRemoteRepositories(joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
-		mavenRequest.setPluginArtifactRepositories(joinRemoteRepositories(mavenRequest.getPluginArtifactRepositories(), defaultRemoteRepositories));
+		List<ArtifactRepository> defaultRemoteRepositories = Collections
+				.singletonList(repositorySystem.createDefaultRemoteRepository());
+		mavenRequest.setRemoteRepositories(
+				joinRemoteRepositories(mavenRequest.getRemoteRepositories(), defaultRemoteRepositories));
+		mavenRequest.setPluginArtifactRepositories(
+				joinRemoteRepositories(mavenRequest.getPluginArtifactRepositories(), defaultRemoteRepositories));
 		mavenRequest.setSystemProperties(systemProperties);
 		mavenRequest.setCacheNotFound(true);
 		mavenRequest.setCacheTransferError(true);
@@ -424,7 +425,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return mavenRequest;
 	}
 
-	public Settings buildSettings(PlexusContainer container, File globalSettingsFile, File userSettingsFile, Properties systemProperties) {
+	public Settings buildSettings(PlexusContainer container, File globalSettingsFile, File userSettingsFile,
+			Properties systemProperties) {
 		SettingsBuildingRequest request = new DefaultSettingsBuildingRequest();
 		request.setGlobalSettingsFile(globalSettingsFile);
 		request.setUserSettingsFile(userSettingsFile != null ? userSettingsFile
@@ -436,15 +438,14 @@ public class MavenLemminxExtension implements IXMLExtension {
 			return null;
 		}
 	}
-	
+
 	/*
-	 * Thread-safe properties copy implementation.
-	 * <p>
-	 * {@link Properties#entrySet()} iterator is not thread safe and fails with
-	 * {@link ConcurrentModificationException} if the source properties "is
-	 * structurally modified at any time after the iterator is created". The
-	 * solution is to use thread-safe {@link Properties#stringPropertyNames()}
-	 * enumerate and copy properties.
+	 * Thread-safe properties copy implementation. <p> {@link Properties#entrySet()}
+	 * iterator is not thread safe and fails with {@link
+	 * ConcurrentModificationException} if the source properties "is structurally
+	 * modified at any time after the iterator is created". The solution is to use
+	 * thread-safe {@link Properties#stringPropertyNames()} enumerate and copy
+	 * properties.
 	 *
 	 * @see https://bugs.eclipse.org/bugs/show_bug.cgi?id=440696
 	 */
@@ -603,7 +604,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return this.cache;
 	}
 
-	/** 
+	/**
 	 * Returns the Maven Session object
 	 * 
 	 * @return Maven Session object
@@ -623,7 +624,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return this.container;
 	}
 
-	/** 
+	/**
 	 * Returns the Maven Build Plugin Manager object
 	 * 
 	 * @return Maven Build Plugin Manager object
@@ -643,7 +644,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 		return localRepositorySearcher;
 	}
 
-	/** 
+	/**
 	 * Returns the Maven Plugin Manager object
 	 * 
 	 * @return Maven Plugin Manager object
@@ -664,8 +665,8 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	/**
-	 *  Returns the URI Resolver Extension Manager
-	 *  
+	 * Returns the URI Resolver Extension Manager
+	 * 
 	 * @return URI Resolver Extension Manager object
 	 */
 	public URIResolverExtensionManager getUriResolveExtentionManager() {
@@ -676,7 +677,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	/**
 	 * Returns set of URI objects representing the folders available in Workspace
 	 * 
-	 * @return A linkedHashSet of Workspace folders URI 
+	 * @return A linkedHashSet of Workspace folders URI
 	 */
 	public LinkedHashSet<URI> getCurrentWorkspaceFolders() {
 		return currentWorkspaceFolders;
@@ -685,44 +686,45 @@ public class MavenLemminxExtension implements IXMLExtension {
 	/**
 	 * A handler to be called on changing the Workspace Folders
 	 * 
-	 * @param added An array of added folders
- 	 * @param removed An array of removed folders
+	 * @param added   An array of added folders
+	 * @param removed An array of removed folders
 	 */
 	public void didChangeWorkspaceFolders(URI[] added, URI[] removed) {
-		CompletableFuture<Void> initializer =  getMavenInitializer();
+		CompletableFuture<Void> initializer = getMavenInitializer();
 		if (initializer.isDone()) {
 			internalDidChangeWorkspaceFolders(added, removed);
 		} else {
 			initializer.thenAccept(Void -> internalDidChangeWorkspaceFolders(added, removed));
 		}
 	}
-	
+
 	private void internalDidChangeWorkspaceFolders(URI[] added, URI[] removed) {
-		currentWorkspaceFolders.addAll(List.of(added != null? added : new URI[0]));
+		currentWorkspaceFolders.addAll(List.of(added != null ? added : new URI[0]));
 		currentWorkspaceFolders.removeAll(List.of(removed != null ? removed : new URI[0]));
 		WorkspaceReader workspaceReader = mavenRequest.getWorkspaceReader();
 		if (workspaceReader instanceof MavenLemminxWorkspaceReader reader) {
-			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null? added : new URI[0]);
+			Collection<URI> projectsToAdd = computeAddedWorkspaceProjects(added != null ? added : new URI[0]);
 			Collection<URI> projectsToRemove = computeRemovedWorkspaceProjects(removed != null ? removed : new URI[0]);
 
 			reader.addToWorkspace(sortProjects(projectsToAdd));
 			projectsToRemove.stream().forEach(reader::remove);
 		}
 	}
-	
+
 	private Collection<URI> sortProjects(Collection<URI> projectsUris) {
 		HashMap<URI, String> depByUri = new HashMap<>();
 		HashMap<String, URI> uriByDep = new HashMap<>();
 		LinkedHashMap<String, String> parentByDep = new LinkedHashMap<>();
 		LinkedHashSet<URI> resultUris = new LinkedHashSet<>();
-		
+
 		Optional.ofNullable(projectsUris).ifPresent(uris -> {
-			uris.stream().filter(Objects::nonNull).forEach(uri ->{
+			uris.stream().filter(Objects::nonNull).forEach(uri -> {
 				Optional.ofNullable(createDOMDocument(uri)).ifPresent(doc -> {
 					if (doc.getDocumentElement() != null
 							&& PROJECT_ELT.equals(doc.getDocumentElement().getNodeName())) {
 						Optional.ofNullable(MavenParseUtils.parseArtifact(doc.getDocumentElement())).ifPresent(a -> {
-							Parent p = MavenParseUtils.parseParent(DOMUtils.findChildElement(doc.getDocumentElement(), PARENT_ELT).orElse(null));
+							Parent p = MavenParseUtils.parseParent(
+									DOMUtils.findChildElement(doc.getDocumentElement(), PARENT_ELT).orElse(null));
 							// If artifact groupId is null - set it from parent
 							if (a.getGroupId() == null && p != null) {
 								a.setGroupId(p.getGroupId());
@@ -776,9 +778,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 * @return GAV key string
 	 */
 	public static String key(Dependency artifact) {
-		return Optional.ofNullable(artifact.getGroupId()).orElse("") + ':' 
-			+ Optional.ofNullable(artifact.getArtifactId()).orElse("") + ':' 
-			+ Optional.ofNullable(artifact.getVersion()).orElse("");
+		return Optional.ofNullable(artifact.getGroupId()).orElse("") + ':'
+				+ Optional.ofNullable(artifact.getArtifactId()).orElse("") + ':'
+				+ Optional.ofNullable(artifact.getVersion()).orElse("");
 	}
 
 	/**
@@ -788,9 +790,9 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 * @return GAV key string
 	 */
 	public static String key(Parent parent) {
-		return Optional.ofNullable(parent.getGroupId()).orElse("") + ':' 
-			+ Optional.ofNullable(parent.getArtifactId()).orElse("") + ':' 
-			+ Optional.ofNullable(parent.getVersion()).orElse("");
+		return Optional.ofNullable(parent.getGroupId()).orElse("") + ':'
+				+ Optional.ofNullable(parent.getArtifactId()).orElse("") + ':'
+				+ Optional.ofNullable(parent.getVersion()).orElse("");
 	}
 
 	/**
@@ -800,19 +802,17 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 * @return GAV key string
 	 */
 	public static String key(MavenProject project) {
-		return Optional.ofNullable(project.getGroupId()).orElse("") + ':' 
-			+ Optional.ofNullable(project.getArtifactId()).orElse("") + ':' 
-			+ Optional.ofNullable(project.getVersion()).orElse("");
+		return Optional.ofNullable(project.getGroupId()).orElse("") + ':'
+				+ Optional.ofNullable(project.getArtifactId()).orElse("") + ':'
+				+ Optional.ofNullable(project.getVersion()).orElse("");
 	}
 
-	private void adUrisdParentFirst(String artifactKey, 
-			LinkedHashMap<String, String> parentByDep,
-			HashMap<String, URI> uriByDep,
-			LinkedHashSet<URI> resultUris) {
+	private void adUrisdParentFirst(String artifactKey, LinkedHashMap<String, String> parentByDep,
+			HashMap<String, URI> uriByDep, LinkedHashSet<URI> resultUris) {
 
 		String pKey = parentByDep.get(artifactKey);
-		if(pKey != null) {
-			adUrisdParentFirst(pKey,  parentByDep, uriByDep, resultUris);
+		if (pKey != null) {
+			adUrisdParentFirst(pKey, parentByDep, uriByDep, resultUris);
 		}
 
 		URI uri = uriByDep.get(artifactKey);
@@ -820,15 +820,13 @@ public class MavenLemminxExtension implements IXMLExtension {
 			resultUris.add(uri);
 		}
 	}
-	
+
 	private Collection<URI> computeRemovedWorkspaceProjects(URI[] removed) {
 		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
-			.filter(f -> Arrays.stream(removed).anyMatch(uri -> {
-						Path removedPath = new File(uri).toPath();
-						return f.toPath().startsWith(removedPath);
-					}))
-			.map(File::toURI)
-			.collect(Collectors.toUnmodifiableList());
+				.filter(f -> Arrays.stream(removed).anyMatch(uri -> {
+					Path removedPath = new File(uri).toPath();
+					return f.toPath().startsWith(removedPath);
+				})).map(File::toURI).collect(Collectors.toUnmodifiableList());
 	}
 
 	private List<URI> computeAddedWorkspaceProjects(URI[] added) {
@@ -862,46 +860,40 @@ public class MavenLemminxExtension implements IXMLExtension {
 
 		return projectsToAdd;
 	}
-	
+
 	/**
 	 * Returns the list of Maven Projects currently added to the Workspace
 	 * 
-	 * @param wait A boolean 'true' indicates that all projects are to
-	 * 		be returned, not only the cached ones at the moment,
-	 *		method should wait for the final build result,
-	 * 		otherwise the only project that are already built and
-	 * 		cached are to be returned, the rest of the projects
-	 * 		are to be built in background
+	 * @param wait A boolean 'true' indicates that all projects are to be returned,
+	 *             not only the cached ones at the moment, method should wait for
+	 *             the final build result, otherwise the only project that are
+	 *             already built and cached are to be returned, the rest of the
+	 *             projects are to be built in background
 	 * @return List of Maven Projects
 	 */
 	public List<MavenProject> getCurrentWorkspaceProjects(boolean wait) {
-		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
-					.map(file -> {
-						try {
-							CompletableFuture<LoadedMavenProject> loadedProject = 
-									 getProjectCache().getLoadedMavenProject(toUriASCIIString(file));
-							return wait ? loadedProject.get(WAIT_SAFE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-									: loadedProject.getNow(null);
-						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							LOGGER.log(Level.SEVERE, e.getMessage(), e);
-							return null;
-						}
-					})
-					.filter(Objects::nonNull)
-					.map(LoadedMavenProject::getMavenProject)
-					.toList();
+		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream().map(file -> {
+			try {
+				CompletableFuture<LoadedMavenProject> loadedProject = getProjectCache()
+						.getLoadedMavenProject(toUriASCIIString(file));
+				return wait ? loadedProject.get(WAIT_SAFE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+						: loadedProject.getNow(null);
+			} catch (InterruptedException | ExecutionException | TimeoutException e) {
+				LOGGER.log(Level.SEVERE, e.getMessage(), e);
+				return null;
+			}
+		}).filter(Objects::nonNull).map(LoadedMavenProject::getMavenProject).toList();
 	}
-	
+
 	/**
 	 * Returns the list of Maven Project files currently added to the Workspace
 	 * 
 	 * @return List of Maven Project files
 	 */
 	public List<File> getCurrentWorkspaceProjectFiles() {
-		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream()
-			.filter(Objects::nonNull).toList();
+		return workspaceReader.getCurrentWorkspaceArtifactFiles().stream().filter(Objects::nonNull).toList();
 	}
-	
+
 	private void registerCodeActionParticipants(XMLExtensionsRegistry registry) {
 		if (codeActionParticipants.isEmpty()) {
 			synchronized (codeActionParticipants) {
@@ -912,22 +904,22 @@ public class MavenLemminxExtension implements IXMLExtension {
 				codeActionParticipants.add(new MavenIdPartRemovalCodeAction());
 				codeActionParticipants.add(new MavenManagedVersionRemovalCodeAction());
 
-				// Refactoring 
+				// Refactoring
 				codeActionParticipants.add(new InlinePropertyCodeAction(this));
 				codeActionParticipants.add(new ExtractPropertyCodeAction(this));
-				
+
 				codeActionParticipants.stream().forEach(registry::registerCodeActionParticipant);
 			}
 		}
 	}
-	
+
 	private void unregisterCodeActionParticipants(XMLExtensionsRegistry registry) {
 		synchronized (codeActionParticipants) {
 			codeActionParticipants.stream().forEach(registry::unregisterCodeActionParticipant);
 			codeActionParticipants.clear();
 		}
 	}
-	
+
 	/**
 	 * Returns true if the lemminx maven is run in JUnit test context and false
 	 * otherwise.
@@ -949,7 +941,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	public static void setUnitTestMode(boolean unitTestMode) {
 		MavenLemminxExtension.unitTestMode = unitTestMode;
 	}
-	
+
 	/**
 	 * Gets a normalized URI ASCII string from the given File
 	 * 
