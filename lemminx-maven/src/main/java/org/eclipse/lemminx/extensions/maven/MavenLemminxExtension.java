@@ -537,7 +537,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 			centralSearcher.stop();
 			centralSearcher = null;
 		}
-		cache = null;
+		if (cache != null) {
+			cache.stop();
+			cache = null;
+		}
 		if (container != null) {
 			container.dispose();
 			container = null;
@@ -547,7 +550,6 @@ public class MavenLemminxExtension implements IXMLExtension {
 		if (mavenInitializer != null) {
 			mavenInitializer.cancel(true);
 		}
-		cache.stop();
 	}
 
 	/**
