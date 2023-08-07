@@ -201,9 +201,9 @@ public class LocalRepositorySearcher {
 		return createArtifact(file, repoPath, groupIdArtifactIdToVersion, true);
 	}
 
-	public static DefaultArtifact createArtifact(Path file, final Path repoPath,
+	public static DefaultArtifact createArtifact(Path dir, final Path repoPath,
 			Map<String, Artifact> groupIdArtifactIdToVersion, boolean checkExistingPomFile) {
-		Path artifactFolderPath = repoPath.relativize(file);
+		Path artifactFolderPath = repoPath.relativize(dir);
 		if (artifactFolderPath.getNameCount() < 3) {
 			// eg "maven-dependency-plugin/3.1.2"
 			return null;
@@ -212,8 +212,8 @@ public class LocalRepositorySearcher {
 			String artifactId = artifactFolderPath.getParent().getFileName().toString();
 			String groupId = artifactFolderPath.getParent().getParent().toString()
 					.replace(artifactFolderPath.getFileSystem().getSeparator(), ".");
-			if (!checkExistingPomFile
-					|| new File(file.toFile(), artifactId + '-' + version.toString() + ".pom").isFile()) {
+			File pomFile = new File(dir.toFile(), artifactId + '-' + version.toString() + ".pom");
+			if (!checkExistingPomFile || pomFile.isFile()) {
 				String groupIdArtifactId = groupId + ':' + artifactId;
 				Artifact existingGav = groupIdArtifactIdToVersion != null
 						? groupIdArtifactIdToVersion.get(groupIdArtifactId)
@@ -222,8 +222,10 @@ public class LocalRepositorySearcher {
 				if (existingGav != null) {
 					ArtifactVersion existingVersion = new DefaultArtifactVersion(existingGav.getVersion());
 					replace |= existingVersion.compareTo(version) < 0;
-					replace |= (existingVersion.toString().endsWith("-SNAPSHOT")
-							&& !version.toString().endsWith("-SNAPSHOT"));
+					// DefaultArtifactVersion.compareTo() does a correct version compare withour 
+					// any additional workarounds
+					//replace |= (existingVersion.toString().endsWith("-SNAPSHOT")
+					//		&& !version.toString().endsWith("-SNAPSHOT"));
 				}
 				if (replace) {
 					return new DefaultArtifact(groupId, artifactId, null, version.toString());

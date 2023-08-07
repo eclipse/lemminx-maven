@@ -8,11 +8,15 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven.searcher.watcher;
 
+import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.util.Collection;
 import java.util.Optional;
@@ -53,16 +57,22 @@ public class LocalRepositoryFilesWatcher extends WatchDir {
 	@Override
 	protected void notifyListeners(WatchEvent<?> event, Path child) {
 		try {
-			boolean checkExistingPomFile = event.kind() == StandardWatchEventKinds.ENTRY_CREATE;
-			DefaultArtifact fileArtifact = LocalRepositorySearcher.createArtifact(child, localRepoPath, null,
-					checkExistingPomFile);
+			// In case of EBTRY_DELETE we cannot use Files.isDirectory (because of 
+			// false-negative result), but the child in this case is highly likely 
+			// is a directory
+			Path childDir = (event.kind() == ENTRY_DELETE || Files.isDirectory(child, NOFOLLOW_LINKS))
+					? child : child.getParent();
+			boolean checkExistingPomFile = event.kind() == ENTRY_CREATE || event.kind() == ENTRY_MODIFY;
+			// We can create artifact only from a directory, so if child is a file we must pass its parent 
+			// to createArtifact()
+			DefaultArtifact fileArtifact = LocalRepositorySearcher.createArtifact(
+					childDir, localRepoPath, null, checkExistingPomFile);
 			if (fileArtifact != null) {
 				// The created / delete folder is an artifact
 				DefaultArtifactVersion fileVersion = new DefaultArtifactVersion(fileArtifact.getVersion());
 				// Get the artifact and version from the cache (which store the last version of
 				// the artifact) for the groupId/artifactId.s
-				Optional<Artifact> cacheArtifactResult = cacheArtifacts //
-						.stream() //
+				Optional<Artifact> cacheArtifactResult = cacheArtifacts.stream() //
 						.filter(a -> a.getArtifactId().equals(fileArtifact.getArtifactId())
 								&& a.getGroupId().equals(fileArtifact.getGroupId())) //
 						.findFirst();
@@ -70,7 +80,7 @@ public class LocalRepositoryFilesWatcher extends WatchDir {
 				DefaultArtifactVersion cacheVersion = cacheArtifact != null
 						? new DefaultArtifactVersion(cacheArtifact.getVersion())
 						: null;
-				if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+				if (event.kind() == ENTRY_CREATE){
 					// A new artifact is added...
 					if (cacheArtifact == null) {
 						// The new artifact doesn't exists, add it to the cache
@@ -85,10 +95,14 @@ public class LocalRepositoryFilesWatcher extends WatchDir {
 							cacheArtifacts.add(fileArtifact);
 						}
 					}
-				} else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+				} else if (event.kind() == ENTRY_DELETE) {
 					// An artifact is deleted...
 					if (cacheArtifact != null && fileVersion.equals(cacheVersion)) {
 						// The last version of artifact is deleted
+						synchronized (cacheArtifacts) {
+							// The new artifact (v2) replace the deleted artifact (v3)
+							cacheArtifacts.remove(cacheArtifact);
+						}
 
 						// - v1
 						// - v2
@@ -98,9 +112,10 @@ public class LocalRepositoryFilesWatcher extends WatchDir {
 						// Get the v2 artifact
 						Artifact newArtifact = null;
 						DefaultArtifactVersion newVersion = null;
-						try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(child.getParent())) {
+						try (DirectoryStream<Path> directoryStream = 
+								Files.newDirectoryStream(childDir.getParent())) {
 							for (Path entry : directoryStream) {
-								if (Files.isDirectory(entry)) {
+								if (Files.isDirectory(entry, NOFOLLOW_LINKS)) {
 									DefaultArtifactVersion version = new DefaultArtifactVersion(
 											entry.getFileName().toString());
 									if (newVersion == null || newVersion.compareTo(version) < 0) {
@@ -120,19 +135,24 @@ public class LocalRepositoryFilesWatcher extends WatchDir {
 							synchronized (cacheArtifacts) {
 								// The new artifact (v2) replace the deleted artifact (v3)
 								cacheArtifacts.add(newArtifact);
-								cacheArtifacts.remove(cacheArtifact);
 							}
 						}
 					}
 				}
 			}
 		} catch (Exception e) {
-			if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+			if (event.kind() == ENTRY_CREATE) {
 				LOGGER.log(Level.SEVERE,
 						"Error while updating local repo cache with created path '" + child.toString() + "'", e);
-			} else {
+			} else if (event.kind() == ENTRY_MODIFY) {
+				LOGGER.log(Level.SEVERE,
+						"Error while updating local repo cache with modified path '" + child.toString() + "'", e);
+			} else if (event.kind() == ENTRY_DELETE) {
 				LOGGER.log(Level.SEVERE,
 						"Error while updating local repo cache with deleted path '" + child.toString() + "'", e);
+			} else {
+				LOGGER.log(Level.SEVERE,
+						"Error while updating local repo cache " + event.kind().name() + " with path '" + child.toString() + "'", e);
 			}
 		}
 	}
