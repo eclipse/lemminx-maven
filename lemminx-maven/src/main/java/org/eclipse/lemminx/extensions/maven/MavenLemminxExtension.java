@@ -92,6 +92,7 @@ import org.eclipse.lemminx.extensions.maven.participants.definition.MavenDefinit
 import org.eclipse.lemminx.extensions.maven.participants.diagnostics.MavenDiagnosticParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.hover.MavenHoverParticipant;
 import org.eclipse.lemminx.extensions.maven.participants.rename.MavenPropertyRenameParticipant;
+import org.eclipse.lemminx.extensions.maven.project.IMavenProjectBuildListener;
 import org.eclipse.lemminx.extensions.maven.project.LoadedMavenProject;
 import org.eclipse.lemminx.extensions.maven.project.MavenProjectCache;
 import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
@@ -124,7 +125,7 @@ import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
  * Extension for pom.xml.
  *
  */
-public class MavenLemminxExtension implements IXMLExtension {
+public class MavenLemminxExtension implements IXMLExtension, IMavenProjectBuildListener {
 
 	// Used for tests
 	private static boolean unitTestMode = false;
@@ -147,6 +148,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 	private MavenProjectCache cache;
 	private RemoteCentralRepositorySearcher centralSearcher;
 	private LocalRepositorySearcher localRepositorySearcher;
+	private List<IMavenProjectBuildListener> mavenProjectBuildListeners = new ArrayList<>();
 	private MavenExecutionRequest mavenRequest;
 	private MavenPluginManager mavenPluginManager;
 	private PlexusContainer container;
@@ -225,9 +227,10 @@ public class MavenLemminxExtension implements IXMLExtension {
 	}
 
 	private void initialize() throws MavenInitializationException {
+		CompletableFuture<Void> future = getMavenInitializer();
 		if (!getMavenInitializer().isDone()) {
 			// The Maven initialization is not ready, throws a MavenInitializationException.
-			throw new MavenInitializationException();
+			throw new MavenInitializationException(future);
 		}
 	}
 
@@ -295,7 +298,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			// Get the real local repository of the user
 			// Initialize maven request
 			mavenRequest = initMavenRequest(container, settings);
-			List<File> localRepositoryDir = LocalRepositoryUtils.getLocalRepositoryPaths(mavenRequest);
+			List<File> localRepositoryDirs = LocalRepositoryUtils.getLocalRepositoryPaths(mavenRequest);
 			// Step3 : initialize Repository system session
 			cancelChecker.checkCanceled();
 			if (progressMonitor != null) {
@@ -322,7 +325,7 @@ public class MavenLemminxExtension implements IXMLExtension {
 			MavenExecutionResult mavenResult = new DefaultMavenExecutionResult();
 			// TODO: MavenSession is deprecated. Investigate for alternative
 			mavenSession = new MavenSession(container, repositorySystemSession, mavenRequest, mavenResult);
-			cache = new MavenProjectCache(mavenSession, documentProvider);
+			cache = new MavenProjectCache(this, mavenSession, documentProvider);
 
 			// Step5 : create local repository searcher
 			cancelChecker.checkCanceled();
@@ -333,10 +336,11 @@ public class MavenLemminxExtension implements IXMLExtension {
 						"Creating local repository searcher" + getStepMessage(currentStep, nbSteps) + "...", percentage,
 						null);
 			}
-			Set<File> dirs = new HashSet(localRepositoryDir);
+			Set<File> dirs = new HashSet<>(localRepositoryDirs);
 			dirs.add(mavenRequest.getLocalRepositoryPath());
 			localRepositorySearcher = new LocalRepositorySearcher(dirs, progressSupport);
-
+			mavenProjectBuildListeners.add(localRepositorySearcher);
+			
 			if (!skipCentralRepository) {
 				// Step6 : create central repository searcher
 				cancelChecker.checkCanceled();
@@ -385,26 +389,24 @@ public class MavenLemminxExtension implements IXMLExtension {
 		MavenExecutionRequest mavenRequest = new DefaultMavenExecutionRequest();
 		Properties systemProperties = getSystemProperties();
 		mavenRequest.setSystemProperties(systemProperties);
-		{
-			final File globalSettingsFile = getFileFromOptions(options.getGlobalSettings(),
-					SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
-			final File localSettingsFile = getFileFromOptions(options.getUserSettings(),
-					SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
+		final File globalSettingsFile = getFileFromOptions(options.getGlobalSettings(),
+				SettingsXmlConfigurationProcessor.DEFAULT_GLOBAL_SETTINGS_FILE);
+		final File localSettingsFile = getFileFromOptions(options.getUserSettings(),
+				SettingsXmlConfigurationProcessor.DEFAULT_USER_SETTINGS_FILE);
 
-			Settings settings = buildSettings(container, globalSettingsFile.canRead() ? globalSettingsFile : null,
-					localSettingsFile.canRead() ? localSettingsFile : null, systemProperties);
+		Settings settings = buildSettings(container, globalSettingsFile.canRead() ? globalSettingsFile : null,
+				localSettingsFile.canRead() ? localSettingsFile : null, systemProperties);
 
-			if (settings != null) {
-				if (globalSettingsFile.canRead()) {
-					mavenRequest.setGlobalSettingsFile(globalSettingsFile);
-				}
-				if (localSettingsFile.canRead()) {
-					mavenRequest.setUserSettingsFile(localSettingsFile);
-				}
-				MavenExecutionRequestPopulator requestPopulator = container
-						.lookup(MavenExecutionRequestPopulator.class);
-				requestPopulator.populateFromSettings(mavenRequest, settings);
+		if (settings != null) {
+			if (globalSettingsFile.canRead()) {
+				mavenRequest.setGlobalSettingsFile(globalSettingsFile);
 			}
+			if (localSettingsFile.canRead()) {
+				mavenRequest.setUserSettingsFile(localSettingsFile);
+			}
+			MavenExecutionRequestPopulator requestPopulator = container
+					.lookup(MavenExecutionRequestPopulator.class);
+			requestPopulator.populateFromSettings(mavenRequest, settings);
 		}
 
 		LocalRepositoryUtils.updateLocalRepositoryPath(mavenRequest, options);
@@ -950,5 +952,16 @@ public class MavenLemminxExtension implements IXMLExtension {
 	 */
 	public static String toUriASCIIString(File file) {
 		return file.toURI().normalize().toASCIIString();
+	}
+
+	@Override
+	public void builtMavenProject(final File repository, final MavenProject mavenProject) {
+		mavenProjectBuildListeners.stream().forEach(l -> {
+			try {	
+				l.builtMavenProject(repository, mavenProject);
+			}catch (Exception e) {
+				// Ignore
+			}
+		});
 	}
 }

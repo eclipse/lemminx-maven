@@ -8,7 +8,7 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
-import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Exception thrown when Maven is initializing.
@@ -16,6 +16,17 @@ import java.util.concurrent.CancellationException;
  * @author Angelo ZERR
  *
  */
-public class MavenInitializationException extends CancellationException{
+public class MavenInitializationException extends RuntimeException {
+	private static final long serialVersionUID = 6811208967929378721L;
+	
+	private final CompletableFuture<Void> future;
 
+	public MavenInitializationException(CompletableFuture<Void> future) {
+		super();
+		this.future = future;
+	}
+
+	public CompletableFuture<Void> getFuture() {
+		return future;
+	}
 }

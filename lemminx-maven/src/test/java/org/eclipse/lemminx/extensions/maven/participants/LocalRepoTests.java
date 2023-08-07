@@ -9,14 +9,21 @@
 package org.eclipse.lemminx.extensions.maven.participants;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 
+import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.lemminx.extensions.maven.MavenLanguageService;
+import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.NoMavenCentralExtension;
+import org.eclipse.lemminx.extensions.maven.searcher.LocalRepositorySearcher;
 import org.eclipse.lemminx.services.XMLLanguageService;
 import org.eclipse.lemminx.settings.SharedSettings;
 import org.eclipse.lsp4j.CompletionItem;
@@ -74,5 +81,37 @@ public class LocalRepoTests {
 		assertTrue(languageService.findDefinition(createDOMDocument("/pom-dependencyManagement-child.xml", languageService), new Position(17, 6), () -> {})
 				.stream().map(LocationLink::getTargetUri)
 				.anyMatch(uri -> uri.endsWith("/pom-dependencyManagement-parent.xml")));
+	}
+	
+	@Test
+	public void testLoadLocalRepo() throws IOException, URISyntaxException, InterruptedException {
+		MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+		try {
+			LocalRepositorySearcher searcher = plugin.getLocalRepositorySearcher();
+			Path localTempRepo = plugin.getMavenSession().getRequest().getLocalRepositoryPath().toPath();
+			assertTrue(localTempRepo.toString().contains("lemminx-maven"),
+					"Temporary local repository isn't set");
+			
+			final String groupSeparator = ".";
+			final String separator = localTempRepo.getFileSystem().getSeparator();
+	
+			long start = System.currentTimeMillis();
+			Collection<Artifact> artifacts = searcher.getLocalArtifactsLastVersion();
+			assertNotNull(artifacts, "Temporary local repository is NULLy");
+			assertTrue(artifacts.size() > 0, "Temporary local repository is empty");
+			
+			System.out.println("\ntestLoadLocalRepo: loaded artifacts:\n");
+			long stop = System.currentTimeMillis();
+			artifacts.stream()
+				.map(a -> 
+					new File((a.getGroupId().replace(groupSeparator, separator)) 
+							+ separator + a.getArtifactId()).toPath().toString()
+						+ " => " + a) 
+				.sorted().forEach(System.out::println);
+			System.out.println("\ntestLoadLocalRepo: " + artifacts.size() + " loaded in " + (stop - start) + " ms");
+		} finally {
+			plugin.stop(languageService);
+		}
 	}
 }

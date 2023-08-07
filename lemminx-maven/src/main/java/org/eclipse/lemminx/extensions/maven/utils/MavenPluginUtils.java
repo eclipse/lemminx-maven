@@ -15,7 +15,6 @@ import static org.eclipse.lemminx.extensions.maven.DOMConstants.GOAL_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.GROUP_ID_ELT;
 import static org.eclipse.lemminx.extensions.maven.DOMConstants.PLUGIN_ELT;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -223,7 +222,7 @@ public class MavenPluginUtils {
 				project.getRemotePluginRepositories().stream().collect(Collectors.toList()),
 				lemminxMavenPlugin.getMavenSession().getRepositorySession());
 		} catch (PluginResolutionException | PluginDescriptorParsingException | InvalidPluginDescriptorException ex) {
-			LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+			LOGGER.log(Level.WARNING, ex.getMessage());
 			if (reThrowPluginDescriptorExceptions) {
 				throw ex; // Needed for plugin validation
 			}
