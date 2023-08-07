@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2023 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
+import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
@@ -60,6 +61,7 @@ import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.lemminx.dom.DOMDocument;
+import org.eclipse.lemminx.extensions.maven.MavenLemminxExtension;
 import org.eclipse.lemminx.extensions.maven.utils.DOMModelSource;
 import org.eclipse.lemminx.services.IXMLDocumentProvider;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
@@ -68,13 +70,14 @@ import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 public class MavenProjectCache {
 
 	private static final Logger LOGGER = Logger.getLogger(MavenProjectCache.class.getName());
+	private MavenLemminxExtension plugin;
 	private final Map<String, LoadedMavenProjectProvider> projectCache;
 	private final MavenSession mavenSession;
 	private final IXMLDocumentProvider documentProvider;
-
 	private ProjectBuildManager projectBuildManager;
 
-	public MavenProjectCache(MavenSession mavenSession, IXMLDocumentProvider documentProvider) {
+	public MavenProjectCache(MavenLemminxExtension plugin, MavenSession mavenSession, IXMLDocumentProvider documentProvider) {
+		this.plugin = plugin;
 		this.mavenSession = mavenSession;
 		this.projectCache = new HashMap<>();
 		this.documentProvider = documentProvider;
@@ -89,6 +92,9 @@ public class MavenProjectCache {
 		projectBuildManager.start();
 	}
 
+	/**
+	 * Should be called when Maven Lemminx Extension is set to shutdown
+	 */
 	public void stop() {
 		projectBuildManager.stop();
 	}
@@ -107,6 +113,7 @@ public class MavenProjectCache {
 			final FileModelSource source;
 			final CompletableFuture<LoadedMavenProject> future;
 			private int priority;
+			private File localTempRepository = null;
 
 			private BuildProjectRunnable(String uri, FileModelSource source) {
 				this.uri = uri;
@@ -127,6 +134,7 @@ public class MavenProjectCache {
 			public void run() {
 				try {
 					future.complete(build(source, new FutureCancelChecker(future)));
+					
 				} catch (Exception e) { // This should include CancellationException
 					future.completeExceptionally(e);
 				}
@@ -153,8 +161,9 @@ public class MavenProjectCache {
 				DependencyResolutionResult dependencyResolutionResult = null;
 				MavenProject project = null;
 				File file = source.getFile();
-				try {			
-					ProjectBuildingResult buildResult = projectBuilder.build(source, newProjectBuildingRequest());
+				try {		
+					ProjectBuildingResult buildResult = projectBuilder.build(
+							source, newProjectBuildingRequest());
 					cancelChecker.checkCanceled();
 					project = buildResult.getProject();
 					problems.addAll(buildResult.getProblems());
@@ -221,6 +230,17 @@ public class MavenProjectCache {
 					LOGGER.log(Level.SEVERE, e.getMessage(), e);
 					return null; // Nothing to be cached
 				}
+
+				if (project != null) {
+					// Report to listeners registered in the extension
+					if (localTempRepository == null) {
+						localTempRepository = mavenSession.getRequest().getLocalRepositoryPath();
+					}
+					if (localTempRepository != null) {
+						plugin.builtMavenProject(localTempRepository, project);
+					}
+				}
+				
 				return new LoadedMavenProject(project, problems, dependencyResolutionResult);
 			}
 		}

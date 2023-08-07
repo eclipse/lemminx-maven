@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020-2023 Red Hat Inc. and others.
+ * Copyright (c) 2020, 2023 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -69,6 +69,7 @@ public class PluginResolutionTest {
 		}
 		FileUtils.deleteDirectory(initialMavenPluginApiDirectory);
 		MavenLemminxTestsUtils.prefetchMavenXSD();
+		MavenLemminxExtension.setUnitTestMode(true);
 	}
 
 	@AfterEach
@@ -106,6 +107,8 @@ public class PluginResolutionTest {
     public void testPluginGoalValidationWithPluginWithJDKProfiles()
             throws IOException, InterruptedException, ExecutionException, URISyntaxException {
         MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+
         MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
         languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
         List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-plugin-goal-resolution.xml", languageService),
@@ -119,6 +122,8 @@ public class PluginResolutionTest {
     public void testPluginManagementWithoutGroupId()
             throws IOException, InterruptedException, ExecutionException, URISyntaxException {
         MavenLemminxExtension plugin = new MavenLemminxExtension();
+		plugin.start(null,languageService);
+
         MavenDiagnosticParticipant mavenDiagnosticParticipant = new MavenDiagnosticParticipant(plugin);
         languageService.getDiagnosticsParticipants().add(mavenDiagnosticParticipant);
         List<Diagnostic> diagnostics = languageService.doDiagnostics(createDOMDocument("/pom-pluginManagement-unresolved.xml", languageService),

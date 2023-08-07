@@ -135,9 +135,15 @@ public class MavenDiagnosticParticipant implements IDiagnosticsParticipant {
 					node.getChildren().stream().filter(DOMElement.class::isInstance).forEach(nodes::push);
 				}
 			}
-		} catch (MavenInitializationException | MavenModelOutOfDatedException e) {
+		} catch (MavenInitializationException e) {
 			// - Maven is initializing
-			// - or parse of maven model with DOM document is out of dated
+			CompletableFuture<Void> initFuture = e.getFuture();
+			if (initFuture != null) {
+				initFuture.thenAccept( unused -> plugin.getValidationService()
+						.validate(xmlDocument));
+			}
+		} catch (MavenModelOutOfDatedException e) {
+			// - Parse of maven model with DOM document is out of dated
 			// -> catch the error to avoid breaking XML diagnostics from LemMinX
 		}
 	}
