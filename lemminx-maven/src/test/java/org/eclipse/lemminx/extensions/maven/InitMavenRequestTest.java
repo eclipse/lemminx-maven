@@ -8,6 +8,9 @@
  *******************************************************************************/
 package org.eclipse.lemminx.extensions.maven;
 
+import static org.eclipse.lemminx.extensions.maven.utils.LocalRepositoryUtils.getLocalRepositoryPaths;
+import static org.eclipse.lemminx.extensions.maven.utils.LocalRepositoryUtils.getTempLocalRepositoryPath;
+import static org.eclipse.lemminx.extensions.maven.utils.LocalRepositoryUtils.MAVEN_LOCAL_REPO_PROPERTY_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -18,6 +21,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.eclipse.aether.RepositorySystemSession;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +31,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public class InitMavenRequestTest {
 
 	private static final String TEST_LOCAL_REPO_PATH = "/.m2/bug383repository";
-	private static final String MAVEN_LOCAL_REPO_PROPERTY_NAME = "maven.repo.local";
 	
 	private static final String TEST_DUMMY_PROPERTY_NAME = "DUMMY_USER_HOME";
 	private static final String HOSTNAME_ENV_VARIABLE_NAME = isWindows() ? "COMPUTERNAME" : "HOSTNAME";
@@ -57,10 +61,20 @@ public class InitMavenRequestTest {
 			plugin.settings.setGlobalSettings(null);
 			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
 			
-			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
-			File expectedLocalRepoPath = new File(hostname, TEST_LOCAL_REPO_PATH); 
-			assertNotNull(localRepositoryPath);
-			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+			MavenExecutionRequest mavenRequest = plugin.getMavenSession().getRequest();			
+			File expectedLocalRepoPath = new File(hostname, TEST_LOCAL_REPO_PATH);
+			
+			// Test with temporary lemminx-maven local repository
+			File expectedTempLocalRepoPath = getTempLocalRepositoryPath(expectedLocalRepoPath);
+			File actualTempLocalRepoPath = mavenRequest.getLocalRepositoryPath();
+			assertNotNull(actualTempLocalRepoPath);
+			assertEquals(expectedTempLocalRepoPath.getAbsolutePath(), actualTempLocalRepoPath.getAbsolutePath());
+			
+			// Test with the real local repository
+			File actualLocalRepoPath = getLocalRepositoryPaths(mavenRequest).get(0);
+			assertNotNull(actualLocalRepoPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), actualLocalRepoPath.getAbsolutePath());
+			
 		} finally {
 			if (localSettingsFile != null) {
 				localSettingsFile.delete();
@@ -90,10 +104,20 @@ public class InitMavenRequestTest {
 			plugin.settings.setGlobalSettings(null);
 			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
 			
-			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
-			File expectedLocalRepoPath = new File(mavenProjectBasedirVariable, TEST_LOCAL_REPO_PATH); 
-			assertNotNull(localRepositoryPath);
-			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+			MavenExecutionRequest mavenRequest = plugin.getMavenSession().getRequest();			
+			File expectedLocalRepoPath = new File(mavenProjectBasedirVariable, TEST_LOCAL_REPO_PATH);
+			
+			// Test with temporary lemminx-maven local repository
+			File expectedTempLocalRepoPath = getTempLocalRepositoryPath(expectedLocalRepoPath);
+			File actualTempLocalRepoPath = mavenRequest.getLocalRepositoryPath();
+			assertNotNull(actualTempLocalRepoPath);
+			assertEquals(expectedTempLocalRepoPath.getAbsolutePath(), actualTempLocalRepoPath.getAbsolutePath());
+			
+			// Test with the real local repository
+			File actualLocalRepoPath = getLocalRepositoryPaths(mavenRequest).get(0);
+			assertNotNull(actualLocalRepoPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), actualLocalRepoPath.getAbsolutePath());
+			
 		} finally {
 			if (localSettingsFile != null) {
 				localSettingsFile.delete();
@@ -122,10 +146,20 @@ public class InitMavenRequestTest {
 			plugin.settings.setGlobalSettings(null);
 			plugin.settings.setUserSettings(localSettingsFile.getAbsolutePath());
 			
-			File localRepositoryPath = plugin.getMavenSession().getRequest().getLocalRepositoryPath();
-			File expectedLocalRepoPath = new File(homeVariable, TEST_LOCAL_REPO_PATH); 
-			assertNotNull(localRepositoryPath);
-			assertEquals(expectedLocalRepoPath.getAbsolutePath(), localRepositoryPath.getAbsolutePath());
+			MavenExecutionRequest mavenRequest = plugin.getMavenSession().getRequest();			
+			File expectedLocalRepoPath = new File(homeVariable, TEST_LOCAL_REPO_PATH);
+			
+			// Test with temporary lemminx-maven local repository
+			File expectedTempLocalRepoPath = getTempLocalRepositoryPath(expectedLocalRepoPath);
+			File actualTempLocalRepoPath = mavenRequest.getLocalRepositoryPath();
+			assertNotNull(actualTempLocalRepoPath);
+			assertEquals(expectedTempLocalRepoPath.getAbsolutePath(), actualTempLocalRepoPath.getAbsolutePath());
+			
+			// Test with the real local repository
+			File actualLocalRepoPath = getLocalRepositoryPaths(mavenRequest).get(0);
+			assertNotNull(actualLocalRepoPath);
+			assertEquals(expectedLocalRepoPath.getAbsolutePath(), actualLocalRepoPath.getAbsolutePath());
+
 		} finally {
 			if (localSettingsFile != null) {
 				localSettingsFile.delete();
