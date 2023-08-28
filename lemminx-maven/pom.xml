@@ -130,13 +130,16 @@
 			<version>${maven.version}</version>
 			<scope>compile</scope>
 		</dependency>
+<!--
 		<dependency>
 			<groupId>io.takari.aether</groupId>
 			<artifactId>aether-connector-okhttp</artifactId>
 			<version>0.17.8</version>
+-->
                         <!-- Parts of these got merged into maven-resolver-api and would cause conflicts if on the classpath
                              See https://github.com/eclipse/lemminx-maven/issues/360
                         -->
+<!--
 			<exclusions>
 				<exclusion>
 					<groupId>org.eclipse.aether</groupId>
@@ -148,6 +151,22 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
+-->
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-transport-file</artifactId>
+			<version>1.9.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-transport-http</artifactId>
+			<version>1.9.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-transport-wagon</artifactId>
+			<version>1.9.8</version>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
 			<artifactId>wagon-http</artifactId>
@@ -156,6 +175,11 @@
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
 			<artifactId>wagon-file</artifactId>
+			<version>3.5.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.wagon</groupId>
+			<artifactId>wagon-provider-api</artifactId>
 			<version>3.5.3</version>
 		</dependency>
 	</dependencies>
