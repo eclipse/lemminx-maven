@@ -78,9 +78,12 @@ public class MarkdownUtils {
 					link.append('#').append(selection);
 				}
 			}
-			if (title != null && title.trim().length() > 0) {
-				link.append(' ').append('"').append(title.trim()).append('"');
-			}
+			
+			// We do not add link titles as they create problems on Windows
+			// See: https://github.com/eclipse/lemminx-maven/issues/505
+//			if (title != null && title.trim().length() > 0) {
+//				link.append(' ').append('"').append(title.trim()).append('"');
+//			}
 			link.append(')');
 		}
 		return link.toString();

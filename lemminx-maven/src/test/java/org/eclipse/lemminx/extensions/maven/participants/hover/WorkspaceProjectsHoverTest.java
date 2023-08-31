@@ -502,8 +502,7 @@ public class WorkspaceProjectsHoverTest {
 				+ "**The managed version is 5.3.3.** " //
 				+ "**The artifact is managed in [org.springframework:spring-framework-bom:5.3.3](" //
 				+ localRepoDirectory.toURI().toString()  //
-				+ "org/springframework/spring-framework-bom/5.3.3/spring-framework-bom-5.3.3.pom#L63,22-L63,22" //
-				+ " \"org.springframework:spring-framework-bom:5.3.3\")**" + NL //
+				+ "org/springframework/spring-framework-bom/5.3.3/spring-framework-bom-5.3.3.pom#L63,22-L63,22)**" + NL //
 				+ "**The managed scope is: \"compile\"**";
 		Range expectedHoverRange = r(34, 15, 34, 29);
 		
@@ -575,8 +574,7 @@ public class WorkspaceProjectsHoverTest {
 				+ "**The managed version is 0.0.1-SNAPSHOT.** " //
 				+ "**The artifact is managed in [mygroup:tools.retry.springframework:0.0.1-SNAPSHOT](" // 
 				+ new File(getClass().getResource(WORKSPACE_PATH).getFile()).toURI().toString()  //
-				+ "tools/modules/retry-springframework/pom.xml#L35,18-L35,18" //
-				+" \"mygroup:tools.retry.springframework:0.0.1-SNAPSHOT\")**" + NL //
+				+ "tools/modules/retry-springframework/pom.xml#L35,18-L35,18)**" + NL //
 				+ "**The managed scope is: \"compile\"**";
 		Range expectedHoverRange = r(20, 15, 20, 52);
 		
