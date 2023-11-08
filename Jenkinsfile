@@ -1,7 +1,6 @@
 pipeline{
 	agent any
 	tools {
-		maven 'apache-maven-latest'
 		jdk 'openjdk-jdk17-latest'
 	}
 	environment {
@@ -11,7 +10,7 @@ pipeline{
 	stages{
 		stage("Maven Build"){
 			steps {
-				sh 'mvn -B verify --file lemminx-maven/pom.xml -Pgenerate-vscode-jars -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
+				sh './mvnw -B verify --file lemminx-maven/pom.xml -Pgenerate-vscode-jars -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true'
 			}
 			post {
 				always {
@@ -25,7 +24,7 @@ pipeline{
 				branch 'master'
 			}
 			steps {
-				sh 'mvn -B deploy  --file lemminx-maven/pom.xml -Pgenerate-vscode-jars  -DskipTests -Dcbi.jarsigner.skip=false'
+				sh './mvnw -B deploy  --file lemminx-maven/pom.xml -Pgenerate-vscode-jars  -DskipTests -Dcbi.jarsigner.skip=false'
 			}
 		}
 	}
