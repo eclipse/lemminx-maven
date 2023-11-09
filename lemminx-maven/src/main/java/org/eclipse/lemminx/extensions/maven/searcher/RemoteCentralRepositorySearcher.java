@@ -52,20 +52,16 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.apache.maven.wagon.providers.http.HttpWagon;
-import org.apache.http.HttpRequest;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.utils.HttpClientUtils;
 import org.apache.http.impl.client.CloseableHttpClient;
-
-//import io.takari.aether.client.AetherClientAuthentication;
-//import io.takari.aether.client.AetherClientConfig;
-//import io.takari.aether.client.AetherClientProxy;
-//import io.takari.aether.client.Response;
-//import io.takari.aether.okhttp.OkHttpAetherClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 public class RemoteCentralRepositorySearcher {
 	private static final Logger LOGGER = Logger.getLogger(RemoteCentralRepositorySearcher.class.getName());
@@ -82,9 +78,9 @@ public class RemoteCentralRepositorySearcher {
 	public static boolean disableCentralSearch = Boolean.parseBoolean(
 			System.getProperty(RemoteCentralRepositorySearcher.class.getName() + ".disableCentralSearch"));
 
-	private final static long DEFAULT_CACHE_EXPIRATION_TIMEOUT = 30L;
+	private final static long DEFAULT_CACHE_EXPIRATION_TIMEOUT = 30L; // Minutes
 
-	private final CloseableHttpClient client;
+	private final HttpClient client;
 
 	private final ExecutorService executorService;
 
@@ -247,54 +243,43 @@ public class RemoteCentralRepositorySearcher {
 		this.groupIdsCache = new CacheManager<RemoteCentralRepositorySearcher.RequestKey, Collection<String>>(cache);
 		this.artifactVersionsCache = new CacheManager<RemoteCentralRepositorySearcher.RequestKey, Collection<ArtifactVersion>>(
 				cache);
-		
-		
 	}
 
 	private CloseableHttpClient newHttpClient() {
-//		AetherClientConfig config = new AetherClientConfig();
-//		config.setConnectionTimeout(ConfigurationProperties.DEFAULT_CONNECT_TIMEOUT);
-//		config.setRequestTimeout(ConfigurationProperties.DEFAULT_REQUEST_TIMEOUT);
-//		// config.setSslSocketFactory(SSLContext.getDefault().getSocketFactory());
-//
-//		// Authentification
-//		AetherClientAuthentication authentication = null;
-//		final String username = System.getProperty("http.proxyUser");
-//		final String password = System.getProperty("http.proxyPassword");
-//		if (username != null && password != null) {
-//			authentication = new AetherClientAuthentication(username, password);
-//		}
-//
-//		// Proxy
-//		String proxyHost = System.getProperty("http.proxyHost");
-//		Integer proxyPort = null;
-//		if (proxyHost != null) {
-//			proxyPort = Integer.getInteger(System.getProperty("http.proxyPort"));
-//		} else {
-//			proxyHost = System.getProperty("https.proxyHost");
-//			if (proxyHost != null) {
-//				proxyPort = Integer.getInteger(System.getProperty("https.proxyPort"));
-//			}
-//		}
-//		if (proxyHost != null && proxyPort != null) {
-//			AetherClientProxy clientProxy = new AetherClientProxy();
-//			clientProxy.setHost(proxyHost);
-//			clientProxy.setPort(proxyPort);
-//			clientProxy.setAuthentication(authentication);
-//			config.setProxy(clientProxy);
-//		}
-//
-//		if (config.getProxy() == null) {
-//			config.setAuthentication(authentication);
-//		}
-//		
-//		// ex: LemMinX/0.27.1-SNAPSHOT (Windows 11 10.0)
-//		String userAgent = "LemMinX/" + Platform.getVersion().getVersionNumber() + " (" + Platform.getOS().getName()
-//				+ " " + Platform.getOS().getVersion() + ")";
-//		config.setUserAgent(userAgent);
-//		config.setHeaders(Collections.emptyMap());
-		CloseableHttpClient httpClient = HttpWagon.getHttpClient();
-		return httpClient;
+		// Proxy
+		String proxyHost = System.getProperty("http.proxyHost");
+		Integer proxyPort = null;
+		if (proxyHost != null) {
+			proxyPort = Integer.getInteger(System.getProperty("http.proxyPort"));
+		} else {
+			proxyHost = System.getProperty("https.proxyHost");
+			if (proxyHost != null) {
+				proxyPort = Integer.getInteger(System.getProperty("https.proxyPort"));
+			}
+		}
+
+		// ex: LemMinX/0.27.1-SNAPSHOT (Windows 11 10.0)
+		String userAgent = "LemMinX/" + Platform.getVersion().getVersionNumber() + " (" + Platform.getOS().getName()
+				+ " " + Platform.getOS().getVersion() + ")";
+		
+		RequestConfig requestConfig = RequestConfig.custom()
+				.setConnectionRequestTimeout(ConfigurationProperties.DEFAULT_REQUEST_TIMEOUT)
+				.setConnectTimeout(5*ConfigurationProperties.DEFAULT_CONNECT_TIMEOUT)
+				.build();
+
+		HttpClientBuilder builder = HttpClientBuilder.create() //
+	            .useSystemProperties() //
+	            .disableConnectionState() //
+	            .setUserAgent(userAgent) //
+	            .setDefaultHeaders(Collections.emptySet()) //
+	            .setDefaultRequestConfig(requestConfig); //
+
+		if (proxyHost != null && proxyPort != null) {
+			builder = builder.setProxy(
+					new HttpHost(proxyHost, proxyPort, null));
+		}
+
+		return builder.build();
 	}
 
 	public Collection<Artifact> getArtifacts(Dependency artifactToSearch) throws OngoingOperationException {
@@ -477,7 +462,7 @@ public class RemoteCentralRepositorySearcher {
 	private JsonObject getResponseBody(String url, Dependency artifactToSearch) throws Exception {
 		// Response is closable
 		HttpUriRequest request = new HttpGet(url);
-		try (CloseableHttpResponse response = client.execute((HttpUriRequest) request)) {
+		try (CloseableHttpResponse response = (CloseableHttpResponse)client.execute(request)) {
 			if (isSuccessful(response)) {
 				JsonObject bodyObject = JsonParser.parseReader(new InputStreamReader(response.getEntity().getContent()))
 						.getAsJsonObject();
@@ -503,7 +488,7 @@ public class RemoteCentralRepositorySearcher {
 	 * 
 	 * @throws IOException
 	 */
-	private static boolean isSuccessful(CloseableHttpResponse response) {
+	private static boolean isSuccessful(HttpResponse response) {
 		try {
 			int code = response.getStatusLine().getStatusCode();
 			return code >= 200 && code < 300;
