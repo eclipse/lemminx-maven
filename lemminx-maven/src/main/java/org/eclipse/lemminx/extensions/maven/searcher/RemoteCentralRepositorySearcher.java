@@ -18,10 +18,22 @@ import static org.eclipse.lemminx.extensions.maven.searcher.JsonRemoteCentralRep
 import static org.eclipse.lemminx.utils.ExceptionUtils.getRootCause;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.Authenticator;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.ProxySelector;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpClient.Builder;
+import java.net.http.HttpClient.Redirect;
+import java.net.http.HttpClient.Version;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,7 +53,6 @@ import java.util.logging.Logger;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.model.Dependency;
-import org.eclipse.aether.ConfigurationProperties;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -51,17 +62,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
-import org.apache.http.HttpHost;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.utils.HttpClientUtils;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
 
 public class RemoteCentralRepositorySearcher {
 	private static final Logger LOGGER = Logger.getLogger(RemoteCentralRepositorySearcher.class.getName());
@@ -79,6 +79,14 @@ public class RemoteCentralRepositorySearcher {
 			System.getProperty(RemoteCentralRepositorySearcher.class.getName() + ".disableCentralSearch"));
 
 	private final static long DEFAULT_CACHE_EXPIRATION_TIMEOUT = 30L; // Minutes
+	private final static long DEFAULT_CONNECT_TIMEOUT = 30; // Seconds
+	private final static long DEFAULT_REQUEST_TIMEOUT = 60; // Seconds 
+
+	private final static String HEADER_USERAGENT = "User-Agent";
+	
+	// ex: LemMinX/0.27.1-SNAPSHOT (Windows 11 10.0)
+	private final static String DEFAULT_HEADER_USERAGENT = "LemMinX/" + Platform.getVersion().getVersionNumber() + " (" + Platform.getOS().getName()
+			+ " " + Platform.getOS().getVersion() + ")";
 
 	private final HttpClient client;
 
@@ -245,7 +253,21 @@ public class RemoteCentralRepositorySearcher {
 				cache);
 	}
 
-	private CloseableHttpClient newHttpClient() {
+	private class ProxyAuthenticator extends Authenticator {
+
+	    private String user, password;
+
+	    public ProxyAuthenticator(String user, String password) {
+	        this.user = user;
+	        this.password = password;
+	    }
+
+	    protected PasswordAuthentication getPasswordAuthentication() {
+	        return new PasswordAuthentication(user, password.toCharArray());
+	    }
+	}
+
+	private HttpClient newHttpClient() {
 		// Proxy
 		String proxyHost = System.getProperty("http.proxyHost");
 		Integer proxyPort = null;
@@ -257,28 +279,26 @@ public class RemoteCentralRepositorySearcher {
 				proxyPort = Integer.getInteger(System.getProperty("https.proxyPort"));
 			}
 		}
-
-		// ex: LemMinX/0.27.1-SNAPSHOT (Windows 11 10.0)
-		String userAgent = "LemMinX/" + Platform.getVersion().getVersionNumber() + " (" + Platform.getOS().getName()
-				+ " " + Platform.getOS().getVersion() + ")";
 		
-		RequestConfig requestConfig = RequestConfig.custom()
-				.setConnectionRequestTimeout(ConfigurationProperties.DEFAULT_REQUEST_TIMEOUT)
-				.setConnectTimeout(5*ConfigurationProperties.DEFAULT_CONNECT_TIMEOUT)
-				.build();
-
-		HttpClientBuilder builder = HttpClientBuilder.create() //
-	            .useSystemProperties() //
-	            .disableConnectionState() //
-	            .setUserAgent(userAgent) //
-	            .setDefaultHeaders(Collections.emptySet()) //
-	            .setDefaultRequestConfig(requestConfig); //
-
+		// Authentification
+		final String username = System.getProperty("http.proxyUser");
+		final String password = System.getProperty("http.proxyPassword");
+		
+		Builder builder = HttpClient.newBuilder()
+				.version(Version.HTTP_1_1)
+				.followRedirects(Redirect.NORMAL)
+				.connectTimeout(Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT));
+		 
 		if (proxyHost != null && proxyPort != null) {
-			builder = builder.setProxy(
-					new HttpHost(proxyHost, proxyPort, null));
+			builder = builder.proxy(ProxySelector.of(
+					InetSocketAddress.createUnresolved(proxyHost, proxyPort)));
 		}
 
+		if (username != null && password != null) {
+			builder = builder.authenticator(
+					new ProxyAuthenticator(username, password));
+		}
+		
 		return builder.build();
 	}
 
@@ -460,12 +480,17 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	private JsonObject getResponseBody(String url, Dependency artifactToSearch) throws Exception {
-		// Response is closable
-		HttpUriRequest request = new HttpGet(url);
-		try (CloseableHttpResponse response = (CloseableHttpResponse)client.execute(request)) {
+		try {
+			HttpRequest request = HttpRequest.newBuilder()
+					.uri(URI.create(url))
+					.timeout(Duration.ofSeconds(DEFAULT_REQUEST_TIMEOUT))
+					.header(HEADER_USERAGENT, DEFAULT_HEADER_USERAGENT)
+					.GET()
+					.build();
+			
+			HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
 			if (isSuccessful(response)) {
-				JsonObject bodyObject = JsonParser.parseReader(new InputStreamReader(response.getEntity().getContent()))
-						.getAsJsonObject();
+				JsonObject bodyObject = JsonParser.parseString(response.body()).getAsJsonObject();
 				if (bodyObject.has(RESPONSE)) {
 					JsonObject responseObject = bodyObject.get(RESPONSE).getAsJsonObject();
 					if (responseObject.has(NUM_FOUND) && responseObject.has(DOCS)) {
@@ -474,10 +499,17 @@ public class RemoteCentralRepositorySearcher {
 				}
 			} else {
 				LOGGER.log(Level.SEVERE,
-						"Maven Central Repo search failed for " + String.join(":", artifactToSearch.getGroupId(),
-								artifactToSearch.getArtifactId(), artifactToSearch.getVersion()),
-						response.getStatusLine().getReasonPhrase());
+						"Maven Central Repo search failed for " //
+								+ String.join(":", artifactToSearch.getGroupId(),
+										artifactToSearch.getArtifactId(), artifactToSearch.getVersion())
+								+ ": Status code received: " + response.statusCode());
 			}
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE,
+					"Maven Central Repo search failed for " // 
+						+ String.join(":", artifactToSearch.getGroupId(),
+							artifactToSearch.getArtifactId(), artifactToSearch.getVersion())
+						+ ": " + e.getMessage());
 		}
 		return null;
 	}
@@ -488,9 +520,9 @@ public class RemoteCentralRepositorySearcher {
 	 * 
 	 * @throws IOException
 	 */
-	private static boolean isSuccessful(HttpResponse response) {
+	private static boolean isSuccessful(@SuppressWarnings("rawtypes") HttpResponse response) {
 		try {
-			int code = response.getStatusLine().getStatusCode();
+			int code = response.statusCode();
 			return code >= 200 && code < 300;
 		} catch (Exception e) {
 			return false;
@@ -510,7 +542,6 @@ public class RemoteCentralRepositorySearcher {
 	}
 
 	public void stop() {
-		HttpClientUtils.closeQuietly(client);
 		executorService.shutdown();
 	}
 }
