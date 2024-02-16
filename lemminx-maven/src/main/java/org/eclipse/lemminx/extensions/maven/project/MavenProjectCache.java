@@ -15,6 +15,10 @@ import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -23,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -32,11 +37,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.ParseException;
 import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
-import org.apache.maven.artifact.repository.metadata.Plugin;
+import org.apache.maven.cli.CLIManager;
 import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
@@ -68,6 +76,9 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 
 public class MavenProjectCache {
+
+	private static final String MVN_FOLDER = ".mvn";
+	private static final String MAVEN_CONFIG = "maven.config";
 
 	private static final Logger LOGGER = Logger.getLogger(MavenProjectCache.class.getName());
 	private MavenLemminxExtension plugin;
@@ -162,8 +173,9 @@ public class MavenProjectCache {
 				MavenProject project = null;
 				File file = source.getFile();
 				try {		
-					ProjectBuildingResult buildResult = projectBuilder.build(
-							source, newProjectBuildingRequest());
+					ProjectBuildingRequest request = newProjectBuildingRequest(file);
+
+					ProjectBuildingResult buildResult = projectBuilder.build(source, request);
 					cancelChecker.checkCanceled();
 					project = buildResult.getProject();
 					problems.addAll(buildResult.getProblems());
@@ -337,7 +349,7 @@ public class MavenProjectCache {
 			}
 
 			try {
-				return Optional.of(projectBuilder.build(file, newProjectBuildingRequest()).getProject());
+				return Optional.of(projectBuilder.build(file, newProjectBuildingRequest(file)).getProject());
 			} catch (ProjectBuildingException e) {
 				List<ProjectBuildingResult> result = e.getResults();
 				if (result != null && result.size() == 1 && result.get(0).getProject() != null) {
@@ -364,7 +376,7 @@ public class MavenProjectCache {
 		 */
 		public MavenProject getSnapshotProject(DOMDocument document, String profileId, boolean resolve) {
 			// it would be nice to directly rebuild from Model instead of re-parsing text
-			ProjectBuildingRequest request = newProjectBuildingRequest(resolve);
+			ProjectBuildingRequest request = newProjectBuildingRequest(resolve, getFileForDocument(document));
 			if (profileId != null) {
 				request.setActiveProfileIds(List.of(profileId));
 			}
@@ -386,24 +398,28 @@ public class MavenProjectCache {
 		}
 
 		/**
-		 * Creates a new default Maven Project Building request (with dependency 
-		 * resolve enabled) 
+		 * Creates a new default Maven Project Building request (with dependency resolve
+		 * enabled)
+		 * 
+		 * @param projectFile the project file or base directory of the building request
 		 * 
 		 * @return A ProjectBuildingRequest object
 		 */
-		public ProjectBuildingRequest newProjectBuildingRequest() {
-			return newProjectBuildingRequest(true);
+		public ProjectBuildingRequest newProjectBuildingRequest(File projectFile) {
+			return newProjectBuildingRequest(true, projectFile);
 		}
 		
 		/**
 		 * Creates a new default Maven Project Building request
 		 * 
-		 * @param resolveDependencies a boolean indicating if the dependency 
-		 * resolve is to be enabled on the request.
+		 * @param resolveDependencies a boolean indicating if the dependency resolve is
+		 *                            to be enabled on the request.
+		 * @param projectFile         the project file or base directory of the building
+		 *                            request
 		 * 
 		 * @return A ProjectBuildingRequest object
 		 */
-		public ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies) {
+		public ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies, File projectFile) {
 			ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
 			MavenExecutionRequest mavenRequest = mavenSession.getRequest();
 			request.setSystemProperties(mavenRequest.getSystemProperties());
@@ -415,7 +431,38 @@ public class MavenProjectCache {
 			request.setResolveDependencies(resolveDependencies);
 
 			// See: https://issues.apache.org/jira/browse/MRESOLVER-374
-			request.getUserProperties().setProperty("aether.syncContext.named.factory", "noop");
+			Properties userProperties = request.getUserProperties();
+			userProperties.setProperty("aether.syncContext.named.factory", "noop");
+			File multiModuleProjectDirectory = computeMultiModuleProjectDirectory(projectFile);
+			if (multiModuleProjectDirectory != null) {
+				File mavenConfig = new File(multiModuleProjectDirectory, MAVEN_CONFIG);
+				if (mavenConfig.isFile()) {
+					try {
+						CLIManager manager = new CLIManager();
+						String[] args;
+						try (Stream<String> lines = Files.lines(mavenConfig.toPath(), Charset.defaultCharset())) {
+							args = lines.filter(arg -> !arg.isEmpty()).toArray(String[]::new);
+						}
+						CommandLine commandline = manager.parse(args);
+						if (commandline.hasOption(CLIManager.SET_USER_PROPERTY)) {
+							String[] configUserProperties = commandline.getOptionValues(CLIManager.SET_USER_PROPERTY);
+							if (configUserProperties != null) {
+								for (String property : configUserProperties) {
+									int index = property.indexOf('=');
+									if (index <= 0) {
+										userProperties.setProperty(property.trim(), "true");
+									} else {
+										userProperties.setProperty(property.substring(0, index).trim(),
+												property.substring(index + 1).trim());
+									}
+								}
+							}
+						}
+					} catch (IOException | ParseException e) {
+						// TODO how to best propagate this?!?
+					}
+				}
+			}
 			return request;
 		}
 	}
@@ -573,4 +620,38 @@ public class MavenProjectCache {
 		}
 		return provider.getLoadedMavenProject();
 	}
+
+	/**
+	 * @param file a base file or directory, may be <code>null</code>
+	 * @return the value for `maven.multiModuleProjectDirectory` as defined in Maven
+	 *         launcher
+	 */
+	public static File computeMultiModuleProjectDirectory(File file) {
+		if (file == null) {
+			return null;
+		}
+		final File basedir = file.isDirectory() ? file : file.getParentFile();
+		for (File root = basedir; root != null; root = root.getParentFile()) {
+			if (new File(root, MVN_FOLDER).isDirectory()) {
+				return root;
+			}
+		}
+		return null;
+	}
+
+	private static File getFileForDocument(DOMDocument document) {
+		String documentURI = document.getDocumentURI();
+		if (documentURI == null) {
+			return null;
+		}
+		if (documentURI.toLowerCase().startsWith("file:")) {
+			try {
+				return new File(new URI(documentURI));
+			} catch (URISyntaxException e) {
+				return null;
+			}
+		}
+		return new File(documentURI);
+	}
+
 }
