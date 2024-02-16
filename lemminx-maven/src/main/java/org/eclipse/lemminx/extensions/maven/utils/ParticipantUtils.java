@@ -30,15 +30,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CancellationException;
-import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.maven.model.Build;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
@@ -46,6 +46,7 @@ import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.artifact.Artifact;
@@ -293,26 +294,42 @@ public class ParticipantUtils {
 	}
 	
 	public static Map<String, String> getMavenProjectProperties(MavenProject project) {
-		Map<String, String> allProps = new HashMap<>();
-		Properties projectProperties = project.getProperties();
-		projectProperties.putAll(getEnvironmentProperties());
-		if (project.getProperties() != null) {
-			for (Entry<Object, Object> prop : projectProperties.entrySet()) {
-				allProps.put((String) prop.getKey(), (String) prop.getValue());
-			}
+		if (project == null) {
+			return Map.of();
 		}
-		allProps.put("basedir", project == null ? "unknown" : project.getBasedir().toString());
-		allProps.put("project.basedir", project == null ? "unknown" : project.getBasedir().toString());
-		allProps.put("project.version", project == null ? "unknown" : project.getVersion());
-		allProps.put("project.groupId", project == null ? "unknown" : project.getGroupId());
-		allProps.put("project.artifactId", project == null ? "unknown" : project.getArtifactId());
-		allProps.put("project.name", project == null ? "unknown" : project.getName());
-		allProps.put("project.build.directory",
-				project.getBuild() == null ? "unknown" : project.getBuild().getDirectory());
-		allProps.put("project.build.outputDirectory",
-				project.getBuild() == null ? "unknown" : project.getBuild().getOutputDirectory());
-
+		// See org.apache.maven.plugin.PluginParameterExpressionEvaluator
+		Map<String, String> allProps = new HashMap<>();
+		putProperties(getEnvironmentProperties(), allProps);
+		putProperties(project.getProperties(), allProps);
+		ProjectBuildingRequest buildingRequest = project.getProjectBuildingRequest();
+		if (buildingRequest != null) {
+			// user properties overwrite project properties
+			putProperties(buildingRequest.getUserProperties(), allProps);
+			// but system properties overwrite even user properties
+			putProperties(buildingRequest.getSystemProperties(), allProps);
+		}
+		allProps.put("basedir", project.getBasedir().toString());
+		allProps.put("project.basedir", project.getBasedir().toString());
+		allProps.put("project.version", project.getVersion());
+		allProps.put("project.groupId", project.getGroupId());
+		allProps.put("project.artifactId", project.getArtifactId());
+		allProps.put("project.name", project.getName());
+		Build build = project.getBuild();
+		if (build != null) {
+			allProps.put("project.build.directory", build.getDirectory());
+			allProps.put("project.build.outputDirectory", build.getOutputDirectory());
+			allProps.put("project.build.testOutputDirectory", build.getTestOutputDirectory());
+		}
 		return allProps;
+	}
+
+	private static void putProperties(Properties properties, Map<String, String> map) {
+		if (properties == null || map == null) {
+			return;
+		}
+		properties.stringPropertyNames().forEach(envProperty -> {
+			map.put(envProperty, properties.getProperty(envProperty));
+		});
 	}
 
 	public static Map.Entry<Range, String> getMavenPropertyInRequest(IPositionRequest request) {
