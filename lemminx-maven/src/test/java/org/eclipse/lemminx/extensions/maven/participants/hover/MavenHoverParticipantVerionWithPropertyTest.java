@@ -9,6 +9,7 @@
 package org.eclipse.lemminx.extensions.maven.participants.hover;
 
 import static org.eclipse.lemminx.extensions.maven.utils.MavenLemminxTestsUtils.createDOMDocument;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -58,6 +59,27 @@ class MavenHoverParticipantVerionWithPropertyTest {
 		value = hover.getContents().getRight().getValue();
 		System.out.println("testPluginManagementPluginWithVerionProperty: on version: " + value);
  		assertTrue((hover.getContents().getRight().getValue().contains("1.8")));
+	}
+
+	@Test
+	void testPluginWithVersionPropertyFromMavenConfig()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/maven.config/properties/pom.xml", languageService);
+		Hover hover = languageService.doHover(document, new Position(14, 32), new SharedSettings());
+		assertNotNull(hover, "Hover not found, property from .mvn/maven.config missing?");
+		String value = hover.getContents().getRight().getValue();
+		assertTrue(value.contains("antrun.plugin.version"));
+		assertTrue(value.contains("1.8"));
+		assertTrue(value.contains("The property is defined in the user properties"));
+	}
+
+	@Test
+	void testPluginWithVersionPropertyFromMavenConfigProfile()
+			throws IOException, InterruptedException, ExecutionException, URISyntaxException {
+		DOMDocument document = createDOMDocument("/maven.config/properties/pom.xml", languageService);
+		Hover hover = languageService.doHover(document, new Position(22, 28), new SharedSettings());
+		assertNotNull(hover, "Hover not found, property from profile activated in .mvn/maven.config missing?");
+		assertTrue((hover.getContents().getRight().getValue().contains("3.5.1")));
 	}
 
 	@Test

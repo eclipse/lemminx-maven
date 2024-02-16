@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.StringTokenizer;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -172,8 +173,8 @@ public class MavenProjectCache {
 				DependencyResolutionResult dependencyResolutionResult = null;
 				MavenProject project = null;
 				File file = source.getFile();
-				try {		
-					ProjectBuildingRequest request = newProjectBuildingRequest(file);
+				try {
+					ProjectBuildingRequest request = newProjectBuildingRequest(file, problems);
 
 					ProjectBuildingResult buildResult = projectBuilder.build(source, request);
 					cancelChecker.checkCanceled();
@@ -349,7 +350,7 @@ public class MavenProjectCache {
 			}
 
 			try {
-				return Optional.of(projectBuilder.build(file, newProjectBuildingRequest(file)).getProject());
+				return Optional.of(projectBuilder.build(file, newProjectBuildingRequest(file, null)).getProject());
 			} catch (ProjectBuildingException e) {
 				List<ProjectBuildingResult> result = e.getResults();
 				if (result != null && result.size() == 1 && result.get(0).getProject() != null) {
@@ -376,7 +377,7 @@ public class MavenProjectCache {
 		 */
 		public MavenProject getSnapshotProject(DOMDocument document, String profileId, boolean resolve) {
 			// it would be nice to directly rebuild from Model instead of re-parsing text
-			ProjectBuildingRequest request = newProjectBuildingRequest(resolve, getFileForDocument(document));
+			ProjectBuildingRequest request = newProjectBuildingRequest(resolve, getFileForDocument(document), null);
 			if (profileId != null) {
 				request.setActiveProfileIds(List.of(profileId));
 			}
@@ -401,12 +402,17 @@ public class MavenProjectCache {
 		 * Creates a new default Maven Project Building request (with dependency resolve
 		 * enabled)
 		 * 
-		 * @param projectFile the project file or base directory of the building request
+		 * @param projectFile       the project file or base directory of the building
+		 *                          request
+		 * @param problemsCollector if not <code>null</code> this method will add
+		 *                          problems to the collection if there is a problem
+		 *                          while creating the request
 		 * 
 		 * @return A ProjectBuildingRequest object
 		 */
-		public ProjectBuildingRequest newProjectBuildingRequest(File projectFile) {
-			return newProjectBuildingRequest(true, projectFile);
+		public ProjectBuildingRequest newProjectBuildingRequest(File projectFile,
+				Collection<ModelProblem> problemsCollector) {
+			return newProjectBuildingRequest(true, projectFile, problemsCollector);
 		}
 		
 		/**
@@ -416,10 +422,14 @@ public class MavenProjectCache {
 		 *                            to be enabled on the request.
 		 * @param projectFile         the project file or base directory of the building
 		 *                            request
+		 * @param problemsCollector   if not <code>null</code> this method will add
+		 *                            problems to the collection if there is a problem
+		 *                            while creating the request
 		 * 
 		 * @return A ProjectBuildingRequest object
 		 */
-		public ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies, File projectFile) {
+		public ProjectBuildingRequest newProjectBuildingRequest(boolean resolveDependencies, File projectFile,
+				Collection<ModelProblem> problemsCollector) {
 			ProjectBuildingRequest request = new DefaultProjectBuildingRequest();
 			MavenExecutionRequest mavenRequest = mavenSession.getRequest();
 			request.setSystemProperties(mavenRequest.getSystemProperties());
@@ -435,7 +445,7 @@ public class MavenProjectCache {
 			userProperties.setProperty("aether.syncContext.named.factory", "noop");
 			File multiModuleProjectDirectory = computeMultiModuleProjectDirectory(projectFile);
 			if (multiModuleProjectDirectory != null) {
-				File mavenConfig = new File(multiModuleProjectDirectory, MAVEN_CONFIG);
+				File mavenConfig = new File(multiModuleProjectDirectory, MVN_FOLDER + "/" + MAVEN_CONFIG);
 				if (mavenConfig.isFile()) {
 					try {
 						CLIManager manager = new CLIManager();
@@ -458,8 +468,30 @@ public class MavenProjectCache {
 								}
 							}
 						}
+						if (commandline.hasOption(CLIManager.ACTIVATE_PROFILES)) {
+							String[] profileOptionValues = commandline.getOptionValues(CLIManager.ACTIVATE_PROFILES);
+							if (profileOptionValues != null) {
+								for (String profileOptionValue : profileOptionValues) {
+									StringTokenizer tokenizer = new StringTokenizer(profileOptionValue, ",");
+									while (tokenizer.hasMoreTokens()) {
+										String profileToken = tokenizer.nextToken().trim();
+										if (profileToken.startsWith("-") || profileToken.startsWith("!")) {
+											request.getInactiveProfileIds().add(profileToken.substring(1));
+										} else if (profileToken.startsWith("+")) {
+											request.getActiveProfileIds().add(profileToken.substring(1));
+										} else {
+											request.getActiveProfileIds().add(profileToken);
+										}
+									}
+								}
+							}
+						}
 					} catch (IOException | ParseException e) {
-						// TODO how to best propagate this?!?
+						if (problemsCollector != null) {
+							problemsCollector.add(new DefaultModelProblem("Problem parsing " + mavenConfig,
+									ModelProblem.Severity.ERROR, null, null,
+									-1, -1, e));
+						}
 					}
 				}
 			}

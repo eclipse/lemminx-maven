@@ -49,6 +49,7 @@ import org.apache.maven.plugin.PluginResolutionException;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.lemminx.dom.DOMDocument;
 import org.eclipse.lemminx.dom.DOMElement;
@@ -566,7 +567,8 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 	
 					// Find location
 					MavenProject parentProject = project, childProj = project;
-					while (parentProject != null && parentProject.getProperties().containsKey(property.getValue())) {
+					String propertyName = property.getValue();
+					while (parentProject != null && parentProject.getProperties().containsKey(propertyName)) {
 						cancelChecker.checkCanceled();
 						childProj = parentProject;
 						parentProject = parentProject.getParent();
@@ -580,14 +582,14 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 					cancelChecker.checkCanceled();
 					if (childProjectUri.equals(thisProjectUri)) {
 						// Property is defined in the same file as the request
-						propertyDeclaration = DOMUtils.findNodesByLocalName(doc, property.getValue()).stream()
+						propertyDeclaration = DOMUtils.findNodesByLocalName(doc, propertyName).stream()
 								.filter(isMavenProperty).findFirst().orElse(null);
 					} else {
 						DOMDocument propertyDeclaringDocument = org.eclipse.lemminx.utils.DOMUtils.loadDocument(
 								childProj.getFile().toURI().toString(),
 								request.getNode().getOwnerDocument().getResolverExtensionManager());
 						cancelChecker.checkCanceled();
-						propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, property.getValue())
+						propertyDeclaration = DOMUtils.findNodesByLocalName(propertyDeclaringDocument, propertyName)
 								.stream().filter(isMavenProperty).findFirst().orElse(null);
 					}
 
@@ -595,9 +597,19 @@ public class MavenHoverParticipant extends HoverParticipantAdapter {
 						cancelChecker.checkCanceled();
 						String uri = childProj.getFile().getAbsolutePath();
 						Range targetRange = XMLPositionUtility.createRange(propertyDeclaration);
-						String sourceModelId = childProj.getGroupId() + ':' + childProj.getArtifactId() + ':' + childProj.getVersion();
-						message.append(toBold.apply(MessageFormat.format(PomTextHover_property_location, 
-								supportsMarkdown ? MarkdownUtils.toLink(uri, targetRange, sourceModelId, null) : sourceModelId)));
+							String sourceModelId = childProj.getGroupId() + ':' + childProj.getArtifactId() + ':'
+									+ childProj.getVersion();
+							message.append(toBold.apply(MessageFormat.format(PomTextHover_property_location,
+									supportsMarkdown ? MarkdownUtils.toLink(uri, targetRange, sourceModelId, null)
+											: sourceModelId)));
+					} else {
+							ProjectBuildingRequest projectRequest = project.getProjectBuildingRequest();
+							if (projectRequest != null) {
+								if (projectRequest.getUserProperties().getProperty(propertyName) != null) {
+									message.append(toBold.apply(MessageFormat.format(PomTextHover_property_location,
+											"the user properties")));
+								}
+							}
 					}
 
 					Hover hover = new Hover(
