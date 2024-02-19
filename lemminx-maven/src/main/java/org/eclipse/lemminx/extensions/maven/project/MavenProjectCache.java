@@ -112,6 +112,11 @@ public class MavenProjectCache {
 	}
 	
 	class ProjectBuildManager {
+		private static final char ACTIVATE_PROFILES = CLIManager.ACTIVATE_PROFILES;
+
+		@SuppressWarnings("deprecation")
+		private static final char SET_USER_PROPERTY = CLIManager.SET_SYSTEM_PROPERTY;
+
 		private static final int CORE_POOL_SIZE = 10;
 
 		private Map<Object, BuildProjectRunnable> toProcess = new HashMap<>();
@@ -454,8 +459,8 @@ public class MavenProjectCache {
 							args = lines.filter(arg -> !arg.isEmpty()).toArray(String[]::new);
 						}
 						CommandLine commandline = manager.parse(args);
-						if (commandline.hasOption(CLIManager.SET_USER_PROPERTY)) {
-							String[] configUserProperties = commandline.getOptionValues(CLIManager.SET_USER_PROPERTY);
+						if (commandline.hasOption(SET_USER_PROPERTY)) {
+							String[] configUserProperties = commandline.getOptionValues(SET_USER_PROPERTY);
 							if (configUserProperties != null) {
 								for (String property : configUserProperties) {
 									int index = property.indexOf('=');
@@ -468,8 +473,8 @@ public class MavenProjectCache {
 								}
 							}
 						}
-						if (commandline.hasOption(CLIManager.ACTIVATE_PROFILES)) {
-							String[] profileOptionValues = commandline.getOptionValues(CLIManager.ACTIVATE_PROFILES);
+						if (commandline.hasOption(ACTIVATE_PROFILES)) {
+							String[] profileOptionValues = commandline.getOptionValues(ACTIVATE_PROFILES);
 							if (profileOptionValues != null) {
 								for (String profileOptionValue : profileOptionValues) {
 									StringTokenizer tokenizer = new StringTokenizer(profileOptionValue, ",");
