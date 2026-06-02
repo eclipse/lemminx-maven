@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2023 Red Hat Inc. and others.
+ * Copyright (c) 2019, 2026 Red Hat Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -188,34 +188,26 @@ public class LocalRepositorySearcher implements IMavenProjectBuildListener {
 			}
 			
 			void begin() {
-				if (monitor == null) {
-					monitor = progressSupport != null ? progressSupport.createProgressMonitor() : null;
-					if (monitor != null) {
-						monitor.begin((initial ? "Loading" : "Updating") 
-								+ " local artifacts from ''" + repository.toPath() + "''...", 
-								null, 100, null);
-					}
-				}
-			}
+				monitor = progressSupport.createProgressMonitor();
+				monitor.begin((initial ? "Loading" : "Updating")
+								+ " local artifacts from ''" + repository.toPath() + "''...",
+						null, 100, null);
+            }
 			
 			void report(String entry) {
 				var newCoompleted = incrementCompleted(1);
-				if (monitor != null) {
-					// Limiting report counts to 10 (one after each 10%-progress)
-					int percentage = percentage();
-					if (lastReportedPercentage < 0 || percentage >=100 
-							|| (percentage / 10 - lastReportedPercentage / 10) % 10 >= 1) {
-						monitor.report("Scanning folder ''" + entry  + "'' (" + newCoompleted + " / "
-								+ total + ")...", percentage(), null);
-						lastReportedPercentage = percentage;
-					}
+				// Limiting report counts to 10 (one after each 10%-progress)
+				int percentage = percentage();
+				if (lastReportedPercentage < 0 || percentage >= 100
+						|| (percentage / 10 - lastReportedPercentage / 10) % 10 >= 1) {
+					monitor.report("Scanning folder ''" + entry + "'' (" + newCoompleted + " / "
+							+ total + ")...", percentage(), null);
+					lastReportedPercentage = percentage;
 				}
-			}
-			
+            }
+
 			void end() {
-				if (monitor != null) {
-					monitor.end("Finished loading local artifacts from ''" + repository.toPath() + "''.");
-				}
+				monitor.end("Finished loading local artifacts from ''" + repository.toPath() + "''.");
 			}
 		}
 		
@@ -306,7 +298,7 @@ public class LocalRepositorySearcher implements IMavenProjectBuildListener {
 	}
 	
 	public LocalRepositorySearcher(Set<File> localRepositoryDirs, ProgressSupport progressSupport) {
-		this.progressSupport = progressSupport;
+		this.progressSupport = Objects.requireNonNull(progressSupport);
 		// Force the load of the local artifacts done in background
 		localRepositoryDirs.stream().filter(Objects::nonNull)
 			.forEach(this::createLocalLocalRepositoryCache);
